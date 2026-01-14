@@ -9,10 +9,10 @@ const COMMENT_END = "/* importmap end */";
 
 export async function getImportMap ({ inputMap, prune, exclude } = {}) {
 	const generator = new Generator({
-		inputMap,
+		// inputMap,
 
 		// The URL of the import map, for normalising relative URLs:
-		mapUrl: new URL("..", import.meta.url),
+		mapUrl: ".",
 
 		// The default CDN to use for external package resolutions:
 		defaultProvider: "nodemodules",
@@ -64,7 +64,7 @@ export async function getImportMapJs (map) {
 	);`;
 }
 
-export function readImportMap ({ map = "importmap.js"} = {}) {
+export function readImportMap ({ map = "importmap.js" } = {}) {
 	let contents = readFileSync(map, "utf8");
 	if (!contents.includes(COMMENT_START) || !contents.includes(COMMENT_END)) {
 		throw new Error("Malformed import map");
@@ -74,7 +74,7 @@ export function readImportMap ({ map = "importmap.js"} = {}) {
 	let end = contents.lastIndexOf(COMMENT_END);
 	let importMap = contents.slice(start, end);
 	let mapJson = JSON.parse(importMap);
-	return new ImportMap({map: mapJson});
+	return new ImportMap({ map: mapJson });
 }
 
 export function getPaths (map) {
@@ -86,7 +86,9 @@ export function getPaths (map) {
 export function getTopLevelDirectories (map) {
 	let paths = [...getPaths(map)];
 	// No g flag is intentional: we want the first match!
-	let dirs = paths.map(path => path.match(/(?<=node_modules\/)@[\w-.]+\/[\w-.]+/)?.[0]).filter(Boolean);
+	let dirs = paths
+		.map(path => path.match(/(?<=node_modules\/)@[\w-.]+\/[\w-.]+/)?.[0])
+		.filter(Boolean);
 	return new Set(dirs);
 }
 
@@ -106,6 +108,8 @@ async function installPackage (generator, name, target) {
 				subpaths: false,
 			});
 		}
-		catch (e) {}
+		catch (e) {
+			// console.error(e);
+		}
 	}
 }

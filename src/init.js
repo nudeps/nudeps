@@ -60,7 +60,7 @@ export default async function init () {
 
 				if (!paths[dir]) {
 					paths[dir] = rewritten;
-					cpSync(whole, rewritten, { recursive: true });
+					cp(whole, rewritten, { recursive: true });
 				}
 			}
 		}
