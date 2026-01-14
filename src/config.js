@@ -25,11 +25,12 @@ export const availableOptions = {
 	config: {
 		flag: "c",
 		default: "nudeps.js",
+		validate: v => existsSync(v),
 	},
 };
 
-function readArgs () {
-	let args = minimist(process.argv.slice(2));
+function readArgs (argv = process.argv.slice(2)) {
+	let args = minimist(argv);
 	let ret = {};
 
 	for (let key in availableOptions) {
@@ -40,9 +41,16 @@ function readArgs () {
 		else if (option.flag in args) {
 			ret[key] = args[option.flag];
 		}
+		else {
+			continue;
+		}
 
 		if (typeof ret[key] === "string" && option.parse) {
 			ret[key] = option.parse(ret[key]);
+		}
+
+		if (option.validate && !option.validate(ret[key])) {
+			delete ret[key];
 		}
 	}
 
@@ -63,6 +71,10 @@ function readExternalConfig (args) {
 	return importCwdRelative(configPath).then(m => m.default ?? m);
 }
 
+/**
+ * Get the resolved config regardless of where settings come from
+ * @returns
+ */
 export async function getConfig () {
 	let args = readArgs();
 
@@ -76,6 +88,10 @@ export async function getConfig () {
 	for (let key in availableOptions) {
 		let option = availableOptions[key];
 		ret[key] = args[key] ?? config[key] ?? option.default;
+
+		if (option.validate && !option.validate(ret[key])) {
+			delete ret[key];
+		}
 	}
 
 	return ret;
