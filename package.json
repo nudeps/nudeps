@@ -1,0 +1,39 @@
+{
+	"name": "nudeps",
+	"version": "0.0.0",
+	"description": "Description",
+	"keywords": [],
+	"homepage": "https://github.com/leaverou/nudeps/#readme",
+	"bugs": {
+		"url": "https://github.com/leaverou/nudeps/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/leaverou/nudeps.git"
+	},
+	"license": "MIT",
+	"author": "Lea Verou",
+	"type": "module",
+	"main": "src/index.js",
+	"bin": {
+		"nudeps": "src/cli.js"
+	},
+	"scripts": {
+		"release": "release-it",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"devDependencies": {
+		"jspm": "^4.2.0",
+		"prettier": "~3.5.3",
+		"prettier-plugin-brace-style": "latest",
+		"prettier-plugin-merge": "latest",
+		"prettier-plugin-space-before-function-paren": "latest",
+		"release-it": "latest"
+	},
+	"dependencies": {
+		"minimist": "^1.2.8"
+	},
+	"engines": {
+		"npm": ">=7"
+	}
+}
