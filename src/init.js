@@ -8,15 +8,7 @@ import {
 	extractTopLevelDirectory,
 	getTopLevelModules,
 } from "./util.js";
-import {
-	writeFileSync,
-	renameSync,
-	existsSync,
-	mkdirSync,
-	rmSync,
-	rmdirSync,
-	readdirSync,
-} from "node:fs";
+import { writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { cp } from "node:fs/promises";
 import { getImportMap, getImportMapJs } from "./map.js";
 
@@ -70,11 +62,12 @@ export default async function init () {
 
 	writeJSONSync(".nudeps/config.json", config);
 
-	let map = await getImportMap(config);
+	let map = await getImportMap({ prune: config.prune, exclude: config.exclude });
 	let packages = readJSONSync("package-lock.json")?.packages;
 
 	if (!existsSync(config.dir)) {
-		mkdirSync(config.dir);
+		mkdirSync(config.dir, { recursive: true });
+		writeFileSync(path.join(config.dir, ".gitignore"), "*");
 	}
 
 	// Extract top-level directories, copy them over to config.dir
