@@ -12,21 +12,26 @@ import { writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:f
 import { cp } from "node:fs/promises";
 import { getImportMap, getImportMapJs } from "./map.js";
 
-function processMap (map, toCopy, packages) {
+function rewritePackagePath (url, config, packages) {
+	let topLevelPackage = extractTopLevelPackage(url);
+	let key = extractPackageLockKey(url);
+	if (!key) {
+		return url;
+	}
+
+	let version = packages?.[key]?.version;
+	version = version ? "@" + version : "";
+	return topLevelPackage + version;
+}
+
+function processMap (map, config, toCopy, packages) {
 	if (map) {
 		for (let specifier in map) {
 			let url = map[specifier];
 			let topLevelPackage = extractTopLevelPackage(url);
+			let rewritten = rewritePackagePath(url, config, packages);
 			let topLevelDir = extractTopLevelDirectory(url);
-			let key = extractPackageLockKey(url);
-			if (!key) {
-				continue;
-			}
-
-			let version = packages?.[key]?.version;
-			version = version ? "@" + version : "";
-			let rewritten = topLevelPackage + version;
-			map[specifier] = url.replace(topLevelDir, rewritten);
+			map[specifier] = config.dir + "/" + url.replace(topLevelDir, rewritten);
 
 			toCopy[topLevelPackage] ??= rewritten;
 			if (!toCopy[topLevelPackage]) {
@@ -75,11 +80,16 @@ export default async function init () {
 	// and update the import map to use that directory instead
 	let toCopy = {};
 
-	processMap(map.imports, toCopy, packages);
+	processMap(map.imports, config, toCopy, packages);
 
 	if (map.scopes) {
 		for (let scope in map.scopes) {
-			processMap(map.scopes[scope], toCopy, packages);
+			processMap(map.scopes[scope], config, toCopy, packages);
+
+			// Rewrite scope itself
+			let newScope = config.dir + "/" + rewritePackagePath(scope, config, packages);
+			map.scopes[newScope] = map.scopes[scope];
+			delete map.scopes[scope];
 		}
 	}
 
