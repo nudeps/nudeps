@@ -39,23 +39,33 @@ or globally:
 npm install nudeps -gD
 ```
 
-Then, whenever you want to initialize for a given project, run `nudeps init`.
+The rest of this readme will assume global installation (which lets you run `nudeps` directly).
+For a local install, prepend all `nudeps` commands with `npx` (e.g. `npx nudeps init`).
 
-Then, either run `nudeps install` or manually add the following scripts to your `package.json`:
+Then, whenever you want to initialize for a given project, just run `nudeps` in its root directory.
+To avoid having to run `nudeps` whenever you install or uninstall a dependency, add the following script to your `package.json`:
 
 ```json
-"dependencies": "nudeps update",
+"dependencies": "nudeps",
+```
+
+Then, to use the import map in your app, include this script in your HTML before any modules are loaded (replace `importmap.js` with the path to your import map if different):
+
+```html
+<script src="importmap.js"></script>
 ```
 
 ## Config
 
 ### `prune`
 
+Default: `false`
+
 Whether to subset only to specifiers used by the package entry points (`true`), or include all direct dependencies anyway.
 
 ### `dir` / `-d`
 
-Default: `client_modules`
+Default: `./client_modules`
 
 Directory to copy deployed dependencies to, relative to project root.
 It is assumed that Nudeps owns this directory,
@@ -88,27 +98,29 @@ File path for nudeps configuration
 
 ### `nudeps`
 
-Generate a new import map for the current project based on dependencies used.
+Initialize or update as needed.
+Takes care of
 
-### `nudeps init`
+- Copying dependencies to the target directory
+- Generating a new import map
 
-Copy dependencies and recreate import map from scratch.
+### `nudeps --prune`
 
-### `nudeps update`
+Subset copied dependencies and import map to only those used by the package entry points.
 
-Update `client_modules` and import map based on new dependencies installed or uninstalled since the last time `nudeps` ran
+## TODO
 
-### `nudeps prod`
-
-Generate import map for production use
-
-The rest of this readme will assume global installation (which lets you run `nudeps` directly).
-For a local install, prepend all `nudeps` commands with `npx` (e.g. `npx nudeps init`)
-
-TODO:
-
-- [ ] Delete unused modules from `client_modules`
-- [ ] Append version to directory names, for cache busting
 - [ ] Incremental version
 - [ ] Prod version
-- [ ] prune as an explicit command
+
+## FAQ
+
+### Does this support pnpm/bun/yarn/etc.?
+
+At the moment Nudeps only supports npm and any other package managers that follow similar conventions in terms of:
+
+- `node_modules` directory structure
+- `package-lock.json` file format
+- `package.json` file format
+
+You're welcome to contribute support for other package managers, but please let me know first so we can discuss the best approach.
