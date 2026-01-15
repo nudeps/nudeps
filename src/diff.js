@@ -1,6 +1,6 @@
 import { readJSONSync } from "./util.js";
 
-export async function diffLockfiles (
+export function diffLockfiles (
 	package_lock = readJSONSync("package-lock.json"),
 	old_package_lock = readJSONSync(".nudeps/package-lock.json"),
 ) {
