@@ -11,7 +11,7 @@ export function init (cwd = process.cwd()) {}
 export const availableOptions = {
 	dir: {
 		flag: "d",
-		default: "client_modules",
+		default: "./client_modules",
 	},
 	map: {
 		flag: "m",

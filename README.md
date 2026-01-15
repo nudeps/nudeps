@@ -107,7 +107,8 @@ For a local install, prepend all `nudeps` commands with `npx` (e.g. `npx nudeps 
 
 TODO:
 
-- [ ] Copy all modules from import map into `browser_modules` (customizable)
-- [ ] Figure out how to bust cache (append ?v=x.y.z to resolved URLs? append `@vx.y.z` to dir names?)
-- [ ] Add to import map when running `npm install` without breaking previous subsetting
-- [ ] Keep previous package-lock and diff to figure out what changed
+- [ ] Delete unused modules from `client_modules`
+- [ ] Append version to directory names, for cache busting
+- [ ] Incremental version
+- [ ] Prod version
+- [ ] prune as an explicit command

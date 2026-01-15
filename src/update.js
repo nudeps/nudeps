@@ -1,4 +1,32 @@
 import { readJSONSync, writeJSONSync } from "./util.js";
+import { existsSync } from "node:fs";
+import init from "./init.js";
+
+export default async function update () {
+	if (!existsSync(".nudeps")) {
+		// First run
+		return init();
+	}
+
+	let config = await getConfig();
+	let oldConfig = readJSONSync(".nudeps/config.json");
+
+	if (oldConfig) {
+		// Check if any important settings changed
+		if (config.map !== oldConfig.map && existsSync(oldConfig.map)) {
+			// Rename old import map to new name
+			renameSync(oldConfig.map, config.map);
+		}
+
+		if (config.dir !== oldConfig.dir && existsSync(oldConfig.dir)) {
+			renameSync(oldConfig.dir, config.dir);
+			// TODO update .gitignore?
+		}
+
+		// TODO handle changed exclude
+		// TODO handle changed prune
+	}
+}
 
 export async function diffDeps (
 	package_lock = readJSONSync("package-lock.json"),
