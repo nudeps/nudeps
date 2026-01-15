@@ -102,6 +102,8 @@ Takes care of
 ### `nudeps --prune`
 
 Subset copied dependencies and import map to only those used by the package entry points.
+Subsequent runs of `nudeps` will respect previously pruned dependencies (unless you use `--init`).
+This allows you to use dependencies immediately as they are added, without having to continuously watch all your JS files, and periodically run `nudeps --prune` to subset.
 
 ### `nudeps --init`
 
