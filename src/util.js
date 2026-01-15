@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, readdirSync, fstatSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -62,7 +62,7 @@ export function extractPackageLockKey (url) {
 
 export function getTopLevelModules (directory = "./node_modules") {
 	return readdirSync(directory).flatMap(dir => {
-		if (fstatSync(path.join(directory, dir)).isFile()) {
+		if (statSync(path.join(directory, dir)).isFile()) {
 			return [];
 		}
 
