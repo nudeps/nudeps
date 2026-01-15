@@ -151,6 +151,9 @@ export default async function () {
 	// intentionally async.
 	// Nothing hinges on the result of this, and we're not going to run update immediately after.
 	cp("package.json", ".nudeps/package.json");
+	if (config.prune) {
+		cp("package.json", ".nudeps/package-since-last-prune.json");
+	}
 	cp("package-lock.json", ".nudeps/package-lock.json");
 	writeJSONSync(".nudeps/config.json", config);
 }

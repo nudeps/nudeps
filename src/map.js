@@ -32,9 +32,13 @@ export async function getImportMap ({ inputMap, prune, exclude } = {}) {
 	await installPackage(generator, pkg.name, "./");
 
 	if (!prune && pkg.dependencies) {
-		exclude = new Set(exclude);
+		exclude = new Set(exclude ?? []);
+
+		let lastPruneDeps =
+			readJSONSync(".nudeps/package-since-last-prune.json")?.dependencies ?? {};
+
 		for (const dep in pkg.dependencies) {
-			if (exclude.has(dep)) {
+			if (exclude.has(dep) || lastPruneDeps[dep]) {
 				continue;
 			}
 
