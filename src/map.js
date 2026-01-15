@@ -9,7 +9,7 @@ const COMMENT_END = "/* importmap end */";
 
 export async function getImportMap ({ inputMap, prune, exclude } = {}) {
 	const generator = new Generator({
-		// inputMap,
+		inputMap,
 
 		// The URL of the import map, for normalising relative URLs:
 		mapUrl: ".",

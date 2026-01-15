@@ -1,3 +1,6 @@
+/**
+ * Main entry point
+ */
 import * as path from "node:path";
 import { getConfig } from "./config.js";
 import {
@@ -7,12 +10,13 @@ import {
 	extractPackageLockKey,
 	extractTopLevelDirectory,
 	getTopLevelModules,
+	isDirectoryEmptySync,
 } from "./util.js";
-import { writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { writeFileSync, renameSync, existsSync, mkdirSync, rmSync, rmdirSync } from "node:fs";
 import { cp } from "node:fs/promises";
 import { getImportMap, getImportMapJs } from "./map.js";
 
-function rewritePackagePath (url, config, packages) {
+function rewritePackagePath (url, packages) {
 	let topLevelPackage = extractTopLevelPackage(url);
 	let key = extractPackageLockKey(url);
 	if (!key) {
@@ -29,7 +33,12 @@ function processMap (map, config, toCopy, packages) {
 		for (let specifier in map) {
 			let url = map[specifier];
 			let topLevelPackage = extractTopLevelPackage(url);
-			let rewritten = rewritePackagePath(url, config, packages);
+
+			if (!topLevelPackage) {
+				// Nothing to copy or rewrite
+				continue;
+			}
+			let rewritten = rewritePackagePath(url, packages);
 			let topLevelDir = extractTopLevelDirectory(url);
 			map[specifier] = config.dir + "/" + url.replace(topLevelDir, rewritten);
 
@@ -43,7 +52,7 @@ function processMap (map, config, toCopy, packages) {
 	}
 }
 
-export default async function init () {
+export default async function () {
 	let config = await getConfig();
 	let oldConfig = readJSONSync(".nudeps/config.json");
 
@@ -60,14 +69,24 @@ export default async function init () {
 	}
 
 	// Remove old import map
-	let oldMap = oldConfig?.map ?? config.map;
-	if (oldMap && existsSync(oldMap)) {
-		rmSync(oldMap);
+	let oldMapPath = oldConfig?.map ?? config.map;
+	if (oldMapPath && existsSync(oldMapPath)) {
+		rmSync(oldMapPath);
 	}
 
 	writeJSONSync(".nudeps/config.json", config);
 
-	let map = await getImportMap({ prune: config.prune, exclude: config.exclude });
+	let inputMap = undefined;
+	if (config.incremental && !config.prune) {
+		inputMap = readJSONSync(".nudeps/importmap.json");
+	}
+
+	let map = await getImportMap({
+		prune: config.prune,
+		exclude: config.exclude,
+		inputMap,
+	});
+	writeJSONSync(".nudeps/importmap.json", map);
 	let packages = readJSONSync("package-lock.json")?.packages;
 
 	if (!existsSync(config.dir)) {
@@ -87,9 +106,11 @@ export default async function init () {
 			processMap(map.scopes[scope], config, toCopy, packages);
 
 			// Rewrite scope itself
-			let newScope = config.dir + "/" + rewritePackagePath(scope, config, packages);
-			map.scopes[newScope] = map.scopes[scope];
-			delete map.scopes[scope];
+			if (scope.includes("node_modules")) {
+				let newScope = config.dir + "/" + rewritePackagePath(scope, config, packages);
+				map.scopes[newScope] = map.scopes[scope];
+				delete map.scopes[scope];
+			}
 		}
 	}
 
@@ -109,7 +130,17 @@ export default async function init () {
 	}
 
 	for (let dir of toDelete) {
-		rmSync(config.dir + "/" + dir, { recursive: true });
+		let fullPath = config.dir + "/" + dir;
+		if (existsSync(fullPath)) {
+			rmSync(fullPath, { recursive: true });
+		}
+		if (dir.includes("/")) {
+			// Delete the parent directory if empty
+			let parentDir = config.dir + "/" + dir.split("/")[0];
+			if (existsSync(parentDir) && isDirectoryEmptySync(parentDir)) {
+				rmdirSync(parentDir);
+			}
+		}
 	}
 
 	let js = await getImportMapJs(map);

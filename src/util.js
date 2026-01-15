@@ -1,4 +1,11 @@
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import {
+	readFileSync,
+	writeFileSync,
+	existsSync,
+	readdirSync,
+	statSync,
+	opendirSync,
+} from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -72,4 +79,11 @@ export function getTopLevelModules (directory = "./node_modules") {
 
 		return dir;
 	});
+}
+
+export function isDirectoryEmptySync (path) {
+	const dir = opendirSync(path);
+	const entry = dir.readSync();
+	dir.closeSync();
+	return entry === null;
 }

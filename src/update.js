@@ -28,7 +28,7 @@ export default async function update () {
 	}
 }
 
-export async function diffDeps (
+export async function diffLockfiles (
 	package_lock = readJSONSync("package-lock.json"),
 	old_package_lock = readJSONSync(".nudeps/package-lock.json"),
 ) {
@@ -46,7 +46,6 @@ export async function diffDeps (
 		return;
 	}
 
-	// writeJSONSync("changes.json", changes);
 	return changes;
 }
 
@@ -54,7 +53,7 @@ export async function diffDeps (
  *
  * @param {object} newPackages The .packages object from a package-lock.json file
  * @param {*} [oldPackages] The .packages object from the other package-lock.json file
- * @returns
+ * @returns {{installed: Record<string, string>, uninstalled: Record<string, string>, version: Record<string, string>}}
  */
 function diffPackages (newPackages, oldPackages) {
 	let oldPackagesList = oldPackages ? Object.keys(oldPackages) : [];
