@@ -22,6 +22,9 @@ export const availableOptions = {
 		parse: v => v.split(","),
 		default: [],
 	},
+	prune: {
+		default: false,
+	},
 	config: {
 		flag: "c",
 		default: "nudeps.js",
