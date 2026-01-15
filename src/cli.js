@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import init from "./init.js";
+import nudeps from "./index.js";
 
-await init();
+await nudeps();
