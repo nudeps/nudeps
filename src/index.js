@@ -63,21 +63,17 @@ export default async function () {
 	}
 	else if (oldConfig) {
 		if (config.dir !== oldConfig.dir && existsSync(oldConfig.dir)) {
-			renameSync(oldConfig.dir, config.dir);
-			// TODO update .gitignore?
+			if (config.init) {
+				rmSync(oldConfig.dir, { recursive: true });
+			}
+			else {
+				renameSync(oldConfig.dir, config.dir);
+			}
 		}
 	}
 
-	// Remove old import map
-	let oldMapPath = oldConfig?.map ?? config.map;
-	if (oldMapPath && existsSync(oldMapPath)) {
-		rmSync(oldMapPath);
-	}
-
-	writeJSONSync(".nudeps/config.json", config);
-
 	let inputMap = undefined;
-	if (config.incremental && !config.prune) {
+	if (!config.init && !config.prune) {
 		inputMap = readJSONSync(".nudeps/importmap.json");
 	}
 
@@ -143,6 +139,11 @@ export default async function () {
 		}
 	}
 
+	if (oldConfig.map !== config.map && existsSync(oldConfig.map)) {
+		// Remove old import map
+		rmSync(oldConfig.map);
+	}
+
 	let js = await getImportMapJs(map);
 	writeFileSync(config.map, js);
 
@@ -151,4 +152,5 @@ export default async function () {
 	// Nothing hinges on the result of this, and we're not going to run update immediately after.
 	cp("package.json", ".nudeps/package.json");
 	cp("package-lock.json", ".nudeps/package-lock.json");
+	writeJSONSync(".nudeps/config.json", config);
 }

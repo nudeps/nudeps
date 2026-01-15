@@ -30,6 +30,9 @@ export const availableOptions = {
 		default: "nudeps.js",
 		validate: v => existsSync(v),
 	},
+	init: {
+		default: false,
+	},
 };
 
 function readArgs (argv = process.argv.slice(2)) {
