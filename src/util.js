@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -58,4 +58,14 @@ export function extractPackageLockKey (url) {
 	}
 
 	return "node_modules/" + extractTopLevelPackage(url);
+}
+
+export function getTopLevelModules (directory = "./node_modules") {
+	return readdirSync(directory).flatMap(dir => {
+		if (dir[0] !== "@") {
+			return dir;
+		}
+
+		return readdirSync(directory + "/" + dir).map(subdir => `${dir}/${subdir}`);
+	});
 }
