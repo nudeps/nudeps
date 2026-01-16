@@ -1,7 +1,7 @@
 {
 	"name": "nudeps",
 	"version": "0.0.0",
-	"description": "Description",
+	"description": "Naked dependencies, in the browser.",
 	"keywords": [],
 	"homepage": "https://github.com/leaverou/nudeps/#readme",
 	"bugs": {
