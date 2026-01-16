@@ -24,7 +24,6 @@
 	},
 	"devDependencies": {
 		"htest.dev": "^0.0.20",
-		"jspm": "^4.2.0",
 		"prettier": "~3.5.3",
 		"prettier-plugin-brace-style": "latest",
 		"prettier-plugin-merge": "latest",
@@ -32,6 +31,7 @@
 		"release-it": "latest"
 	},
 	"dependencies": {
+		"@jspm/generator": "^2.8.0",
 		"minimist": "^1.2.8"
 	},
 	"engines": {
