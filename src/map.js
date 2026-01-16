@@ -16,7 +16,14 @@ export async function getImportMap ({ inputMap, prune, exclude } = {}) {
 	}
 
 	// Install from a local package:
-	await installPackage(generator, pkg.name, "./");
+	try {
+		await generator.install({
+			alias: pkg.name,
+			target: "./",
+			subpaths: true,
+		});
+	}
+	catch (error) {}
 
 	if (!prune && pkg.dependencies) {
 		exclude = new Set(exclude ?? []);
@@ -28,12 +35,14 @@ export async function getImportMap ({ inputMap, prune, exclude } = {}) {
 				continue;
 			}
 
-			// --- Option 1 ---
-			await installPackage(generator, dep, `./node_modules/${dep}`);
-
-			// --- Option 2 (gives different import map!) ---
-			// With nodemodules provider, use package name, not path
-			// await installPackage(generator, dep, dep);
+			try {
+				await generator.install({
+					alias: dep,
+					target: `./node_modules/${dep}`,
+					subpaths: true,
+				});
+			}
+			catch (error) {}
 		}
 	}
 
@@ -70,17 +79,6 @@ export async function getImportMapJs (map) {
 	map ??= await getImportMap();
 	let stringified = typeof map === "string" ? map : JSON.stringify(map, null, "\t");
 	return `{let map = ${stringified};\n(${injectMapCode})(map, document.currentScript)}`;
-}
-
-async function installPackage (generator, name, target) {
-	try {
-		return await generator.install({
-			alias: name,
-			target: target,
-			subpaths: true,
-		});
-	}
-	catch (error) {}
 }
 
 export function walkMap (map, callback) {
