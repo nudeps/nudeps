@@ -38,7 +38,17 @@ export async function getImportMap ({ inputMap, prune, exclude } = {}) {
 	}
 
 	// Output the import map:
-	return generator.getMap();
+	let map = generator.getMap();
+
+	if (map.imports && map.scopes["./"]) {
+		// Remove redundant scoped imports
+		for (let specifier in map.scopes["./"]) {
+			if (map.imports[specifier] === map.scopes["./"][specifier]) {
+				delete map.scopes["./"][specifier];
+			}
+		}
+	}
+	return map;
 }
 
 // prettier-ignore
