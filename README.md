@@ -4,13 +4,45 @@ Your dependencies, naked.
 
 For background, see [Web dependencies are broken. Can we fix them?](https://lea.verou.me/blog/2026/web-deps/).
 This package introduces lightweight tooling as an alternative to bundlers.
-It is an opinionated wrapper over the excellent [JSPM Generator](https://jspm.org/) that provides an end-to-end solution for using specifiers in the browser.
-Unlike JSPM, it does not aim to cover all possible use cases.
+It lets you use specifiers in the browser with no traditional build tools, meaning:
+
+- Nothing to remember to run before working on code
+- No transpilation or bundling needed for your own code or even the code of your dependencies
+
+Too good to be true?
+And yet, it is not.
+
+## How does it work?
+
+You run `nudeps` once to initialize the project.
+It will generate an `importmap.js` file that you include in your HTML like so:
+
+```html
+<script src="importmap.js"></script>
+```
+
+> [!IMPORTANT]
+> This script needs to be included before any modules are loaded
+
+You can include that one line of HTML either manually or via your templating system of choice.
+
+The import map maps specifiers like `vue` to URLs like `./client_modules/vue@3.5.26/dist/vue.runtime.esm-bundler.js` which Nudeps also manages for you.
+Cache busting just works, because the version number is part of the directory name.
+
+You then install and uninstall dependencies as needed and use them straight away, and both the import map and copied dependencies will be automatically updated.
+No, without you having to remember to run anything.
+
+If you want, you can periodically run `nudeps --prune` to subset the copied dependencies and import map to only those used by your own package entry points.
+
+## Nudeps vs JSPM
+
+Nudeps is actually implemented as an opinionated wrapper over the excellent [JSPM Generator](https://jspm.org/), which handles a lot of the heavy lifting around import map generation.
+Unlike JSPM, Nudeps does not aim to cover all possible use cases.
 Instead, it aims to cover a subset of use cases with the best DX possible.
 
-## Do I need nudeps or JSPM?
+### Do I need nudeps or JSPM?
 
-JSPM is excellent for generating import maps that let you use specifiers in the browser and is doing a lot of the heavy lifting here.
+JSPM has paved the way in managing import maps that let you use specifiers in the browser and its Generator module doing a lot of the heavy lifting here.
 
 However:
 
@@ -101,9 +133,11 @@ Takes care of
 
 ### `nudeps --prune`
 
-Subset copied dependencies and import map to only those used by the package entry points.
+Subset copied dependencies and import map to only those used by your own package entry points.
 Subsequent runs of `nudeps` will respect previously pruned dependencies (unless you use `--init`).
 This allows you to use dependencies immediately as they are added, without having to continuously watch all your JS files, and periodically run `nudeps --prune` to subset.
+
+You can set `prune: true` in your config file to always prune dependencies but then you will need to re-run it when your code changes.
 
 ### `nudeps --init`
 
@@ -121,3 +155,11 @@ However, Nudeps should however work with any other package managers that follow 
 - `package.json` file format
 
 You're welcome to contribute support for other package managers, but please let me know first so we can discuss the best approach.
+
+### Why does it copy the entire dependency directory and not just the files I import?
+
+Because this allows dependencies to fetch other files dynamically, e.g. stylesheets, images, etc.
+
+### Why does it add the version number to the directory name?
+
+Because this allows you to get the same cache busting behavior as you would with a CDN, but in your own domain.
