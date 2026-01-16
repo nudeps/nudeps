@@ -7,6 +7,7 @@ import {
 	opendirSync,
 } from "node:fs";
 import * as path from "node:path";
+import { pathToFileURL } from "node:url";
 
 export function readJSONSync (path) {
 	if (!existsSync(path)) {
@@ -39,4 +40,8 @@ export function isDirectoryEmptySync (path) {
 	const entry = dir.readSync();
 	dir.closeSync();
 	return entry === null;
+}
+
+export function importCwdRelative (pathFromCwd) {
+	return import(pathToFileURL(path.resolve(process.cwd(), pathFromCwd)).href);
 }
