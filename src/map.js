@@ -80,18 +80,7 @@ async function installPackage (generator, name, target) {
 			subpaths: true,
 		});
 	}
-	catch (error) {
-		try {
-			return await generator.install({
-				alias: name,
-				target: target,
-				subpaths: false,
-			});
-		}
-		catch (e) {
-			// console.error(e);
-		}
-	}
+	catch (error) {}
 }
 
 export function walkMap (map, callback) {
