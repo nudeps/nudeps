@@ -145,13 +145,13 @@ export default async function () {
 	let js = await getImportMapJs(map);
 	writeFileSync(config.map, js);
 
-	// Prepare for `nudeps update`
 	// intentionally async.
-	// Nothing hinges on the result of this, and we're not going to run update immediately after.
-	cp("package.json", ".nudeps/package.json");
+	// Nothing immediately hinges on the result of this, and we're not going to run update immediately after.
 	if (config.prune) {
-		cp("package.json", ".nudeps/package-since-last-prune.json");
+		// Save package.json at the last prune so we don't re-add packages that were pruned
+		// (unless they are actually used now)
+		cp("package.json", ".nudeps/package.json");
 	}
-	cp("package-lock.json", ".nudeps/package-lock.json");
+
 	writeJSONSync(".nudeps/config.json", config);
 }
