@@ -14,7 +14,7 @@ import {
 } from "./util.js";
 import { writeFileSync, renameSync, existsSync, mkdirSync, rmSync, rmdirSync } from "node:fs";
 import { cp } from "node:fs/promises";
-import { getImportMap, getImportMapJs, walkMap } from "./map.js";
+import { getImportMap, getImportMapJs, walkMap, applyOverrides } from "./map.js";
 
 function rewritePackagePath (url, packages) {
 	let topLevelPackage = extractTopLevelPackage(url);
@@ -57,6 +57,9 @@ export default async function (options) {
 	let inputMap = undefined;
 	if (!config.init && !config.prune) {
 		inputMap = readJSONSync(".nudeps/importmap.json");
+		if (config.overrides) {
+			applyOverrides(inputMap, config.overrides);
+		}
 		walkMap(inputMap, ({ specifier, path, map }) => {
 			// Remove any paths that no longer exist
 			if (!existsSync(path)) {
@@ -70,6 +73,11 @@ export default async function (options) {
 		exclude: config.exclude,
 		inputMap,
 	});
+
+	if (config.overrides) {
+		applyOverrides(map, config.overrides);
+	}
+
 	writeJSONSync(".nudeps/importmap.json", map);
 	let packages = readJSONSync("package-lock.json")?.packages;
 

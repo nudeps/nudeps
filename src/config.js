@@ -6,8 +6,6 @@ import { importCwdRelative } from "./util.js";
 import { existsSync } from "node:fs";
 import minimist from "minimist";
 
-export function init (cwd = process.cwd()) {}
-
 export const availableOptions = {
 	dir: {
 		flag: "d",
@@ -22,16 +20,16 @@ export const availableOptions = {
 		parse: v => v.split(","),
 		default: [],
 	},
-	prune: {
-		default: false,
-	},
+	prune: {},
 	config: {
 		flag: "c",
 		default: "nudeps.js",
 		validate: v => existsSync(v),
+		file: false,
 	},
-	init: {
-		default: false,
+	init: {},
+	overrides: {
+		cli: false,
 	},
 };
 
@@ -41,6 +39,10 @@ function readArgs (argv = process.argv.slice(2)) {
 
 	for (let key in availableOptions) {
 		let option = availableOptions[key];
+		if (option.cli === false) {
+			continue;
+		}
+
 		if (key in args) {
 			ret[key] = args[key];
 		}

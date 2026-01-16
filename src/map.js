@@ -4,15 +4,8 @@ import { readJSONSync } from "./util.js";
 export async function getImportMap ({ inputMap, prune, exclude } = {}) {
 	const generator = new Generator({
 		inputMap,
-
-		// The URL of the import map, for normalising relative URLs:
 		mapUrl: ".",
-
-		// The default CDN to use for external package resolutions:
 		defaultProvider: "nodemodules",
-
-		// The environment(s) to target. Note that JSPM will use these to resolve
-		// conditional exports in any package it encounters:
 		env: ["production", "browser", "module"],
 	});
 
@@ -121,4 +114,32 @@ export function walkMap (map, callback) {
 			}
 		}
 	}
+}
+
+export function applyOverrides (map, overrides) {
+	return deepAssign(map, overrides);
+}
+
+function deepAssign (target, source) {
+	if (!target) {
+		target = {};
+	}
+	for (let key in source) {
+		if (!target[key]) {
+			target[key] = {};
+		}
+
+		if (typeof source[key] === "object" && source[key] !== null) {
+			target[key] = deepAssign(target[key], source[key]);
+		}
+		else {
+			target[key] = source[key];
+		}
+
+		if (target[key] === undefined) {
+			delete target[key];
+		}
+	}
+
+	return target;
 }
