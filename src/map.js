@@ -92,7 +92,6 @@ export function walkMap (map, callback) {
 				specifier,
 				path: map.imports[specifier],
 				map: map.imports,
-				type: "imports",
 			});
 		}
 	}
@@ -106,7 +105,6 @@ export function walkMap (map, callback) {
 					path: subMap[specifier],
 					map: subMap,
 					scope,
-					type: "scopes",
 				});
 			}
 		}
