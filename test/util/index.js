@@ -1,6 +1,6 @@
-import extractPackageNameTests from "./extract-package-name.js";
+import pathsTests from "./paths.js";
 
 export default {
 	name: "util tests",
-	tests: [extractPackageNameTests],
+	tests: [pathsTests],
 };

@@ -6,27 +6,16 @@ import { getConfig } from "./config.js";
 import {
 	readJSONSync,
 	writeJSONSync,
-	extractTopLevelPackage,
-	extractPackageLockKey,
-	extractTopLevelDirectory,
+	getTopPackage,
+	getTopPackageDirectory,
 	getTopLevelModules,
 	isDirectoryEmptySync,
+	addVersion,
+	rebaseModulePath,
 } from "./util.js";
 import { writeFileSync, renameSync, existsSync, mkdirSync, rmSync, rmdirSync } from "node:fs";
 import { cp } from "node:fs/promises";
 import { getImportMap, getImportMapJs, walkMap, applyOverrides } from "./map.js";
-
-function rewritePackagePath (url, packages) {
-	let topLevelPackage = extractTopLevelPackage(url);
-	let key = extractPackageLockKey(url);
-	if (!key) {
-		return url;
-	}
-
-	let version = packages?.[key]?.version;
-	version = version ? "@" + version : "";
-	return topLevelPackage + version;
-}
 
 export default async function (options) {
 	let config = Object.assign(await getConfig(), options);
@@ -81,7 +70,13 @@ export default async function (options) {
 	writeJSONSync(".nudeps/importmap.json", map);
 	let packages = readJSONSync("package-lock.json")?.packages;
 
-	if (!existsSync(config.dir)) {
+	let dirExists = existsSync(config.dir);
+	if (config.init && dirExists) {
+		rmSync(config.dir, { recursive: true });
+		dirExists = false;
+	}
+
+	if (!dirExists) {
 		mkdirSync(config.dir, { recursive: true });
 		writeFileSync(path.join(config.dir, ".gitignore"), "*");
 	}
@@ -92,23 +87,17 @@ export default async function (options) {
 	let toCopy = {};
 
 	walkMap(map, ({ specifier, path, map }) => {
-		let topLevelPackage = extractTopLevelPackage(path);
-
-		if (!topLevelPackage) {
+		if (!getTopPackage(path)) {
 			// Nothing to copy or rewrite
 			return;
 		}
 
-		let rewritten = rewritePackagePath(path, packages);
-		let topLevelDir = extractTopLevelDirectory(path);
-		map[specifier] = config.dir + "/" + path.replace(topLevelDir, rewritten);
+		let dir = getTopPackageDirectory(path);
+		let withVersion = addVersion(path, packages);
+		let newPath = rebaseModulePath(withVersion, config.dir);
+		map[specifier] = newPath;
 
-		toCopy[topLevelPackage] ??= rewritten;
-		if (!toCopy[topLevelPackage]) {
-			toCopy("./node_modules/" + topLevelPackage, rewritten, {
-				recursive: true,
-			});
-		}
+		toCopy[dir] ??= rebaseModulePath(getTopPackageDirectory(withVersion), config.dir);
 	});
 
 	if (map.scopes) {
@@ -122,17 +111,15 @@ export default async function (options) {
 		}
 	}
 
-	let existingDirs = new Set(getTopLevelModules(config.dir));
+	let existingDirs = new Set(getTopLevelModules(config.dir).map(d => config.dir + "/" + d));
 	let toDelete = new Set(existingDirs);
 
-	for (let topLevelPackage in toCopy) {
-		let targetDir = toCopy[topLevelPackage];
-		if (existingDirs.has(targetDir)) {
-			toDelete.delete(targetDir);
+	for (let from in toCopy) {
+		let to = toCopy[from];
+		if (existingDirs.has(to)) {
+			toDelete.delete(to);
 		}
 		else {
-			let from = "./node_modules/" + topLevelPackage;
-			let to = config.dir + "/" + targetDir;
 			cp(from, to, { recursive: true });
 		}
 	}

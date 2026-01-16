@@ -187,3 +187,17 @@ Because this allows dependencies to fetch other files dynamically, e.g. styleshe
 ### Why does it add the version number to the directory name?
 
 Because this allows you to get the same cache busting behavior as you would with a CDN, but in your own domain.
+
+## Troubleshooting
+
+While most packages should work fine, some packages make certain over-reaching assumptions about the environment they are running in.
+
+### Package assumes a bundler is being used
+
+Some packages don't just use specifiers — they actively assume that if they can use specifiers, it _must_ mean that a bundler is being used and that the environment is NodeJS or similar.
+For example, as of this writing, using `vue` out of the box will fail with an error about `process` not being available.
+
+There are two ways to fix this:
+
+- Use the package's browser bundle through the `overrides` option. This is usually not advisable because it inlines dependencies that other packages may be using too, but sometimes it's the way to go.
+- Stub NodeJS objects like `process`. This can work if the surface area is limited, but it can quickly turn into a game of whack-a-mole. Additionally, it can cause bugs in other packages that depend on the presence of these objects to _detect_ NodeJS.
