@@ -188,6 +188,13 @@ Because this allows dependencies to fetch other files dynamically, e.g. styleshe
 
 Because this allows you to get the same cache busting behavior as you would with a CDN, but in your own domain.
 
+### Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?
+
+This is up to you.
+
+- `.nudeps` and `client_modules` include local `.gitignore` files that prevent you from accidentally committing paths from them, but you may want to gitignore them at the top level so that you don't see them in your IDE.
+- Whether you gitignore `importmap.js` is up to you. On one hand it's a generated file, and these generally should not be committed, on the other hand it can help track changes to dependencies in a compact way.
+
 ## Troubleshooting
 
 While most packages should work fine, some packages make certain over-reaching assumptions about the environment they are running in.
