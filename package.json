@@ -23,7 +23,7 @@
 		"test": "npx htest"
 	},
 	"devDependencies": {
-		"htest.dev": "^0.0.20",
+		"htest.dev": "^0.0.21",
 		"prettier": "~3.5.3",
 		"prettier-plugin-brace-style": "latest",
 		"prettier-plugin-merge": "latest",
