@@ -49,8 +49,7 @@ export async function getImportMap ({ inputMap, prune, exclude } = {}) {
 }
 
 // prettier-ignore
-export function injectMap (map) {
-	let { currentScript: cS } = document;
+export function injectMap (map, cS) {
 	if (!cS) {
 		console.error(`Import map injection script cannot be included as a module script. Please remove type="module".`);
 	}
@@ -62,15 +61,12 @@ export function injectMap (map) {
 	}
 }
 
-const injectMapName = injectMap.name;
 const injectMapCode = injectMap.toString();
 
 export async function getImportMapJs (map) {
 	map ??= await getImportMap();
 	let stringified = typeof map === "string" ? map : JSON.stringify(map, null, "\t");
-	return `(()=>{${injectMapName}(${stringified});
-
-${injectMapCode}})();`;
+	return `{let map = ${stringified};\n(${injectMapCode})(map, document.currentScript)}`;
 }
 
 async function installPackage (generator, name, target) {
