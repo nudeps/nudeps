@@ -32,7 +32,13 @@ export default async function () {
 	let config = await getConfig();
 	let oldConfig = readJSONSync(".nudeps/config.json");
 
-	if (!existsSync(".nudeps")) {
+	let cacheExists = existsSync(".nudeps");
+	if (cacheExists && config.init) {
+		rmSync(".nudeps", { recursive: true });
+		cacheExists = false;
+	}
+
+	if (!cacheExists) {
 		// First run
 		mkdirSync(".nudeps");
 		writeFileSync(".nudeps/.gitignore", "*");
