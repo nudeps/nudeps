@@ -14,7 +14,7 @@ import {
 } from "./util.js";
 import { writeFileSync, renameSync, existsSync, mkdirSync, rmSync, rmdirSync } from "node:fs";
 import { cp } from "node:fs/promises";
-import { getImportMap, getImportMapJs } from "./map.js";
+import { getImportMap, getImportMapJs, walkMap } from "./map.js";
 
 function rewritePackagePath (url, packages) {
 	let topLevelPackage = extractTopLevelPackage(url);
@@ -26,30 +26,6 @@ function rewritePackagePath (url, packages) {
 	let version = packages?.[key]?.version;
 	version = version ? "@" + version : "";
 	return topLevelPackage + version;
-}
-
-function processMap (map, config, toCopy, packages) {
-	if (map) {
-		for (let specifier in map) {
-			let url = map[specifier];
-			let topLevelPackage = extractTopLevelPackage(url);
-
-			if (!topLevelPackage) {
-				// Nothing to copy or rewrite
-				continue;
-			}
-			let rewritten = rewritePackagePath(url, packages);
-			let topLevelDir = extractTopLevelDirectory(url);
-			map[specifier] = config.dir + "/" + url.replace(topLevelDir, rewritten);
-
-			toCopy[topLevelPackage] ??= rewritten;
-			if (!toCopy[topLevelPackage]) {
-				toCopy("./node_modules/" + topLevelPackage, rewritten, {
-					recursive: true,
-				});
-			}
-		}
-	}
 }
 
 export default async function () {
@@ -95,12 +71,28 @@ export default async function () {
 	// and update the import map to use that directory instead
 	let toCopy = {};
 
-	processMap(map.imports, config, toCopy, packages);
+	walkMap(map, ({ specifier, path, map }) => {
+		let topLevelPackage = extractTopLevelPackage(path);
+
+		if (!topLevelPackage) {
+			// Nothing to copy or rewrite
+			return;
+		}
+
+		let rewritten = rewritePackagePath(path, packages);
+		let topLevelDir = extractTopLevelDirectory(path);
+		map[specifier] = config.dir + "/" + path.replace(topLevelDir, rewritten);
+
+		toCopy[topLevelPackage] ??= rewritten;
+		if (!toCopy[topLevelPackage]) {
+			toCopy("./node_modules/" + topLevelPackage, rewritten, {
+				recursive: true,
+			});
+		}
+	});
 
 	if (map.scopes) {
 		for (let scope in map.scopes) {
-			processMap(map.scopes[scope], config, toCopy, packages);
-
 			// Rewrite scope itself
 			if (scope.includes("node_modules")) {
 				let newScope = config.dir + "/" + rewritePackagePath(scope, config, packages);

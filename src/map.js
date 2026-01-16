@@ -117,3 +117,31 @@ async function installPackage (generator, name, target) {
 		}
 	}
 }
+
+export function walkMap (map, callback) {
+	if (map.imports) {
+		for (let specifier in map.imports) {
+			callback({
+				specifier,
+				path: map.imports[specifier],
+				map: map.imports,
+				type: "imports",
+			});
+		}
+	}
+
+	if (map.scopes) {
+		for (let scope in map.scopes) {
+			for (let specifier in map.scopes[scope]) {
+				let subMap = map.scopes[scope];
+				callback({
+					specifier,
+					path: subMap[specifier],
+					map: subMap,
+					scope,
+					type: "scopes",
+				});
+			}
+		}
+	}
+}
