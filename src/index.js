@@ -51,6 +51,12 @@ export default async function () {
 	let inputMap = undefined;
 	if (!config.init && !config.prune) {
 		inputMap = readJSONSync(".nudeps/importmap.json");
+		walkMap(inputMap, ({ specifier, path, map }) => {
+			// Remove any paths that no longer exist
+			if (!existsSync(path)) {
+				delete map[specifier];
+			}
+		});
 	}
 
 	let map = await getImportMap({
