@@ -137,7 +137,7 @@ export default async function () {
 		}
 	}
 
-	if (oldConfig.map !== config.map && existsSync(oldConfig.map)) {
+	if (oldConfig && oldConfig.map !== config.map && existsSync(oldConfig.map)) {
 		// Remove old import map
 		rmSync(oldConfig.map);
 	}

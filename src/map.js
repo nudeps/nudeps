@@ -118,6 +118,10 @@ async function installPackage (generator, name, target) {
 }
 
 export function walkMap (map, callback) {
+	if (!map) {
+		return;
+	}
+
 	if (map.imports) {
 		for (let specifier in map.imports) {
 			callback({
