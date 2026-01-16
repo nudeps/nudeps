@@ -1,10 +1,6 @@
 import { Generator } from "@jspm/generator";
 import { readJSONSync } from "./util.js";
 
-// These help us parse an importmap JS and extract the actual import map JSON
-const COMMENT_START = "/* importmap start */";
-const COMMENT_END = "/* importmap end */";
-
 export async function getImportMap ({ inputMap, prune, exclude } = {}) {
 	const generator = new Generator({
 		inputMap,
@@ -53,7 +49,7 @@ export async function getImportMap ({ inputMap, prune, exclude } = {}) {
 }
 
 // prettier-ignore
-export function injectImportMap (map) {
+export function injectMap (map) {
 	let { currentScript: cS } = document;
 	if (!cS) {
 		console.error(`Import map injection script cannot be included as a module script. Please remove type="module".`);
@@ -66,14 +62,15 @@ export function injectImportMap (map) {
 	}
 }
 
-const injectImportMapName = injectImportMap.name;
-const injectImportMapCode = injectImportMap.toString();
+const injectMapName = injectMap.name;
+const injectMapCode = injectMap.toString();
 
 export async function getImportMapJs (map) {
 	map ??= await getImportMap();
 	let stringified = typeof map === "string" ? map : JSON.stringify(map, null, "\t");
-	return `{${injectImportMapName}(${COMMENT_START}${stringified}${COMMENT_END});
-${injectImportMapCode}}`;
+	return `(()=>{${injectMapName}(${stringified});
+
+${injectMapCode}})();`;
 }
 
 async function installPackage (generator, name, target) {
