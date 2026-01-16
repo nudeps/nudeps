@@ -3,17 +3,16 @@
  */
 import * as path from "node:path";
 import { getConfig } from "./config.js";
+import { readJSONSync, writeJSONSync, getTopLevelModules, isDirectoryEmptySync } from "./util.js";
 import {
-	readJSONSync,
-	writeJSONSync,
-	getTopPackage,
-	getTopPackageDirectory,
-	getTopLevelModules,
-	isDirectoryEmptySync,
-	addVersion,
-	rebaseModulePath,
-} from "./util.js";
-import { writeFileSync, renameSync, existsSync, mkdirSync, rmSync, rmdirSync } from "node:fs";
+	writeFileSync,
+	renameSync,
+	existsSync,
+	mkdirSync,
+	rmSync,
+	rmdirSync,
+	cpSync,
+} from "node:fs";
 import { cp } from "node:fs/promises";
 import { getImportMap, getImportMapJs, walkMap, applyOverrides } from "./map.js";
 
@@ -85,34 +84,65 @@ export default async function (options) {
 	// using the package version at the end of the directory (e.g. @foo/bar@3.1.2 instead of @foo/bar)
 	// and update the import map to use that directory instead
 	let toCopy = {};
+	let existingDirs = new Set(getTopLevelModules(config.dir).map(d => config.dir + "/" + d));
+	let toDelete = new Set(existingDirs);
 
 	walkMap(map, ({ specifier, path, map }) => {
-		if (!getTopPackage(path)) {
+		let parts = path.split("/");
+		let index = parts.indexOf("node_modules");
+
+		if (index === -1) {
 			// Nothing to copy or rewrite
 			return;
 		}
 
-		let dir = getTopPackageDirectory(path);
-		let withVersion = addVersion(path, packages);
-		let newPath = rebaseModulePath(withVersion, config.dir);
-		map[specifier] = newPath;
+		let indexLast = parts.lastIndexOf("node_modules");
+		let isNested = index !== indexLast;
+		let dirIndex = indexLast + (parts[indexLast + 1].startsWith("@") ? 2 : 1);
+		let lockKey = parts.slice(index, dirIndex + 1).join("/");
 
-		toCopy[dir] ??= rebaseModulePath(getTopPackageDirectory(withVersion), config.dir);
+		let version = packages[lockKey]?.version;
+		let packageName = parts.slice(indexLast + 1, dirIndex + 1).join("/");
+
+		let dir = parts.slice(0, dirIndex + 1).join("/");
+		let targetDir = [config.dir, packageName + "@" + version].join("/");
+		let newPath = [targetDir, ...parts.slice(dirIndex + 1)].join("/");
+
+		map[specifier] = newPath;
+		toCopy[dir] ??= targetDir;
+
+		if (isNested) {
+			// Delete nested node_modules directory
+			let parentDirIndex = index + (parts[index + 1].startsWith("@") ? 2 : 1);
+			let parentDir = parts.slice(0, parentDirIndex + 1).join("/");
+			let copiedDir = toCopy[parentDir];
+			let parentPath =
+				copiedDir + "/" + parts.slice(parentDirIndex + 1, indexLast + 1).join("/");
+			toDelete.add(parentPath);
+		}
 	});
 
 	if (map.scopes) {
 		for (let scope in map.scopes) {
 			// Rewrite scope itself
-			if (scope.includes("node_modules")) {
-				let newScope = config.dir + "/" + rewritePackagePath(scope, config, packages);
-				map.scopes[newScope] = map.scopes[scope];
-				delete map.scopes[scope];
+			let parts = scope.split("/");
+			let index = parts.indexOf("node_modules");
+
+			if (index === -1) {
+				continue;
 			}
+
+			let indexLast = parts.lastIndexOf("node_modules");
+			let dirIndex = indexLast + (parts[indexLast + 1].startsWith("@") ? 2 : 1);
+			let lockKey = parts.slice(index, dirIndex + 1).join("/");
+			let version = packages[lockKey]?.version;
+			let packageName = parts.slice(indexLast + 1, dirIndex + 1).join("/");
+			let newScope = [config.dir, packageName + "@" + version].join("/");
+
+			map.scopes[newScope] = map.scopes[scope];
+			delete map.scopes[scope];
 		}
 	}
-
-	let existingDirs = new Set(getTopLevelModules(config.dir).map(d => config.dir + "/" + d));
-	let toDelete = new Set(existingDirs);
 
 	for (let from in toCopy) {
 		let to = toCopy[from];
@@ -120,21 +150,24 @@ export default async function (options) {
 			toDelete.delete(to);
 		}
 		else {
-			cp(from, to, { recursive: true });
+			cpSync(from, to, { recursive: true });
 		}
 	}
 
 	for (let dir of toDelete) {
-		let fullPath = config.dir + "/" + dir;
-		if (existsSync(fullPath)) {
-			rmSync(fullPath, { recursive: true });
+		if (existsSync(dir)) {
+			rmSync(dir, { recursive: true });
 		}
-		if (dir.includes("/")) {
-			// Delete the parent directory if empty
-			let parentDir = config.dir + "/" + dir.split("/")[0];
-			if (existsSync(parentDir) && isDirectoryEmptySync(parentDir)) {
-				rmdirSync(parentDir);
-			}
+
+		let parentDir = dir.split("/").slice(0, -1).join("/");
+
+		if (parentDir === config.dir) {
+			continue;
+		}
+
+		// Delete the parent directory if empty
+		if (existsSync(parentDir) && isDirectoryEmptySync(parentDir)) {
+			rmdirSync(parentDir);
 		}
 	}
 
