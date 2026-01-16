@@ -17,8 +17,8 @@ export function readJSONSync (path) {
 	return JSON.parse(readFileSync(path, "utf8"));
 }
 
-export function writeJSONSync (path, data) {
-	return writeFileSync(path, JSON.stringify(data, null, "\t"));
+export function writeJSONSync (path, data, indent = "\t") {
+	return writeFileSync(path, JSON.stringify(data, null, indent));
 }
 
 export function importCwdRelative (pathFromCwd) {

@@ -28,8 +28,8 @@ function rewritePackagePath (url, packages) {
 	return topLevelPackage + version;
 }
 
-export default async function () {
-	let config = await getConfig();
+export default async function (options) {
+	let config = Object.assign(await getConfig(), options);
 	let oldConfig = readJSONSync(".nudeps/config.json");
 
 	let cacheExists = existsSync(".nudeps");

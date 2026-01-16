@@ -18,7 +18,7 @@ You run `nudeps` once to initialize the project.
 It will generate an `importmap.js` file that you include in your HTML like so:
 
 ```html
-<script src="importmap.js"></script>
+<script src="/importmap.js"></script>
 ```
 
 > [!IMPORTANT]
@@ -26,11 +26,11 @@ It will generate an `importmap.js` file that you include in your HTML like so:
 
 You can include that one line of HTML either manually or via your templating system of choice.
 
-The import map maps specifiers like `vue` to URLs like `./client_modules/vue@3.5.26/dist/vue.runtime.esm-bundler.js` which Nudeps also manages for you.
+Nudeps then copies your dependencies to `./client_modules` and generates an import map that maps specifiers to URLs like `./client_modules/vue@3.5.26/dist/vue.runtime.esm-bundler.js`.
 Cache busting just works, because the version number is part of the directory name.
 
 You then install and uninstall dependencies as needed and use them straight away, and both the import map and copied dependencies will be automatically updated.
-No, without you having to remember to run anything.
+No, without you having to remember to run anything before or after.
 
 If you want, you can periodically run `nudeps --prune` to subset the copied dependencies and import map to only those used by your own package entry points.
 
@@ -77,13 +77,17 @@ Here is a handy table to compare the two:
 
 You can install nudeps as a devDependency, locally in each project or globally to have it available on every project.
 
+### Local installation
+
+This can be useful for signaling to collaborators that nudeps is required to work on the project.
+
 ```bash
 npm install nudeps -D
 ```
 
-This will also automatically initialize it for the current project.
+### Global installation
 
-or globally:
+You can also install Nudeps globally:
 
 ```bash
 npm install nudeps -gD
@@ -92,34 +96,45 @@ npm install nudeps -gD
 Then, whenever you want to initialize for a given project, just run `nudeps` in its root directory.
 It will automatically detect that it has not run before and initialize.
 
-To avoid having to run `nudeps` whenever you install or uninstall a dependency, add the following script to your `package.json`:
+### Automatically run nudeps when dependencies change
+
+This is essential, otherwise you’d need to manually run `nudeps` whenever you install or uninstall a dependency.
+
+Either run `nudeps install` to automatically add the necessary scripts to your `package.json`, or add a `dependencies` script manually:
 
 ```json
-"dependencies": "nudeps",
+{
+	"name": "my-project",
+	"scripts": {
+		"dependencies": "npx nudeps"
+	}
+}
 ```
 
-If you have another `dependencies` script, you can use `predependencies` to run `nudeps` before it or `postdependencies` to run `nudeps` after it.
+> [!TIP]
+> If you have another `dependencies` script, you can use `predependencies` to run `nudeps` before it or `postdependencies` to run `nudeps` after it.
 
 Then, to use the import map in your app, include this script in your HTML before any modules are loaded, either manually or via your templating system of choice:
 
 ```html
-<!-- Replace `importmap.js` with the path to your import map if different -->
-<script src="importmap.js"></script>
+<script src="/importmap.js"></script>
 ```
+
+> [!IMPORTANT]
+> This script needs to be included before any module scripts are loaded or it won't work!
 
 ## Config options
 
 Each of the following options is available either as a config file key, or a command line option (e.g. `foo` would be `--foo`).
 Some command line options allow for a shorthand one letter syntax, which is listed after a slash.
 
-| Option | Config file key | CLI option | CLI short flag | Default | Description |
-| ------ | --------------- | ---------- | -------------- | ------- | ----------- |
-
-| Directory | `dir` | `--dir` | `-d` | `./client_modules` | Directory to copy deployed dependencies to, relative to project root. It will be created if it does not exist. It is assumed that Nudeps owns this directory, do not use a directory path that you use for other things. |
-| Import map | `map` | `--map` | `-m` | `importmap.js` | File path for import map injection script, relative to project root. Nudeps needs to be able to own this file, do not input a file you use for other things too. |
-| Prune | `prune` | `--prune` | | `false` | Whether to subset only to specifiers used by the package entry points (`true`), or include all direct dependencies anyway. |
-| Excluded dependencies | `exclude` | `--exclude` | `-e` | `[]` | Any packages to exclude from import map even though they appear in `dependencies`. Useful for server-side dependencies. When providing via the command line option, comma-separate and do not include any spaces. |
-| External config file | | `--config` | `-c` | `nudeps.json` | File path for nudeps configuration, relative to project root. |
+| Option                | Config file key | CLI option  | CLI short flag | Default            | Description                                                                                                                                                                                                              |
+| --------------------- | --------------- | ----------- | -------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Directory             | `dir`           | `--dir`     | `-d`           | `./client_modules` | Directory to copy deployed dependencies to, relative to project root. It will be created if it does not exist. It is assumed that Nudeps owns this directory, do not use a directory path that you use for other things. |
+| Import map            | `map`           | `--map`     | `-m`           | `importmap.js`     | File path for import map injection script, relative to project root. Nudeps needs to be able to own this file, do not input a file you use for other things too.                                                         |
+| Prune                 | `prune`         | `--prune`   |                | `false`            | Whether to subset only to specifiers used by the package entry points (`true`), or include all direct dependencies anyway.                                                                                               |
+| Excluded dependencies | `exclude`       | `--exclude` | `-e`           | `[]`               | Any packages to exclude from import map even though they appear in `dependencies`. Useful for server-side dependencies. When providing via the command line option, comma-separate and do not include any spaces.        |
+| External config file  |                 | `--config`  | `-c`           | `nudeps.json`      | File path for nudeps configuration, relative to project root.                                                                                                                                                            |
 
 ## Commands
 
@@ -144,6 +159,14 @@ You can set `prune: true` in your config file to always prune dependencies but t
 Force initialization, even if nudeps has already run.
 
 ## FAQ
+
+### Which browsers are supported?
+
+Nudeps works in pretty much every browser that supports import maps, which is [all of them](https://caniuse.com/import-maps) at this point, including:
+
+- Chrome **89+**
+- Safari **16.4+**
+- Firefox **108+**
 
 ### Does this support pnpm/bun/yarn/etc.?
 
