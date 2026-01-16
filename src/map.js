@@ -1,63 +1,30 @@
 import { Generator } from "@jspm/generator";
-import { readJSONSync } from "./util.js";
 
-export async function getImportMap ({ inputMap, prune, exclude } = {}) {
-	const generator = new Generator({
-		inputMap,
-		mapUrl: ".",
-		defaultProvider: "nodemodules",
-		env: ["production", "browser", "module"],
-	});
-
-	const pkg = readJSONSync("./package.json");
-
-	if (!pkg) {
-		throw new Error("package.json not found or invalid");
-	}
-
-	// Install from a local package:
-	try {
-		await generator.install({
-			alias: pkg.name,
-			target: "./",
-			subpaths: true,
+export class ImportMap {
+	constructor ({ inputMap } = {}) {
+		this.inputMap = inputMap;
+		this.generator = new Generator({
+			inputMap,
+			mapUrl: ".",
+			defaultProvider: "nodemodules",
+			env: ["production", "browser", "module"],
 		});
 	}
-	catch (error) {}
 
-	if (!prune && pkg.dependencies) {
-		exclude = new Set(exclude ?? []);
-
-		let lastPruneDeps = readJSONSync(".nudeps/package.json")?.dependencies ?? {};
-
-		for (const dep in pkg.dependencies) {
-			if (exclude.has(dep) || lastPruneDeps[dep]) {
-				continue;
-			}
-
-			try {
-				await generator.install({
-					alias: dep,
-					target: `./node_modules/${dep}`,
-					subpaths: true,
-				});
-			}
-			catch (error) {}
+	async install (alias, target = `./node_modules/${alias}`) {
+		try {
+			return await this.generator.install({
+				alias,
+				target,
+				subpaths: true,
+			});
 		}
+		catch (error) {}
 	}
 
-	// Output the import map:
-	let map = generator.getMap();
-
-	if (map.imports && map.scopes["./"]) {
-		// Remove redundant scoped imports
-		for (let specifier in map.scopes["./"]) {
-			if (map.imports[specifier] === map.scopes["./"][specifier]) {
-				delete map.scopes["./"][specifier];
-			}
-		}
+	getMap () {
+		return this.generator.getMap();
 	}
-	return map;
 }
 
 // prettier-ignore
@@ -76,7 +43,6 @@ export function injectMap (map, cS) {
 const injectMapCode = injectMap.toString();
 
 export async function getImportMapJs (map) {
-	map ??= await getImportMap();
 	let stringified = typeof map === "string" ? map : JSON.stringify(map, null, "\t");
 	return `{let map = ${stringified};\n(${injectMapCode})(map, document.currentScript)}`;
 }

@@ -14,7 +14,7 @@ import {
 	cpSync,
 } from "node:fs";
 import { cp } from "node:fs/promises";
-import { getImportMap, getImportMapJs, walkMap, applyOverrides } from "./map.js";
+import { ImportMap, getImportMapJs, walkMap, applyOverrides } from "./map.js";
 
 export default async function (options) {
 	let config = Object.assign(await getConfig(), options);
@@ -56,11 +56,32 @@ export default async function (options) {
 		});
 	}
 
-	let map = await getImportMap({
-		prune: config.prune,
-		exclude: config.exclude,
-		inputMap,
-	});
+	const pkg = readJSONSync("./package.json");
+
+	if (!pkg) {
+		throw new Error("package.json not found or invalid");
+	}
+
+	let map = new ImportMap({ inputMap });
+	map.install(pkg.name, "./");
+	// console.log(".", map.getMap());
+
+	if (!config.prune && pkg.dependencies) {
+		let exclude = new Set(config.exclude ?? []);
+		let lastPruneDeps = readJSONSync(".nudeps/package.json")?.dependencies ?? {};
+
+		for (const dep in pkg.dependencies) {
+			if (exclude.has(dep) || lastPruneDeps[dep]) {
+				continue;
+			}
+
+			await map.install(dep);
+
+			// console.log(dep, map.getMap());
+		}
+	}
+
+	map = map.getMap();
 
 	if (config.overrides) {
 		applyOverrides(map, config.overrides);
