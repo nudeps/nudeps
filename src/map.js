@@ -54,17 +54,28 @@ export async function getImportMap ({ inputMap, prune, exclude } = {}) {
 	return generator.getMap();
 }
 
+// prettier-ignore
+export function injectImportMap (map) {
+	let { currentScript: cS } = document;
+	if (!cS) {
+		console.error(`Import map injection script cannot be included as a module script. Please remove type="module".`);
+	}
+	else if (document.querySelector(`script[type=module]`)) {
+		console.error(`${cS.getAttribute("src")} must be included before any module scripts.`);
+	}
+	else {
+		cS.after(Object.assign(document.createElement("script"), { type: "importmap", textContent: JSON.stringify(map) }));
+	}
+}
+
+const injectImportMapName = injectImportMap.name;
+const injectImportMapCode = injectImportMap.toString();
+
 export async function getImportMapJs (map) {
 	map ??= await getImportMap();
 	let stringified = typeof map === "string" ? map : JSON.stringify(map, null, "\t");
-	return `(map => {
-		let script = document.createElement("script");
-		script.type = "importmap";
-		script.textContent = JSON.stringify(map);
-		document.currentScript.after(script);
-	})(
-		${COMMENT_START}${stringified}${COMMENT_END},
-	);`;
+	return `{${injectImportMapName}(${COMMENT_START}${stringified}${COMMENT_END});
+${injectImportMapCode}}`;
 }
 
 export function readImportMap ({ map = "importmap.js" } = {}) {
