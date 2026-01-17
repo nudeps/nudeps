@@ -38,20 +38,22 @@ Try it out in the [demo repository](https://github.com/nudeps/nudeps-demo).
 
 ## How does it work?
 
-You run `nudeps` once to initialize the project.
-It will generate an `importmap.js` file that you include in your HTML like so:
+You run `nudeps install` once to initialize the project.
+That’s it.
+You can then forget about it, it will run automatically whenever you install or uninstall packages.
+Unless you need to transpile your JS for other reasons, you can write JS that just runs, no transpilation needed.
+
+Instead of forcing you to use a CDN, Nudeps copies your dependencies to a **local directory** you specify (`./client_modules` by default), adds versions to directory names for **cache busting**, and generates an **import map** that maps specifiers to these local paths.
+For example, `lit` may be mapped to `"./client_modules/lit@3.3.2/index.js"`.
+
+All it takes to use these definitions is to include the `importmap.js` file in your HTML before any modules are loaded:
 
 ```html
-<script src="/importmap.js"></script>
+<script src="importmap.js"></script>
 ```
 
-> [!IMPORTANT]
-> This script needs to be included before any modules are loaded
-
 You can include that one line of HTML either manually or via your templating system of choice.
-
-Nudeps then copies your dependencies to `./client_modules` and generates an import map that maps specifiers to URLs like `./client_modules/vue@3.5.26/dist/vue.runtime.esm-bundler.js`.
-Cache busting just works, because the version number is part of the directory name.
+You can see an example of what such a file looks like at https://github.com/nudeps/nudeps-demo/blob/main/importmap.js
 
 You then install and uninstall dependencies as needed and use them straight away, and both the import map and copied dependencies will be automatically updated.
 No, without you having to remember to run anything before or after.
@@ -124,7 +126,7 @@ It will automatically detect that it has not run before and initialize.
 
 This is essential, otherwise you’d need to manually run `nudeps` whenever you install or uninstall a dependency.
 
-Either run `nudeps install` to automatically add the necessary scripts to your `package.json`, or add a `dependencies` script manually:
+Either run `nudeps install` which will do this automatically, or add a `dependencies` script manually to your `package.json`:
 
 ```json
 {
