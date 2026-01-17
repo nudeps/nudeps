@@ -15,6 +15,7 @@ import {
 } from "node:fs";
 import { cp } from "node:fs/promises";
 import { ImportMap, getImportMapJs, walkMap, applyOverrides } from "./map.js";
+import ModulePath from "./util/paths.js";
 
 export default async function (options) {
 	let config = Object.assign(await getConfig(), options);
@@ -90,59 +91,35 @@ export default async function (options) {
 	let existingDirs = new Set(getTopLevelModules(config.dir).map(d => config.dir + "/" + d));
 	let toDelete = new Set(existingDirs);
 
-	walkMap(map, ({ specifier, path, map }) => {
-		let parts = path.split("/");
-		let index = parts.indexOf("node_modules");
+	ModulePath.localDir = config.dir;
+	ModulePath.packages = packages;
 
-		if (index === -1) {
+	walkMap(map, ({ specifier, path, map }) => {
+		if (!path.includes("node_modules/")) {
 			// Nothing to copy or rewrite
 			return;
 		}
 
-		let indexLast = parts.lastIndexOf("node_modules");
-		let isNested = index !== indexLast;
-		let dirIndex = indexLast + (parts[indexLast + 1].startsWith("@") ? 2 : 1);
-		let lockKey = parts.slice(index, dirIndex + 1).join("/");
+		let modulePath = ModulePath.from(path);
+		map[specifier] = modulePath.localPath;
+		toCopy[modulePath.nodeDir] ??= modulePath.localDir;
 
-		let version = packages[lockKey]?.version;
-		let packageName = parts.slice(indexLast + 1, dirIndex + 1).join("/");
-
-		let dir = parts.slice(0, dirIndex + 1).join("/");
-		let targetDir = [config.dir, packageName + "@" + version].join("/");
-		let newPath = [targetDir, ...parts.slice(dirIndex + 1)].join("/");
-
-		map[specifier] = newPath;
-		toCopy[dir] ??= targetDir;
-
-		if (isNested) {
+		if (modulePath.isNested) {
 			// Delete nested node_modules directory
-			let parentDirIndex = index + (parts[index + 1].startsWith("@") ? 2 : 1);
-			let parentDir = parts.slice(0, parentDirIndex + 1).join("/");
-			let copiedDir = toCopy[parentDir];
-			let parentPath =
-				copiedDir + "/" + parts.slice(parentDirIndex + 1, indexLast + 1).join("/");
-			toDelete.add(parentPath);
+			let parentPath = [modulePath.parent.localDir, "node_modules", modulePath.packageName];
+			toDelete.add(parentPath.join("/"));
 		}
 	});
 
 	if (map.scopes) {
 		for (let scope in map.scopes) {
-			// Rewrite scope itself
-			let parts = scope.split("/");
-			let index = parts.indexOf("node_modules");
-
-			if (index === -1) {
+			if (!scope.includes("node_modules/")) {
 				continue;
 			}
 
-			let indexLast = parts.lastIndexOf("node_modules");
-			let dirIndex = indexLast + (parts[indexLast + 1].startsWith("@") ? 2 : 1);
-			let lockKey = parts.slice(index, dirIndex + 1).join("/");
-			let version = packages[lockKey]?.version;
-			let packageName = parts.slice(indexLast + 1, dirIndex + 1).join("/");
-			let newScope = [config.dir, packageName + "@" + version].join("/");
-
-			map.scopes[newScope] = map.scopes[scope];
+			// Rewrite scope itself
+			let { localDir } = ModulePath.from(scope);
+			map.scopes[localDir] = map.scopes[scope];
 			delete map.scopes[scope];
 		}
 	}

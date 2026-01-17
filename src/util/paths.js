@@ -1,72 +1,97 @@
-/**
- * Get the top-level package name from a URL
- * E.g. ./node_modules/@foo/bar/node_modules/@baz/quux/index.js -> @foo/bar
- * @param {string} url
- * @returns {string}
- */
-export function getTopPackage (url) {
-	let parts = url.split("/");
-	let index = parts.indexOf("node_modules");
-	if (index === -1) {
-		return undefined;
+import { readJSONSync } from "./fs.js";
+import availableOptions from "../options.js";
+
+export default class ModulePath {
+	packages = [];
+	parent = null;
+	path = "";
+	parts = [];
+	base = [];
+	filePath = "";
+
+	static all = {};
+	static packages;
+	static localDir = availableOptions.dir.default;
+
+	constructor (path) {
+		this.constructor.packages ??= readJSONSync("package-lock.json")?.packages;
+
+		if (Array.isArray(path)) {
+			this.path = path.join("/");
+			this.parts = path;
+		}
+		else {
+			this.path = path;
+			this.parts = path.split("/");
+		}
+
+		let index = this.parts.indexOf("node_modules");
+
+		if (index > -1) {
+			this.base = this.parts.splice(0, index).join("/");
+
+			while (this.parts[0] === "node_modules") {
+				this.parts.shift();
+				let isScoped = this.parts[0].startsWith("@");
+				let packageName = this.parts.splice(0, isScoped ? 2 : 1).join("/");
+				this.packages.push(packageName);
+			}
+		}
+
+		this.filePath = this.parts.join("/") ?? "";
+
+		this.parent = this.isNested
+			? this.constructor.from([this.base, ...this.packages.slice(0, -1)])
+			: null;
 	}
 
-	let dirIndex = index + (parts[index + 1].startsWith("@") ? 2 : 1);
-	return parts.slice(index + 1, dirIndex + 1).join("/");
-}
-
-/**
- * Get the top-level package directory from a URL
- * E.g. ./node_modules/@foo/bar/node_modules/@baz/quux/index.js -> ./node_modules/@foo/bar
- * @param {string} url
- * @returns {string}
- */
-export function getTopPackageDirectory (url) {
-	let parts = url.split("/");
-	let index = parts.indexOf("node_modules");
-	if (index === -1) {
-		return url;
+	get isNested () {
+		return this.packages.length > 1;
 	}
 
-	let dirIndex = index + (parts[index + 1].startsWith("@") ? 2 : 1);
-	return parts.slice(0, dirIndex + 1).join("/");
-}
-
-/**
- * Remove part of path up to node_modules/ and replace with a new directory
- * E.g. ./node_modules/@foo/bar/node_modules/@baz/quux/index.js -> ./client_modules/@foo/bar/node_modules/@baz/quux/index.js
- * @param {string} url
- * @param {string} dir
- * @returns {string}
- */
-export function rebaseModulePath (url, dir) {
-	let parts = url.split("/");
-	let index = parts.indexOf("node_modules");
-	if (index === -1) {
-		return url;
+	get lockKey () {
+		return this.packages.map(pkg => "node_modules/" + pkg).join("/");
 	}
 
-	parts.splice(0, index + 1, dir);
-	return parts.join("/");
-}
-
-/**
- * Add the version number to the top-level package
- * E.g. ./node_modules/@foo/bar/node_modules/@baz/quux/index.js -> ./node_modules/@foo/bar@3.1.2/node_modules/@baz/quux/index.js
- * @param {string} url
- * @param {Record<string, { version: string }>} packages - package-lock.json packages object
- * @returns {string}
- */
-export function addVersion (url, packages) {
-	let parts = url.split("/");
-	let index = parts.indexOf("node_modules");
-	if (index === -1) {
-		return url;
+	get topLockKey () {
+		return "node_modules/" + this.packages[0];
 	}
 
-	let dirIndex = index + (parts[index + 1].startsWith("@") ? 2 : 1);
-	let lockKey = parts.slice(index, dirIndex + 1).join("/");
-	let version = packages?.[lockKey]?.version;
-	parts[dirIndex] += version ? "@" + version : "";
-	return parts.join("/");
+	get version () {
+		return ModulePath.packages[this.lockKey]?.version;
+	}
+
+	get packageName () {
+		return this.packages.at(-1);
+	}
+
+	get localDir () {
+		let versionSuffix = this.version ? "@" + this.version : "";
+		return [ModulePath.localDir, this.packageName + versionSuffix].join("/");
+	}
+
+	get localParentDir () {}
+
+	get localPath () {
+		return [this.localDir, this.filePath].join("/");
+	}
+
+	get nodeDir () {
+		return [this.base, this.lockKey].join("/");
+	}
+
+	get topNodeDir () {
+		return [this.base, this.topLockKey].join("/");
+	}
+
+	toString () {
+		return this.path;
+	}
+
+	static from (path) {
+		if (!this.all[path]) {
+			this.all[path] = new ModulePath(path);
+		}
+		return this.all[path];
+	}
 }
