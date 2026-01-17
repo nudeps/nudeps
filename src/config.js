@@ -31,6 +31,7 @@ export const availableOptions = {
 	overrides: {
 		cli: false,
 	},
+	sri: {},
 };
 
 function readArgs (argv = process.argv.slice(2)) {

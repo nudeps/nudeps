@@ -48,7 +48,7 @@ export default async function (options) {
 		throw new Error("package.json not found or invalid");
 	}
 
-	let map = new ImportMap();
+	let map = new ImportMap({ sri: config.sri });
 	map.install(pkg.name, ".");
 
 	if (!config.prune && pkg.dependencies) {
@@ -144,6 +144,32 @@ export default async function (options) {
 
 			map.scopes[newScope] = map.scopes[scope];
 			delete map.scopes[scope];
+		}
+	}
+
+	if (map.integrity) {
+		for (let path in map.integrity) {
+			let parts = path.split("/");
+			let index = parts.indexOf("node_modules");
+
+			if (index === -1) {
+				// Nothing to copy or rewrite
+				continue;
+			}
+
+			let indexLast = parts.lastIndexOf("node_modules");
+			let dirIndex = indexLast + (parts[indexLast + 1].startsWith("@") ? 2 : 1);
+			let lockKey = parts.slice(index, dirIndex + 1).join("/");
+			let version = packages[lockKey]?.version;
+			let packageName = parts.slice(indexLast + 1, dirIndex + 1).join("/");
+			let newPath = [
+				config.dir,
+				packageName + "@" + version,
+				...parts.slice(dirIndex + 1),
+			].join("/");
+
+			map.integrity[newPath] = map.integrity[path];
+			delete map.integrity[path];
 		}
 	}
 
