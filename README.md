@@ -11,6 +11,7 @@ It lets you use specifiers in the browser with no traditional build tools, meani
 
 Too good to be true?
 And yet, it is not.
+Try it out in the [demo repository](https://github.com/nudeps/nudeps-demo).
 
 ## How does it work?
 
