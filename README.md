@@ -8,6 +8,7 @@ It lets you use specifiers in the browser with no traditional build tools, meani
 
 - Nothing to remember to run before working on code
 - No transpilation or bundling needed for your own code or even the code of your dependencies
+- Granular cache busting, only for modules that change version
 
 Too good to be true?
 And yet, it is not.
@@ -33,8 +34,13 @@ Try it out in the [demo repository](https://github.com/nudeps/nudeps-demo).
 	3. [Why does it copy the entire dependency directory and not just the files I import?](#why-does-it-copy-the-entire-dependency-directory-and-not-just-the-files-i-import)
 	4. [Why does it add the version number to the directory name?](#why-does-it-add-the-version-number-to-the-directory-name)
 	5. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
+	6. [Why doesn't Nudeps have an option to add integrity hashes to the import map?](#why-doesnt-nudeps-have-an-option-to-add-integrity-hashes-to-the-import-map)
 7. [Troubleshooting](#troubleshooting)
 	1. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
+	2. [Packages that use extension-less paths](#packages-that-use-extension-less-paths)
+	3. [CJS packages (packages that use `require()` and `module.exports`)](#cjs-packages-packages-that-use-require-and-moduleexports)
+8. [Recipes for popular packages](#recipes-for-popular-packages)
+	1. [Vue](#vue)
 
 ## How does it work?
 
@@ -213,6 +219,7 @@ Because this allows dependencies to fetch other files dynamically, e.g. styleshe
 ### Why does it add the version number to the directory name?
 
 Because this allows you to get the same cache busting behavior as you would with a CDN, but in your own domain.
+It also allows us to flatten dependencies to get better caching behavior: when you upgrade a dependency, its own dependencies remain cached by the browser unless _they_ also change version.
 
 ### Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?
 
@@ -220,6 +227,12 @@ This is up to you.
 
 - `.nudeps` and `client_modules` include local `.gitignore` files that prevent you from accidentally committing paths from them, but you may want to gitignore them at the top level so that you don't see them in your IDE.
 - Whether you gitignore `importmap.js` is up to you. On one hand it's a generated file, and these generally should not be committed, on the other hand it can help track changes to dependencies in a compact way.
+
+### Why doesn't Nudeps have an option to add integrity hashes to the import map?
+
+The purpose of integrity hashes is to guard against compromise in resources you don't control, such as public CDNs.
+When using Nudeps you host your own dependencies, so that is not necessary, and would unnecessarily double the size of your import map.
+However, if we later decide there is a need for this,[the PR is already written](https://github.com/nudeps/nudeps/pull/5).
 
 ## Troubleshooting
 
@@ -234,3 +247,45 @@ There are two ways to fix this:
 
 - Use the package's browser bundle through the `overrides` option. This is usually not advisable because it inlines dependencies that other packages may be using too, but sometimes it's the best way forwards.
 - Stub NodeJS objects like `process`. This can work if the surface area is limited, but it can quickly turn into a game of whack-a-mole. Additionally, it can cause bugs in other packages that depend on the presence of these objects to _detect_ NodeJS.
+
+### Packages that use extension-less paths
+
+Some packages use extension-less paths even for their own imports, e.g. `./foo/bar` instead of `./foo/bar.js`.
+While this doesn't usually make it to the files they distribute, there are a few exceptions.
+Because these are not actual specifiers, import maps will not help here.
+However, since the browser will see these as URLs, you can take advantage of whatever URL rewriting capabilities your server has and simply rewrite not-found URLs in that directory to their corresponding `.js` paths.
+For example, using a [Netlify `_redirects` file](https://docs.netlify.com/routing/redirects/redirect-options/) this may look like this:
+
+```
+/client_modules/*  /client_modules/:splat.js 301
+```
+
+### CJS packages (packages that use `require()` and `module.exports`)
+
+While most packages these days provide ESM exports, there are still a few that only provide CJS, either because they predate ESM, or as a political choice.
+To support running such packages directly in the browser you will need a tiny shim.
+Some options are:
+
+- [browser-cjs](https://www.npmjs.com/package/browser-cjs)
+- (send PRs to add more!)
+
+## Recipes for popular packages
+
+While most packages work out of the box, there are packages that need a little help.
+
+### Vue
+
+As of this writing, using `vue` out of the box will fail with an error about `process` not being available.
+You need to configure Nudeps to use the browser bundle instead, through the `overrides` option:
+
+```js
+// nudeps.js
+export default {
+	overrides: {
+		imports: {
+			// Override is ./node_modules based, nudeps will transform it accordingly
+			vue: "./node_modules/vue/dist/vue.esm-browser.js",
+		},
+	},
+};
+```
