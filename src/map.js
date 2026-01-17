@@ -1,3 +1,6 @@
+/**
+ * Utils for generating and manipulating import maps
+ */
 import { Generator } from "@jspm/generator";
 
 export class ImportMap {
@@ -71,11 +74,9 @@ export function injectMap (map, cS) {
 	}
 }
 
-const injectMapCode = injectMap.toString();
-
 export async function getImportMapJs (map) {
 	let stringified = typeof map === "string" ? map : JSON.stringify(map, null, "\t");
-	return `{let map = ${stringified};\n(${injectMapCode})(map, document.currentScript)}`;
+	return `{let map = ${stringified};\n(${injectMap})(map, document.currentScript)}`;
 }
 
 export function walkMap (map, callback) {
