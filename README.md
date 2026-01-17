@@ -13,6 +13,29 @@ Too good to be true?
 And yet, it is not.
 Try it out in the [demo repository](https://github.com/nudeps/nudeps-demo).
 
+## Contents
+
+1. [How does it work?](#how-does-it-work)
+2. [Nudeps vs JSPM](#nudeps-vs-jspm)
+	1. [Do I need nudeps or JSPM?](#do-i-need-nudeps-or-jspm)
+3. [Installation](#installation)
+	1. [Local installation](#local-installation)
+	2. [Global installation](#global-installation)
+	3. [Automatically run nudeps when dependencies change](#automatically-run-nudeps-when-dependencies-change)
+4. [Config options](#config-options)
+5. [Commands](#commands)
+	1. [`nudeps`](#nudeps-1)
+	2. [`nudeps --prune`](#nudeps---prune)
+	3. [`nudeps --init`](#nudeps---init)
+6. [FAQ](#faq)
+	1. [Which browsers are supported?](#which-browsers-are-supported)
+	2. [Does this support pnpm/bun/yarn/etc.?](#does-this-support-pnpmbunyarnetc)
+	3. [Why does it copy the entire dependency directory and not just the files I import?](#why-does-it-copy-the-entire-dependency-directory-and-not-just-the-files-i-import)
+	4. [Why does it add the version number to the directory name?](#why-does-it-add-the-version-number-to-the-directory-name)
+	5. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
+7. [Troubleshooting](#troubleshooting)
+	1. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
+
 ## How does it work?
 
 You run `nudeps` once to initialize the project.
