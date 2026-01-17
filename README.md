@@ -161,7 +161,7 @@ Some command line options allow for a shorthand one letter syntax, which is list
 | Prune                | `prune`         | `--prune`   |                | `false`            | Whether to subset only to specifiers used by the package entry points (`true`), or include all direct dependencies anyway.                                                                                               |
 | Exclude              | `exclude`       | `--exclude` | `-e`           | `[]`               | Any packages to exclude from import map even though they appear in `dependencies`. Useful for server-side dependencies. When providing via the command line option, comma-separate and do not include any spaces.        |
 | External config file | -               | `--config`  | `-c`           | `nudeps.json`      | File path for nudeps configuration, relative to project root.                                                                                                                                                            |
-| Overrides            | `overrides`     | -           | -              | `{i}`              | Overrides for the import map, using `./node_modules/` paths. Set a key to `undefined` to remove it from the map.                                                                                                         |
+| Overrides            | `overrides`     | -           | -              | `{}`               | Overrides for the import map, using `./node_modules/` paths. Set a key to `undefined` to remove it from the map.                                                                                                         |
 
 ## Commands
 
@@ -232,5 +232,5 @@ For example, as of this writing, using `vue` out of the box will fail with an er
 
 There are two ways to fix this:
 
-- Use the package's browser bundle through the `overrides` option. This is usually not advisable because it inlines dependencies that other packages may be using too, but sometimes it's the way to go.
+- Use the package's browser bundle through the `overrides` option. This is usually not advisable because it inlines dependencies that other packages may be using too, but sometimes it's the best way forwards.
 - Stub NodeJS objects like `process`. This can work if the surface area is limited, but it can quickly turn into a game of whack-a-mole. Additionally, it can cause bugs in other packages that depend on the presence of these objects to _detect_ NodeJS.
