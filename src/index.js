@@ -45,15 +45,18 @@ export default async function (options) {
 	let inputMap = undefined;
 	if (!config.init && !config.prune) {
 		inputMap = readJSONSync(".nudeps/importmap.json");
-		if (config.overrides) {
-			applyOverrides(inputMap, config.overrides);
-		}
-		walkMap(inputMap, ({ specifier, path, map }) => {
-			// Remove any paths that no longer exist
-			if (!existsSync(path)) {
-				delete map[specifier];
+
+		if (inputMap) {
+			if (config.overrides) {
+				applyOverrides(inputMap, config.overrides);
 			}
-		});
+			walkMap(inputMap, ({ specifier, path, map }) => {
+				// Remove any paths that no longer exist
+				if (!existsSync(path)) {
+					delete map[specifier];
+				}
+			});
+		}
 	}
 
 	const pkg = readJSONSync("./package.json");
@@ -63,8 +66,7 @@ export default async function (options) {
 	}
 
 	let map = new ImportMap({ inputMap });
-	map.install(pkg.name, "./");
-	// console.log(".", map.getMap());
+	map.install(pkg.name, ".");
 
 	if (!config.prune && pkg.dependencies) {
 		let exclude = new Set(config.exclude ?? []);
@@ -76,8 +78,6 @@ export default async function (options) {
 			}
 
 			await map.install(dep);
-
-			// console.log(dep, map.getMap());
 		}
 	}
 

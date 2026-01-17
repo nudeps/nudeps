@@ -5,9 +5,9 @@ export class ImportMap {
 		this.inputMap = inputMap;
 		this.generator = new Generator({
 			inputMap,
-			mapUrl: ".",
 			defaultProvider: "nodemodules",
 			env: ["production", "browser", "module"],
+			flattenScopes: false,
 		});
 	}
 
@@ -23,8 +23,39 @@ export class ImportMap {
 	}
 
 	getMap () {
-		return this.generator.getMap();
+		let map = this.generator.getMap();
+		removeRedundantScopes(map);
+		return map;
 	}
+}
+
+export function removeRedundantScopes (map) {
+	if (map && map.scopes && map.imports) {
+		// Sort scopes in ascending order of length
+		let scopes = Object.keys(map.scopes).sort((a, b) => a.length - b.length);
+		let scopesSeen = [];
+
+		for (let scope of scopes) {
+			let parentMaps = scopesSeen.filter(s => scope.startsWith(s)).map(s => map.scopes[s]);
+			parentMaps.unshift(map.imports);
+
+			for (let specifier in map.scopes[scope]) {
+				let parentMapping = parentMaps
+					.map(m => m[specifier])
+					.filter(Boolean)
+					.pop();
+
+				if (map.scopes[scope][specifier] === parentMapping) {
+					delete map.scopes[scope][specifier];
+				}
+			}
+			if (Object.keys(map.scopes[scope]).length === 0) {
+				delete map.scopes[scope];
+			}
+		}
+	}
+
+	return map;
 }
 
 // prettier-ignore
