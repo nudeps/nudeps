@@ -14,10 +14,15 @@
 	"license": "MIT",
 	"author": "Lea Verou",
 	"type": "module",
-	"main": "src/index.js",
+	"exports": {
+		".": "./src/index.js"
+	},
 	"bin": {
 		"nudeps": "src/cli.js"
 	},
+	"files": [
+		"src"
+	],
 	"scripts": {
 		"release": "release-it",
 		"test": "npx htest"
@@ -33,8 +38,5 @@
 	"dependencies": {
 		"@jspm/generator": "^2.8.0",
 		"minimist": "^1.2.8"
-	},
-	"engines": {
-		"npm": ">=7"
 	}
 }
