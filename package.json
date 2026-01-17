@@ -3,13 +3,13 @@
 	"version": "0.0.1",
 	"description": "Naked dependencies, in the browser.",
 	"keywords": [],
-	"homepage": "https://github.com/leaverou/nudeps/#readme",
+	"homepage": "https://github.com/nudeps/nudeps/#readme",
 	"bugs": {
-		"url": "https://github.com/leaverou/nudeps/issues"
+		"url": "https://github.com/nudeps/nudeps/issues"
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/leaverou/nudeps.git"
+		"url": "git+https://github.com/nudeps/nudeps.git"
 	},
 	"license": "MIT",
 	"author": "Lea Verou",
