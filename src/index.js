@@ -42,30 +42,13 @@ export default async function (options) {
 		}
 	}
 
-	let inputMap = undefined;
-	if (!config.init && !config.prune) {
-		inputMap = readJSONSync(".nudeps/importmap.json");
-
-		if (inputMap) {
-			if (config.overrides) {
-				applyOverrides(inputMap, config.overrides);
-			}
-			walkMap(inputMap, ({ specifier, path, map }) => {
-				// Remove any paths that no longer exist
-				if (!existsSync(path)) {
-					delete map[specifier];
-				}
-			});
-		}
-	}
-
 	const pkg = readJSONSync("./package.json");
 
 	if (!pkg) {
 		throw new Error("package.json not found or invalid");
 	}
 
-	let map = new ImportMap({ inputMap });
+	let map = new ImportMap();
 	map.install(pkg.name, ".");
 
 	if (!config.prune && pkg.dependencies) {
@@ -87,7 +70,6 @@ export default async function (options) {
 		applyOverrides(map, config.overrides);
 	}
 
-	writeJSONSync(".nudeps/importmap.json", map);
 	let packages = readJSONSync("package-lock.json")?.packages;
 
 	let dirExists = existsSync(config.dir);
