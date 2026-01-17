@@ -5,7 +5,6 @@ import { Generator } from "@jspm/generator";
 
 export class ImportMap {
 	constructor ({ inputMap } = {}) {
-		this.inputMap = inputMap;
 		this.generator = new Generator({
 			inputMap,
 			defaultProvider: "nodemodules",
@@ -27,35 +26,55 @@ export class ImportMap {
 
 	getMap () {
 		let map = this.generator.getMap();
-		removeRedundantScopes(map);
+		cleanupScopes(map);
 		return map;
 	}
 }
 
-export function removeRedundantScopes (map) {
-	if (map && map.scopes && map.imports) {
-		// Sort scopes in ascending order of length
-		let scopes = Object.keys(map.scopes).sort((a, b) => a.length - b.length);
-		let scopesSeen = [];
+/**
+ * This function processes map.scopes and does the following:
+ * 1. Removes redundant scopes, i.e. scopes that are identical to their parent
+ * 2. Hoists specifiers to parent scopes if they would otherwise be undefined
+ * @param {object} map
+ * @returns {object} The cleaned up map
+ */
+export function cleanupScopes (map) {
+	if (!map?.scopes) {
+		return map;
+	}
 
-		for (let scope of scopes) {
-			let parentMaps = scopesSeen.filter(s => scope.startsWith(s)).map(s => map.scopes[s]);
-			parentMaps.unshift(map.imports);
+	map.imports ??= {};
 
-			for (let specifier in map.scopes[scope]) {
-				let parentMapping = parentMaps
-					.map(m => m[specifier])
-					.filter(Boolean)
-					.pop();
+	// Sort scopes in ascending order of length
+	let scopes = Object.keys(map.scopes).sort((a, b) => a.length - b.length);
+	let scopesSeen = [];
 
-				if (map.scopes[scope][specifier] === parentMapping) {
-					delete map.scopes[scope][specifier];
-				}
+	for (let scope of scopes) {
+		let parentScopes = scopesSeen.filter(s => scope.startsWith(s) && map.scopes[s]).reverse();
+		let parentMaps = parentScopes.map(s => map.scopes[s]);
+		parentScopes.push("");
+		parentMaps.push(map.imports);
+
+		for (let specifier in map.scopes[scope]) {
+			let parentMappingAt = parentMaps.findIndex(m => m[specifier]);
+			let parentMapping =
+				parentMappingAt > -1 ? parentMaps[parentMappingAt][specifier] : undefined;
+
+			if (map.scopes[scope][specifier] === parentMapping) {
+				// Redundant mapping that is identical to its parent
+				delete map.scopes[scope][specifier];
 			}
-			if (Object.keys(map.scopes[scope]).length === 0) {
-				delete map.scopes[scope];
+			else if (parentMappingAt === -1) {
+				// No parent mapping, hoist to top scope
+				map.imports[specifier] = map.scopes[scope][specifier];
+				delete map.scopes[scope][specifier];
 			}
 		}
+		if (Object.keys(map.scopes[scope]).length === 0) {
+			delete map.scopes[scope];
+		}
+
+		scopesSeen.push(scope);
 	}
 
 	return map;
