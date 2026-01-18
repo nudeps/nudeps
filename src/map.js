@@ -85,27 +85,28 @@ export function cleanupScopes (map) {
 }
 
 // prettier-ignore
-export function injectMap (map, cS) {
+export function injectMap () {
 	if (!cS) {
-		console.error(`Import map injection script cannot be included as a module script. Please remove type="module".`);
+		return console.error(`Import map injection script cannot be included as a module script. Please remove type="module".`);
 	}
 	else if (document.querySelector(`script[type=module]`)) {
-		console.error(`${cS.getAttribute("src")} must be included before any module scripts.`);
+		return console.error(`${cS.getAttribute("src")} must be included before any module scripts.`);
 	}
-	else {
-		const mapUrl = cS.src;
-  		const rebase = m => { for (let k in m) m[k] = new URL(m[k], mapUrl).href; return m; };
-		rebase(map.imports);
-		for (let scope in map.scopes) {
-			rebase(map.scopes[scope]);
-		}
-		cS.after(Object.assign(document.createElement("script"), { type: "importmap", textContent: JSON.stringify(map) }));
-	}
+
+	const mapUrl = cS.src;
+	const rebase = m => { for (let k in m) m[k] = new URL(m[k], mapUrl).href; return m; };
+	rebase(map.imports);
+	for (let scope in map.scopes) rebase(map.scopes[scope]);
+	cS.after(Object.assign(document.createElement("script"), { type: "importmap", textContent: JSON.stringify(map) }));
 }
 
 export async function getImportMapJs (map) {
 	let stringified = typeof map === "string" ? map : JSON.stringify(map, null, "\t");
-	return `{let map = ${stringified};\n(${injectMap})(map, document.currentScript)}`;
+	return `{
+let map = ${stringified};
+let cS = document.currentScript;
+(${injectMap})();
+}`;
 }
 
 export function walkMap (map, callback) {
