@@ -4,12 +4,12 @@
 import { Generator } from "@jspm/generator";
 
 export class ImportMap {
-	constructor ({ inputMap } = {}) {
+	constructor (generatorOptions) {
 		this.generator = new Generator({
-			inputMap,
 			defaultProvider: "nodemodules",
 			env: ["production", "browser", "module"],
 			flattenScopes: false,
+			...generatorOptions,
 		});
 	}
 
