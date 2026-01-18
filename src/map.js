@@ -4,7 +4,11 @@
 import { Generator } from "@jspm/generator";
 
 export class ImportMap {
-	constructor (generatorOptions) {
+	constructor ({ mode, ...generatorOptions } = {}) {
+		if (mode) {
+			generatorOptions.env ??= [mode, "browser", "module"];
+		}
+
 		this.generator = new Generator({
 			defaultProvider: "nodemodules",
 			env: ["production", "browser", "module"],
