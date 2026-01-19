@@ -99,7 +99,7 @@ export default async function (options) {
 				requireMsg = `Use require() to import these packages: ${directCjsDeps.join(", ")}.`;
 			}
 			console.info(
-				`${cjsPackages.length} CommonJS packages detected, adding cjs-browser-shim. ${requireMsg} Disable with --cjs=false`,
+				`[nudeps] ${cjsPackages.length} CommonJS packages detected, adding cjs-browser-shim. ${requireMsg} Disable with --cjs=false`,
 			);
 		}
 	}
@@ -135,6 +135,8 @@ export default async function (options) {
 	ModulePath.localDir = config.dir;
 	ModulePath.packages = packages;
 
+	const stats = { entries: 0, copied: 0, deleted: 0 };
+
 	for (let { specifier, url, map: subMap } of map) {
 		if (!url.includes("node_modules/")) {
 			// Nothing to copy or rewrite
@@ -146,6 +148,7 @@ export default async function (options) {
 		let urlFromMap = path.relative(path.dirname(config.map), modulePath.localPath);
 		urlFromMap = urlFromMap.startsWith(".") ? urlFromMap : "./" + urlFromMap;
 		subMap[specifier] = urlFromMap;
+		stats.entries++;
 		toCopy[modulePath.nodeDir] ??= modulePath.localDir;
 
 		if (modulePath.isNested) {
@@ -179,12 +182,14 @@ export default async function (options) {
 			toDelete.delete(to);
 		}
 		else {
+			stats.copied++;
 			cpSync(from, to, { recursive: true });
 		}
 	}
 
 	for (let dir of toDelete) {
 		if (existsSync(dir)) {
+			stats.deleted++;
 			rmSync(dir, { recursive: true });
 		}
 
@@ -196,6 +201,7 @@ export default async function (options) {
 
 		// Delete the parent directory if empty
 		if (existsSync(parentDir) && isDirectoryEmptySync(parentDir)) {
+			stats.deleted++;
 			rmdirSync(parentDir);
 		}
 	}
@@ -217,4 +223,13 @@ export default async function (options) {
 	}
 
 	writeJSONSync(".nudeps/config.json", config);
+
+	let info = [];
+	if (stats.copied + stats.deleted > 0) {
+		info.push(
+			`${stats.copied} directories added, and ${stats.deleted} deleted from ${config.dir}.`,
+		);
+	}
+	info.push(`Import map with ${stats.entries} entries generated successfully at ${config.map}.`);
+	console.log(`[nudeps] ${info.join(" ")}`);
 }
