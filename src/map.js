@@ -155,7 +155,8 @@ export class ImportMap {
 let map = ${JSON.stringify(this.map, null, "\t")};
 let cS = document.currentScript;
 ${injectMap}
-})();`;
+})();
+`;
 	}
 }
 
