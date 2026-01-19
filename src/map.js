@@ -2,7 +2,8 @@
  * Utils for generating and manipulating import maps
  */
 import { Generator } from "@jspm/generator";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -36,6 +37,21 @@ export class ImportMapGenerator extends Generator {
 			});
 		}
 		catch (error) {
+			if (error.message?.includes("@jspm/core")) {
+				try {
+					installJspmCore();
+
+					return await super.install({
+						alias,
+						target,
+						subpaths: true,
+					});
+				}
+				catch (retryError) {
+					error = retryError;
+				}
+			}
+
 			console.error(`Error installing ${alias}: ${error.message}`);
 		}
 	}
@@ -198,4 +214,17 @@ function deepAssign (target, source) {
 	}
 
 	return target;
+}
+
+function installJspmCore () {
+	let jspmCorePath = path.join("node_modules", "@jspm", "core", "package.json");
+	if (existsSync(jspmCorePath)) {
+		return;
+	}
+
+	console.info("Installing @jspm/core...");
+	let result = spawnSync("npm", ["install", "@jspm/core"], { stdio: "inherit" });
+	if (result.error || result.status !== 0) {
+		throw new Error("Error installing @jspm/core: " + (result.error?.message ?? result.stderr));
+	}
 }
