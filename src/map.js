@@ -118,15 +118,15 @@ export class ImportMap {
 		}
 	}
 
-	walk (callback) {
+	*[Symbol.iterator] () {
 		let map = this.map;
 		if (map.imports) {
 			for (let specifier in map.imports) {
-				callback.call(this, {
+				yield {
 					specifier,
 					url: map.imports[specifier],
 					map: map.imports,
-				});
+				};
 			}
 		}
 
@@ -134,12 +134,12 @@ export class ImportMap {
 			for (let scope in map.scopes) {
 				for (let specifier in map.scopes[scope]) {
 					let subMap = map.scopes[scope];
-					callback.call(this, {
+					yield {
 						specifier,
 						url: subMap[specifier],
 						map: subMap,
 						scope,
-					});
+					};
 				}
 			}
 		}

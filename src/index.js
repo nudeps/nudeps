@@ -135,17 +135,17 @@ export default async function (options) {
 	ModulePath.localDir = config.dir;
 	ModulePath.packages = packages;
 
-	map.walk(({ specifier, url, map }) => {
+	for (let { specifier, url, map: subMap } of map) {
 		if (!url.includes("node_modules/")) {
 			// Nothing to copy or rewrite
-			return;
+			continue;
 		}
 
 		let modulePath = ModulePath.from(url);
 
 		let urlFromMap = path.relative(path.dirname(config.map), modulePath.localPath);
 		urlFromMap = urlFromMap.startsWith(".") ? urlFromMap : "./" + urlFromMap;
-		map[specifier] = urlFromMap;
+		subMap[specifier] = urlFromMap;
 		toCopy[modulePath.nodeDir] ??= modulePath.localDir;
 
 		if (modulePath.isNested) {
@@ -153,7 +153,7 @@ export default async function (options) {
 			let parentPath = [modulePath.parent.localDir, "node_modules", modulePath.packageName];
 			toDelete.add(parentPath.join("/"));
 		}
-	});
+	}
 
 	if (map.scopes) {
 		for (let scope in map.scopes) {
