@@ -40,8 +40,6 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 7. [Troubleshooting](#troubleshooting)
 	1. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
 	2. [Packages that use extension-less paths](#packages-that-use-extension-less-paths)
-8. [Recipes for popular packages](#recipes-for-popular-packages)
-	1. [Vue](#vue)
 
 ## How does it work?
 
@@ -256,7 +254,7 @@ For example, as of this writing, using `vue` out of the box will fail with an er
 
 There are two ways to fix this:
 
-- Use the package's browser bundle through the `overrides` option. This is usually not advisable because it inlines dependencies that other packages may be using too, but sometimes it's the best way forwards.
+- Use the package's browser bundle through the `overrides` option. This is usually not advisable because it inlines dependencies that other packages may be using too, but sometimes it's the best way forwards. You can see an example of this in the [Vue demo](https://github.com/nudeps/nudeps-demos/tree/main/vue).
 - Stub NodeJS objects like `process`. This can work if the surface area is limited, but it can quickly turn into a game of whack-a-mole. Additionally, it can cause bugs in other packages that depend on the presence of these objects to _detect_ NodeJS.
 
 ### Packages that use extension-less paths
@@ -269,25 +267,4 @@ For example, using a [Netlify `_redirects` file](https://docs.netlify.com/routin
 
 ```
 /client_modules/*  /client_modules/:splat.js 301
-```
-
-## Recipes for popular packages
-
-While most packages work out of the box, there are packages that need a little help.
-
-### Vue
-
-As of this writing, using `vue` out of the box will fail with an error about `process` not being available.
-You need to configure Nudeps to use the browser bundle instead, through the `overrides` option:
-
-```js
-// nudeps.js
-export default {
-	overrides: {
-		imports: {
-			// Override is ./node_modules based, nudeps will transform it accordingly
-			vue: "./node_modules/vue/dist/vue.esm-browser.js",
-		},
-	},
-};
 ```
