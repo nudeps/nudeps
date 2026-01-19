@@ -109,7 +109,9 @@ export default async function (options) {
 
 		let modulePath = ModulePath.from(url);
 
-		map[specifier] = path.relative(path.dirname(config.map), modulePath.localPath);
+		let urlFromMap = path.relative(path.dirname(config.map), modulePath.localPath);
+		urlFromMap = urlFromMap.startsWith(".") ? urlFromMap : "./" + urlFromMap;
+		map[specifier] = urlFromMap;
 		toCopy[modulePath.nodeDir] ??= modulePath.localDir;
 
 		if (modulePath.isNested) {
@@ -126,7 +128,12 @@ export default async function (options) {
 			}
 
 			// Rewrite scope itself
-			let localDir = path.relative(path.dirname(config.map), ModulePath.from(scope).localDir);
+			let scopeFromMap = path.relative(
+				path.dirname(config.map),
+				ModulePath.from(scope).localDir,
+			);
+			scopeFromMap = scopeFromMap.startsWith(".") ? scopeFromMap : "./" + scopeFromMap;
+			let localDir = scopeFromMap;
 			map.scopes[localDir] = map.scopes[scope];
 			delete map.scopes[scope];
 		}
