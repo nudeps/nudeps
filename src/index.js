@@ -94,14 +94,15 @@ export default async function (options) {
 	ModulePath.localDir = config.dir;
 	ModulePath.packages = packages;
 
-	walkMap(map, ({ specifier, path, map }) => {
-		if (!path.includes("node_modules/")) {
+	walkMap(map, ({ specifier, path: url, map }) => {
+		if (!url.includes("node_modules/")) {
 			// Nothing to copy or rewrite
 			return;
 		}
 
-		let modulePath = ModulePath.from(path);
-		map[specifier] = modulePath.localPath;
+		let modulePath = ModulePath.from(url);
+
+		map[specifier] = path.relative(path.dirname(config.map), modulePath.localPath);
 		toCopy[modulePath.nodeDir] ??= modulePath.localDir;
 
 		if (modulePath.isNested) {
@@ -118,7 +119,7 @@ export default async function (options) {
 			}
 
 			// Rewrite scope itself
-			let { localDir } = ModulePath.from(scope);
+			let localDir = path.relative(path.dirname(config.map), ModulePath.from(scope).localDir);
 			map.scopes[localDir] = map.scopes[scope];
 			delete map.scopes[scope];
 		}
@@ -157,6 +158,7 @@ export default async function (options) {
 	}
 
 	let js = await getImportMapJs(map);
+	mkdirSync(path.dirname(config.map), { recursive: true });
 	writeFileSync(config.map, js);
 
 	// intentionally async.
