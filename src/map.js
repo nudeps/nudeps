@@ -30,16 +30,11 @@ export class ImportMapGenerator extends Generator {
 	}
 
 	async install (alias, target = `./node_modules/${alias}`) {
-		try {
-			return await super.install({
-				alias,
-				target,
-				subpaths: true,
-			});
-		}
-		catch (error) {
-			console.error(`Error installing ${alias}: ${error.message}`);
-		}
+		return await super.install({
+			alias,
+			target,
+			subpaths: true,
+		});
 	}
 }
 

@@ -52,7 +52,10 @@ export default async function (options) {
 	let generator = new ImportMapGenerator({ commonJS: config.cjs });
 
 	// Ensure the generator has completed tracing before we inspect its trace cache.
-	await generator.install(pkg.name, ".");
+	try {
+		await generator.install(pkg.name, ".");
+	}
+	catch (e) {}
 
 	if (!config.prune && pkg.dependencies) {
 		let exclude = new Set(config.exclude ?? []);
@@ -63,7 +66,12 @@ export default async function (options) {
 				continue;
 			}
 
-			await generator.install(dep);
+			try {
+				await generator.install(dep);
+			}
+			catch (error) {
+				console.error(`Error installing ${dep}: ${error.message}`);
+			}
 		}
 	}
 
