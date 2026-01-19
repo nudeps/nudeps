@@ -3,6 +3,7 @@
  */
 import { Generator } from "@jspm/generator";
 import { readFileSync } from "node:fs";
+import { builtinModules } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +23,7 @@ export class ImportMapGenerator extends Generator {
 			flattenScopes: false,
 			commonJS: true,
 			...generatorOptions,
+			ignore: getNodeBuiltins(),
 		});
 
 		this.commonJS = commonJS;
@@ -198,4 +200,14 @@ function deepAssign (target, source) {
 	}
 
 	return target;
+}
+
+function getNodeBuiltins () {
+	return Array.from(
+		new Set(
+			builtinModules.flatMap(mod =>
+				mod.startsWith("node:") ? [mod, mod.slice(5)] : [mod, `node:${mod}`],
+			),
+		),
+	);
 }
