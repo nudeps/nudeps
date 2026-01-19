@@ -36,6 +36,16 @@ export class ImportMapGenerator extends Generator {
 			subpaths: true,
 		});
 	}
+
+	getEntries (fn) {
+		const resolver = this.traceMap?.resolver;
+
+		if (resolver?.traceEntries) {
+			return Object.entries(resolver.traceEntries).filter(([_, entry]) => fn(entry));
+		}
+
+		return [];
+	}
 }
 
 export class ImportMap {
@@ -56,25 +66,6 @@ export class ImportMap {
 	}
 	set scopes (scopes) {
 		this.map.scopes = scopes;
-	}
-
-	get hasCJS () {
-		const resolver = this.generator?.traceMap?.resolver;
-		let found = false;
-
-		if (resolver?.traceEntries) {
-			for (const url in resolver.traceEntries) {
-				const entry = resolver.traceEntries[url];
-				if (entry?.format === "commonjs") {
-					found = true;
-					break;
-				}
-			}
-		}
-
-		// Cache the result
-		Object.defineProperty(this, "hasCJS", { value: found });
-		return found;
 	}
 
 	/**
@@ -160,15 +151,10 @@ export class ImportMap {
 
 	get js () {
 		let injectMap = readFileSync(path.join(__dirname, "inject-map.js"));
-		let cjsShim =
-			this.commonJS !== false && this.hasCJS
-				? "\n" + readFileSync(path.join(__dirname, "cjs-shim.js"))
-				: "";
 		return `(()=>{
 let map = ${JSON.stringify(this.map, null, "\t")};
 let cS = document.currentScript;
 ${injectMap}
-${cjsShim}
 })();`;
 	}
 }

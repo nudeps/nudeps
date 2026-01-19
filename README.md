@@ -36,7 +36,7 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 	4. [Why does it add the version number to the directory name?](#why-does-it-add-the-version-number-to-the-directory-name)
 	5. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
 	6. [Why doesn't Nudeps have an option to add integrity hashes to the import map?](#why-doesnt-nudeps-have-an-option-to-add-integrity-hashes-to-the-import-map)
-	7. [How does it handle CJS (CommonJS) packages?](#how-does-it-handle-cjs-commonjs-packages)
+	7. [How are CJS (CommonJS) packages handled?](#how-are-cjs-commonjs-packages-handled)
 7. [Troubleshooting](#troubleshooting)
 	1. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
 	2. [Packages that use extension-less paths](#packages-that-use-extension-less-paths)
@@ -234,14 +234,20 @@ The purpose of integrity hashes is to guard against compromise in resources you 
 When using Nudeps you host your own dependencies, so that is not necessary, and would unnecessarily double the size of your import map.
 However, if we later decide there is a need for this,[the PR is already written](https://github.com/nudeps/nudeps/pull/5).
 
-### How does it handle CJS (CommonJS) packages?
+### How are CJS (CommonJS) packages handled?
 
-When CJS packages are detected, an experimental CJS shim is added to the import map injection script.
-The shim makes `require()` work in the browser, both for relative paths and specifiers, allowing such dependencies to work out of the box.
-You can then import them using `require()` in your code.
+When CJS packages are detected, [`cjs-browser-shim`](https://npmjs.com/package/cjs-browser-shim) is automatically included.
+This is a tiny shim that makes `require()` work in the browser, both for relative paths and specifiers, allowing such dependencies to work out of the box.
+Note that you would need to import such dependencies using `require()` in your code, like so:
+
+```js
+import { require } from "cjs-browser-shim";
+const { createElement } = require("react");
+```
+
+You can see a demo of this in [`nudeps-demos/react`](https://github.com/nudeps/nudeps-demos/tree/main/react).
+
 To disable this, set the `cjs` option to `false` and both these packages and the CJS shim will be omitted from the import map.
-
-For a demo of this, check out [`nudeps-demos/react`](https://github.com/nudeps/nudeps-demos/tree/main/react).
 
 ## Troubleshooting
 

@@ -75,11 +75,37 @@ export default async function (options) {
 		}
 	}
 
+	let cjsEntries = [];
+	if (config.cjs !== false) {
+		cjsEntries = generator.getEntries(entry => entry?.format === "commonjs");
+
+		if (cjsEntries.length > 0) {
+			try {
+				await generator.install("cjs-browser-shim");
+			}
+			catch (e) {
+				await generator.install(
+					"cjs-browser-shim",
+					"./node_modules/nudeps/node_modules/cjs-browser-shim",
+				);
+			}
+
+			let cjsPackages = [
+				...new Set(cjsEntries.map(([url]) => ModulePath.from(url).packageName)),
+			];
+			let directCjsDeps = cjsPackages.filter(packageName => packageName in pkg.dependencies);
+			let requireMsg = "";
+			if (directCjsDeps.length > 0) {
+				requireMsg = `Use require() to import these packages: ${directCjsDeps.join(", ")}.`;
+			}
+			console.info(
+				`${cjsPackages.length} CommonJS packages detected, adding cjs-browser-shim. ${requireMsg} Disable with --cjs=false`,
+			);
+		}
+	}
+
 	let map = new ImportMap(generator);
 
-	if (config.cjs !== false && map.hasCJS) {
-		console.info("CommonJS packages detected, adding CJS shim. Use --cjs=false to disable.");
-	}
 	map.cleanupScopes();
 
 	if (config.overrides) {

@@ -37,6 +37,7 @@
 	},
 	"dependencies": {
 		"@jspm/generator": "^2.8.0",
+		"cjs-browser-shim": "latest",
 		"minimist": "^1.2.8"
 	}
 }
