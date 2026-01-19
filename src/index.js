@@ -49,8 +49,10 @@ export default async function (options) {
 		throw new Error("package.json not found or invalid");
 	}
 
-	let map = new ImportMapGenerator();
-	map.install(pkg.name, ".");
+	let generator = new ImportMapGenerator();
+
+	// Ensure the generator has completed tracing before we inspect its trace cache.
+	await generator.install(pkg.name, ".");
 
 	if (!config.prune && pkg.dependencies) {
 		let exclude = new Set(config.exclude ?? []);
@@ -61,11 +63,11 @@ export default async function (options) {
 				continue;
 			}
 
-			await map.install(dep);
+			await generator.install(dep);
 		}
 	}
 
-	map = new ImportMap(map.getMap());
+	let map = new ImportMap(generator);
 	map.cleanupScopes();
 
 	if (config.overrides) {

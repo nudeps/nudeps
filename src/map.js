@@ -3,13 +3,15 @@
  */
 import { Generator } from "@jspm/generator";
 
-export class ImportMapGenerator {
+export class ImportMapGenerator extends Generator {
 	constructor ({ mode, ...generatorOptions } = {}) {
 		if (mode) {
+			this.mode = mode;
 			generatorOptions.env ??= [mode, "browser", "module"];
 		}
 
-		this.generator = new Generator({
+
+		super({
 			defaultProvider: "nodemodules",
 			env: ["production", "browser", "module"],
 			flattenScopes: false,
@@ -19,7 +21,7 @@ export class ImportMapGenerator {
 
 	async install (alias, target = `./node_modules/${alias}`) {
 		try {
-			return await this.generator.install({
+			return await super.install({
 				alias,
 				target,
 				subpaths: true,
@@ -27,15 +29,12 @@ export class ImportMapGenerator {
 		}
 		catch (error) {}
 	}
-
-	getMap () {
-		return this.generator.getMap();
-	}
 }
 
 export class ImportMap {
-	constructor (map) {
-		this.map = map ?? {};
+	constructor (generator) {
+		this.generator = generator;
+		this.map = generator.getMap() ?? {};
 	}
 
 	get imports () {
