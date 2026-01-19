@@ -14,7 +14,7 @@ import {
 	cpSync,
 } from "node:fs";
 import { cp } from "node:fs/promises";
-import { ImportMap, getImportMapJs, walkMap, applyOverrides } from "./map.js";
+import { ImportMapGenerator, getImportMapJs, walkMap, applyOverrides } from "./map.js";
 import ModulePath from "./util/paths.js";
 
 export default async function (options) {
@@ -49,7 +49,7 @@ export default async function (options) {
 		throw new Error("package.json not found or invalid");
 	}
 
-	let map = new ImportMap();
+	let map = new ImportMapGenerator();
 	map.install(pkg.name, ".");
 
 	if (!config.prune && pkg.dependencies) {

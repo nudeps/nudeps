@@ -3,7 +3,7 @@
  */
 import { Generator } from "@jspm/generator";
 
-export class ImportMap {
+export class ImportMapGenerator {
 	constructor ({ mode, ...generatorOptions } = {}) {
 		if (mode) {
 			generatorOptions.env ??= [mode, "browser", "module"];
