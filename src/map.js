@@ -29,59 +29,117 @@ export class ImportMapGenerator {
 	}
 
 	getMap () {
-		let map = this.generator.getMap();
-		cleanupScopes(map);
-		return map;
+		return this.generator.getMap();
 	}
 }
 
-/**
- * This function processes map.scopes and does the following:
- * 1. Removes redundant scopes, i.e. scopes that are identical to their parent
- * 2. Hoists specifiers to parent scopes if they would otherwise be undefined
- * @param {object} map
- * @returns {object} The cleaned up map
- */
-export function cleanupScopes (map) {
-	if (!map?.scopes) {
-		return map;
+export class ImportMap {
+	constructor (map) {
+		this.map = map ?? {};
 	}
 
-	map.imports ??= {};
-
-	// Sort scopes in ascending order of length
-	let scopes = Object.keys(map.scopes).sort((a, b) => a.length - b.length);
-	let scopesSeen = [];
-
-	for (let scope of scopes) {
-		let parentScopes = scopesSeen.filter(s => scope.startsWith(s) && map.scopes[s]).reverse();
-		let parentMaps = parentScopes.map(s => map.scopes[s]);
-		parentScopes.push("");
-		parentMaps.push(map.imports);
-
-		for (let specifier in map.scopes[scope]) {
-			let parentMappingAt = parentMaps.findIndex(m => m[specifier]);
-			let parentMapping =
-				parentMappingAt > -1 ? parentMaps[parentMappingAt][specifier] : undefined;
-
-			if (map.scopes[scope][specifier] === parentMapping) {
-				// Redundant mapping that is identical to its parent
-				delete map.scopes[scope][specifier];
-			}
-			else if (parentMappingAt === -1) {
-				// No parent mapping, hoist to top scope
-				map.imports[specifier] = map.scopes[scope][specifier];
-				delete map.scopes[scope][specifier];
-			}
-		}
-		if (Object.keys(map.scopes[scope]).length === 0) {
-			delete map.scopes[scope];
-		}
-
-		scopesSeen.push(scope);
+	get imports () {
+		return this.map.imports;
+	}
+	set imports (imports) {
+		this.map.imports = imports;
 	}
 
-	return map;
+	get scopes () {
+		return this.map.scopes;
+	}
+	set scopes (scopes) {
+		this.map.scopes = scopes;
+	}
+
+	/**
+	 * This function processes map.scopes and does the following:
+	 * 1. Removes redundant scopes, i.e. scopes that are identical to their parent
+	 * 2. Hoists specifiers to parent scopes if they would otherwise be undefined
+	 * @param {object} map
+	 * @returns {object} The cleaned up map
+	 */
+	cleanupScopes () {
+		let map = this.map;
+		if (!map?.scopes) {
+			return map;
+		}
+
+		map.imports ??= {};
+
+		// Sort scopes in ascending order of length
+		let scopes = Object.keys(map.scopes).sort((a, b) => a.length - b.length);
+		let scopesSeen = [];
+
+		for (let scope of scopes) {
+			let parentScopes = scopesSeen
+				.filter(s => scope.startsWith(s) && map.scopes[s])
+				.reverse();
+			let parentMaps = parentScopes.map(s => map.scopes[s]);
+			parentScopes.push("");
+			parentMaps.push(map.imports);
+
+			for (let specifier in map.scopes[scope]) {
+				let parentMappingAt = parentMaps.findIndex(m => m[specifier]);
+				let parentMapping =
+					parentMappingAt > -1 ? parentMaps[parentMappingAt][specifier] : undefined;
+
+				if (map.scopes[scope][specifier] === parentMapping) {
+					// Redundant mapping that is identical to its parent
+					delete map.scopes[scope][specifier];
+				}
+				else if (parentMappingAt === -1) {
+					// No parent mapping, hoist to top scope
+					map.imports[specifier] = map.scopes[scope][specifier];
+					delete map.scopes[scope][specifier];
+				}
+			}
+			if (Object.keys(map.scopes[scope]).length === 0) {
+				delete map.scopes[scope];
+			}
+
+			scopesSeen.push(scope);
+		}
+	}
+
+	walk (callback) {
+		let map = this.map;
+		if (map.imports) {
+			for (let specifier in map.imports) {
+				callback.call(this, {
+					specifier,
+					url: map.imports[specifier],
+					map: map.imports,
+				});
+			}
+		}
+
+		if (map.scopes) {
+			for (let scope in map.scopes) {
+				for (let specifier in map.scopes[scope]) {
+					let subMap = map.scopes[scope];
+					callback.call(this, {
+						specifier,
+						url: subMap[specifier],
+						map: subMap,
+						scope,
+					});
+				}
+			}
+		}
+	}
+
+	applyOverrides (overrides) {
+		return deepAssign(this.map, overrides);
+	}
+
+	get js () {
+		return `{
+let map = ${JSON.stringify(this.map, null, "\t")};
+let cS = document.currentScript;
+(${injectMap})();
+}`;
+	}
 }
 
 // prettier-ignore
@@ -98,49 +156,6 @@ export function injectMap () {
 	rebase(map.imports);
 	for (let scope in map.scopes) rebase(map.scopes[scope]);
 	cS.after(Object.assign(document.createElement("script"), { type: "importmap", textContent: JSON.stringify(map) }));
-}
-
-export async function getImportMapJs (map) {
-	let stringified = typeof map === "string" ? map : JSON.stringify(map, null, "\t");
-	return `{
-let map = ${stringified};
-let cS = document.currentScript;
-(${injectMap})();
-}`;
-}
-
-export function walkMap (map, callback) {
-	if (!map) {
-		return;
-	}
-
-	if (map.imports) {
-		for (let specifier in map.imports) {
-			callback({
-				specifier,
-				path: map.imports[specifier],
-				map: map.imports,
-			});
-		}
-	}
-
-	if (map.scopes) {
-		for (let scope in map.scopes) {
-			for (let specifier in map.scopes[scope]) {
-				let subMap = map.scopes[scope];
-				callback({
-					specifier,
-					path: subMap[specifier],
-					map: subMap,
-					scope,
-				});
-			}
-		}
-	}
-}
-
-export function applyOverrides (map, overrides) {
-	return deepAssign(map, overrides);
 }
 
 function deepAssign (target, source) {

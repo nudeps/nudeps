@@ -14,7 +14,7 @@ import {
 	cpSync,
 } from "node:fs";
 import { cp } from "node:fs/promises";
-import { ImportMapGenerator, getImportMapJs, walkMap, applyOverrides } from "./map.js";
+import { ImportMapGenerator, ImportMap } from "./map.js";
 import ModulePath from "./util/paths.js";
 
 export default async function (options) {
@@ -65,10 +65,11 @@ export default async function (options) {
 		}
 	}
 
-	map = map.getMap();
+	map = new ImportMap(map.getMap());
+	map.cleanupScopes();
 
 	if (config.overrides) {
-		applyOverrides(map, config.overrides);
+		map.applyOverrides(config.overrides);
 	}
 
 	let packages = readJSONSync("package-lock.json")?.packages;
@@ -94,7 +95,7 @@ export default async function (options) {
 	ModulePath.localDir = config.dir;
 	ModulePath.packages = packages;
 
-	walkMap(map, ({ specifier, path: url, map }) => {
+	map.walk(({ specifier, url, map }) => {
 		if (!url.includes("node_modules/")) {
 			// Nothing to copy or rewrite
 			return;
@@ -157,9 +158,8 @@ export default async function (options) {
 		rmSync(oldConfig.map);
 	}
 
-	let js = await getImportMapJs(map);
 	mkdirSync(path.dirname(config.map), { recursive: true });
-	writeFileSync(config.map, js);
+	writeFileSync(config.map, map.js);
 
 	// intentionally async.
 	// Nothing immediately hinges on the result of this, and we're not going to run update immediately after.
