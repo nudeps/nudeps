@@ -2,6 +2,10 @@
  * Utils for generating and manipulating import maps
  */
 import { Generator } from "@jspm/generator";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import * as path from "node:path";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export class ImportMapGenerator extends Generator {
 	constructor ({ mode, ...generatorOptions } = {}) {
@@ -133,28 +137,13 @@ export class ImportMap {
 	}
 
 	get js () {
-		return `{
+		let injectMap = readFileSync(path.join(__dirname, "inject-map.js"));
+		return `(()=>{
 let map = ${JSON.stringify(this.map, null, "\t")};
 let cS = document.currentScript;
-(${injectMap})();
-}`;
+${injectMap}
+})();`;
 	}
-}
-
-// prettier-ignore
-export function injectMap () {
-	if (!cS) {
-		return console.error(`Import map injection script cannot be included as a module script. Please remove type="module".`);
-	}
-	else if (document.querySelector(`script[type=module]`)) {
-		return console.error(`${cS.getAttribute("src")} must be included before any module scripts.`);
-	}
-
-	const mapUrl = cS.src;
-	const rebase = m => { for (let k in m) m[k] = new URL(m[k], mapUrl).href; return m; };
-	rebase(map.imports);
-	for (let scope in map.scopes) rebase(map.scopes[scope]);
-	cS.after(Object.assign(document.createElement("script"), { type: "importmap", textContent: JSON.stringify(map) }));
 }
 
 function deepAssign (target, source) {
