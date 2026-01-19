@@ -35,7 +35,9 @@ export class ImportMapGenerator extends Generator {
 				subpaths: true,
 			});
 		}
-		catch (error) {}
+		catch (error) {
+			console.error(`Error installing ${alias}: ${error.message}`);
+		}
 	}
 }
 
