@@ -1,6 +1,6 @@
 {
 	"name": "nudeps",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"description": "Naked dependencies, in the browser.",
 	"keywords": [],
 	"homepage": "https://github.com/nudeps/nudeps/#readme",
