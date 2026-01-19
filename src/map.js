@@ -22,8 +22,8 @@ export class ImportMapGenerator extends Generator {
 			env: ["production", "browser", "module"],
 			flattenScopes: false,
 			commonJS: true,
-			...generatorOptions,
 			ignore: getNodeBuiltins(),
+			...generatorOptions,
 		});
 
 		this.commonJS = commonJS;
@@ -202,12 +202,13 @@ function deepAssign (target, source) {
 	return target;
 }
 
+let nodeBuiltins = null;
 function getNodeBuiltins () {
-	return Array.from(
+	nodeBuiltins ??= Array.from(
 		new Set(
 			builtinModules.flatMap(mod =>
-				mod.startsWith("node:") ? [mod, mod.slice(5)] : [mod, `node:${mod}`],
-			),
+				mod.startsWith("node:") ? [mod, mod.slice(5)] : [mod, `node:${mod}`]),
 		),
 	);
+	return nodeBuiltins;
 }
