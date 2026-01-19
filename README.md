@@ -1,4 +1,4 @@
-# NuDeps
+# Nudeps
 
 Your dependencies, naked.
 
@@ -11,7 +11,7 @@ Yes, you read that right.
 - Granular cache busting, only for modules that change version
 - Even CJS works (very experimental!)
 
-Try it out in the [demo repository](https://github.com/nudeps/nudeps-demo).
+Try it out in the [demos repository](https://github.com/nudeps/nudeps-demos).
 
 For background, see [Web dependencies are broken. Can we fix them?](https://lea.verou.me/blog/2026/web-deps/).
 
@@ -60,7 +60,7 @@ All it takes to use these definitions is to include the `importmap.js` file in y
 ```
 
 You can include that one line of HTML either manually or via your templating system of choice.
-You can see an example of what such a file looks like at https://github.com/nudeps/nudeps-demo/blob/main/importmap.js
+You can see an example of what such a file looks like at https://github.com/nudeps/nudeps-demos/blob/main/floating-ui/importmap.js
 
 You then install and uninstall dependencies as needed and use them straight away, and both the import map and copied dependencies will be automatically updated.
 No, without you having to remember to run anything before or after.
@@ -243,7 +243,7 @@ The shim makes `require()` work in the browser, both for relative paths and spec
 You can then import them using `require()` in your code.
 To disable this, set the `cjs` option to `false` and both these packages and the CJS shim will be omitted from the import map.
 
-For a demo of this, check out [`nudeps-demo/react`](https://github.com/nudeps/nudeps-demo/tree/main/react).
+For a demo of this, check out [`nudeps-demos/react`](https://github.com/nudeps/nudeps-demos/tree/main/react).
 
 ## Troubleshooting
 
