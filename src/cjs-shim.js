@@ -3,9 +3,12 @@ let modules = {};
 
 function resolve (specifier, parentURL = cS.src) {
 	for (let s in map.imports) {
-		if (specifier === s || specifier.startsWith(s + "/")) {
-			specifier = specifier.replace(s, map.imports[s]);
-			return new URL(specifier, parentURL).href;
+		if (specifier === s) {
+			return new URL(map.imports[s], parentURL).href;
+		}
+		if (s.endsWith("/") && specifier.startsWith(s)) {
+			let target = map.imports[s] + specifier.slice(s.length);
+			return new URL(target, parentURL).href;
 		}
 	}
 
@@ -15,7 +18,10 @@ function resolve (specifier, parentURL = cS.src) {
 function require (specifier, parentURL) {
 	let url = specifier;
 
-	if (!url.startsWith(".") && !url.startsWith("https:")) {
+	if (url.startsWith(".")) {
+		url = new URL(url, parentURL ?? cS.src).href;
+	}
+	else if (!url.startsWith("https:")) {
 		url = resolve(specifier, parentURL);
 	}
 
