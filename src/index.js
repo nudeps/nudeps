@@ -49,7 +49,7 @@ export default async function (options) {
 		throw new Error("package.json not found or invalid");
 	}
 
-	let generator = new ImportMapGenerator();
+	let generator = new ImportMapGenerator({ commonJS: config.cjs });
 
 	// Ensure the generator has completed tracing before we inspect its trace cache.
 	await generator.install(pkg.name, ".");
@@ -68,6 +68,10 @@ export default async function (options) {
 	}
 
 	let map = new ImportMap(generator);
+
+	if (config.cjs !== false && map.hasCJS) {
+		console.info("CommonJS packages detected, adding CJS shim. Use --cjs=false to disable.");
+	}
 	map.cleanupScopes();
 
 	if (config.overrides) {

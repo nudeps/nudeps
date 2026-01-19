@@ -2,17 +2,18 @@
 
 Your dependencies, naked.
 
-For background, see [Web dependencies are broken. Can we fix them?](https://lea.verou.me/blog/2026/web-deps/).
 This package introduces lightweight tooling as an alternative to bundlers.
-It lets you use specifiers in the browser with no traditional build tools, meaning:
+It lets you use `npm install` as you normally would, and import dependencies via specifiers in the browser without a bundler or build step.
+Yes, you read that right.
 
 - Nothing to remember to run before working on code
-- No transpilation or bundling needed for your own code or even the code of your dependencies
+- No transpilation or bundling needed for either your code or your dependencies
 - Granular cache busting, only for modules that change version
+- Even CJS works (very experimental!)
 
-Too good to be true?
-And yet, it is not.
 Try it out in the [demo repository](https://github.com/nudeps/nudeps-demo).
+
+For background, see [Web dependencies are broken. Can we fix them?](https://lea.verou.me/blog/2026/web-deps/).
 
 ## Contents
 
@@ -35,10 +36,10 @@ Try it out in the [demo repository](https://github.com/nudeps/nudeps-demo).
 	4. [Why does it add the version number to the directory name?](#why-does-it-add-the-version-number-to-the-directory-name)
 	5. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
 	6. [Why doesn't Nudeps have an option to add integrity hashes to the import map?](#why-doesnt-nudeps-have-an-option-to-add-integrity-hashes-to-the-import-map)
+	7. [How does it handle CJS (CommonJS) packages?](#how-does-it-handle-cjs-commonjs-packages)
 7. [Troubleshooting](#troubleshooting)
 	1. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
 	2. [Packages that use extension-less paths](#packages-that-use-extension-less-paths)
-	3. [CJS packages (packages that use `require()` and `module.exports`)](#cjs-packages-packages-that-use-require-and-moduleexports)
 8. [Recipes for popular packages](#recipes-for-popular-packages)
 	1. [Vue](#vue)
 
@@ -168,6 +169,7 @@ Some command line options allow for a shorthand one letter syntax, which is list
 | Exclude              | `exclude`       | `--exclude` | `-e`           | `[]`               | Any packages to exclude from import map even though they appear in `dependencies`. Useful for server-side dependencies. When providing via the command line option, comma-separate and do not include any spaces.        |
 | External config file | -               | `--config`  | `-c`           | `nudeps.json`      | File path for nudeps configuration, relative to project root.                                                                                                                                                            |
 | Overrides            | `overrides`     | -           | -              | `{}`               | Overrides for the import map, using `./node_modules/` paths. Set a key to `undefined` to remove it from the map.                                                                                                         |
+| CommonJS             | `cjs`           | `--cjs`     | -              | `true`             | Whether to add a CommonJS shim to the import if any CJS packages are detected. Setting to `false` will omit both the shim and these packages from the import map.                                                        |
 
 ## Commands
 
@@ -234,6 +236,15 @@ The purpose of integrity hashes is to guard against compromise in resources you 
 When using Nudeps you host your own dependencies, so that is not necessary, and would unnecessarily double the size of your import map.
 However, if we later decide there is a need for this,[the PR is already written](https://github.com/nudeps/nudeps/pull/5).
 
+### How does it handle CJS (CommonJS) packages?
+
+When CJS packages are detected, an experimental CJS shim is added to the import map injection script.
+The shim makes `require()` work in the browser, both for relative paths and specifiers, allowing such dependencies to work out of the box.
+You can then import them using `require()` in your code.
+To disable this, set the `cjs` option to `false` and both these packages and the CJS shim will be omitted from the import map.
+
+For a demo of this, check out [`nudeps-demo/react`](https://github.com/nudeps/nudeps-demo/tree/main/react).
+
 ## Troubleshooting
 
 While most packages should work fine, some packages make certain over-reaching assumptions about the environment they are running in.
@@ -259,15 +270,6 @@ For example, using a [Netlify `_redirects` file](https://docs.netlify.com/routin
 ```
 /client_modules/*  /client_modules/:splat.js 301
 ```
-
-### CJS packages (packages that use `require()` and `module.exports`)
-
-While most packages these days provide ESM exports, there are still a few that only provide CJS, either because they predate ESM, or as a political choice.
-To support running such packages directly in the browser you will need a tiny shim.
-Some options are:
-
-- [browser-cjs](https://www.npmjs.com/package/browser-cjs)
-- (send PRs to add more!)
 
 ## Recipes for popular packages
 

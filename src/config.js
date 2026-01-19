@@ -30,6 +30,12 @@ function readArgs (argv = process.argv.slice(2)) {
 		if (typeof ret[key] === "string" && option.parse) {
 			ret[key] = option.parse(ret[key]);
 		}
+		else if (
+			typeof option.default === "boolean" &&
+			(ret[key] === "true" || ret[key] === "false")
+		) {
+			ret[key] = ret[key] === "true";
+		}
 
 		if (option.validate && !option.validate(ret[key])) {
 			delete ret[key];
