@@ -1,12 +1,23 @@
+// CJS shim
 let modules = {};
 
 function resolve (specifier, parentURL = cS.src) {
-	specifier = map.imports[specifier] ?? specifier;
-	return new URL(specifier, parentURL).href;
+	for (let s in map.imports) {
+		if (specifier === s || specifier.startsWith(s + "/")) {
+			specifier = specifier.replace(s, map.imports[s]);
+			return new URL(specifier, parentURL).href;
+		}
+	}
+
+	throw new Error(`Unknown specifier: ${specifier}`);
 }
 
 function require (specifier, parentURL) {
-	let url = resolve(specifier, parentURL);
+	let url = specifier;
+
+	if (!url.startsWith(".") && !url.startsWith("https:")) {
+		url = resolve(specifier, parentURL);
+	}
 
 	if (url in modules) {
 		return modules[url];
