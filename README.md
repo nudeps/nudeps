@@ -6,10 +6,13 @@ This package introduces lightweight tooling as an alternative to bundlers.
 It lets you use `npm install` as you normally would, and import dependencies via specifiers in the browser without a bundler or build step.
 Yes, you read that right.
 
-- Nothing to remember to run before working on code
-- No transpilation or bundling needed for either your code or your dependencies
-- Granular cache busting, only for modules that change version
-- Even CJS works (very experimental!)
+- ✅ **No watchers!** Nothing to remember to run before working on code
+- ✅ **No transpilation or bundling** needed for either your code or your dependencies
+- ✅ **Granular cache busting**, only for modules that change version
+- ✅ **No additional client-side code** you need to run [^1]
+- ✅ **Even CJS packages work!** (experimental)
+
+[^1]: Except for CJS packages, which require a shim that is automatically included.
 
 Try it out in the [demos repository](https://github.com/nudeps/nudeps-demos).
 
