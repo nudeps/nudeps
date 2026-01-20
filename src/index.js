@@ -145,8 +145,12 @@ export default async function (options) {
 
 		let modulePath = ModulePath.from(url);
 
-		let urlFromMap = path.relative(path.dirname(config.map), modulePath.localPath);
+		let urlFromMap = path.relative(path.dirname(config.map), modulePath.localPath); // Note: path.relative() might normalize away the trailing slash for directories
 		urlFromMap = urlFromMap.startsWith(".") ? urlFromMap : "./" + urlFromMap;
+		if (specifier.endsWith("/") && !urlFromMap.endsWith("/")) {
+			// Preserve directory specifiers that require a trailing slash in import maps
+			urlFromMap += "/";
+		}
 		subMap[specifier] = urlFromMap;
 		stats.entries++;
 		toCopy[modulePath.nodeDir] ??= modulePath.localDir;
