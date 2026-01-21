@@ -29,11 +29,11 @@ export class ImportMapGenerator extends Generator {
 		this.commonJS = commonJS;
 	}
 
-	async install (alias, target = `./node_modules/${alias}`) {
+	async install (alias, target = `./node_modules/${alias}`, { subpaths = true } = {}) {
 		return await super.install({
 			alias,
 			target,
-			subpaths: true,
+			subpaths,
 		});
 	}
 
