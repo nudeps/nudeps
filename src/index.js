@@ -2,6 +2,7 @@
  * Main entry point
  */
 import * as path from "node:path";
+import { pathToFileURL } from "node:url";
 import { getConfig } from "./config.js";
 import { readJSONSync, writeJSONSync, getTopLevelModules, isDirectoryEmptySync } from "./util.js";
 import {
@@ -49,7 +50,26 @@ export default async function (options) {
 		throw new Error("package.json not found or invalid");
 	}
 
-	let generator = new ImportMapGenerator({ commonJS: config.cjs });
+	let generatorOptions = { commonJS: config.cjs };
+
+	// JSPM Generator does not support npm aliases (npm:), so we override the
+	// root package config to point alias deps at their local node_modules paths.
+	let aliasOverrides = getAliasDependencyOverrides(pkg);
+	if (aliasOverrides) {
+		// We need the full package URL to key packageConfigs, so build an explicit baseUrl.
+		let baseUrl = pathToFileURL(path.resolve(".") + "/");
+		let pkgOverride = applyAliasOverrides(pkg, aliasOverrides);
+		generatorOptions = {
+			...generatorOptions,
+			baseUrl,
+			packageConfigs: {
+				[baseUrl.href]: pkgOverride,
+				[`${baseUrl.href}package.json`]: pkgOverride,
+			},
+		};
+	}
+
+	let generator = new ImportMapGenerator(generatorOptions);
 
 	// Ensure the generator has completed tracing before we inspect its trace cache.
 	try {
@@ -246,4 +266,30 @@ export default async function (options) {
 	}
 	info.push(`Import map with ${stats.entries} entries generated successfully at ${config.map}.`);
 	console.log(`[nudeps] ${info.join(" ")}`);
+}
+
+function getAliasDependencyOverrides (pkg) {
+	let deps = pkg?.dependencies;
+	if (!deps) {
+		return null;
+	}
+
+	let overrides = {};
+	for (let [name, spec] of Object.entries(deps)) {
+		if (typeof spec === "string" && spec.startsWith("npm:")) {
+			overrides[name] = `./node_modules/${name}`;
+		}
+	}
+
+	return Object.keys(overrides).length > 0 ? overrides : null;
+}
+
+function applyAliasOverrides (pkg, overrides) {
+	return {
+		...pkg,
+		dependencies: {
+			...(pkg.dependencies ?? {}),
+			...overrides,
+		},
+	};
 }
