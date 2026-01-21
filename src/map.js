@@ -33,7 +33,7 @@ export class ImportMapGenerator extends Generator {
 		return await super.install({
 			alias,
 			target,
-			subpaths,
+			...installOptions,
 		});
 	}
 
