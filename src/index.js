@@ -54,6 +54,7 @@ export default async function (options) {
 
 	// JSPM Generator does not support npm aliases (npm:), so we override the
 	// root package config to point alias deps at their local node_modules paths.
+	// See https://github.com/jspm/jspm/issues/2687
 	let aliasOverrides = getAliasDependencyOverrides(pkg);
 	if (aliasOverrides) {
 		// We need the full package URL to key packageConfigs, so build an explicit baseUrl.
