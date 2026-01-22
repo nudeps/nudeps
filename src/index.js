@@ -21,7 +21,7 @@ import {
 } from "node:fs";
 import { cp } from "node:fs/promises";
 import { ImportMapGenerator, ImportMap } from "./map.js";
-import ModulePath from "./util/paths.js";
+import ModulePath from "./util/path.js";
 
 export default async function (options) {
 	let config = Object.assign(await getConfig(), options);
