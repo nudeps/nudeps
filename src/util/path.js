@@ -62,7 +62,7 @@ export default class ModulePath {
 	}
 
 	get packageName () {
-		return this.packages.at(-1);
+		return this.constructor.packages[this.lockKey]?.name ?? this.packages.at(-1);
 	}
 
 	get localDir () {
