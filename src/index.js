@@ -2,15 +2,13 @@
  * Main entry point
  */
 import * as path from "node:path";
-import { pathToFileURL } from "node:url";
 import { getConfig } from "./config.js";
 import {
 	readJSONSync,
 	writeJSONSync,
 	getTopLevelModules,
 	isDirectoryEmptySync,
-	getAliasDependencyOverrides,
-	applyAliasOverrides,
+	fixAliases,
 } from "./util.js";
 import {
 	writeFileSync,
@@ -62,20 +60,8 @@ export default async function (options) {
 	// JSPM Generator does not support npm aliases (npm:), so we override the
 	// root package config to point alias deps at their local node_modules paths.
 	// See https://github.com/jspm/jspm/issues/2687
-	let aliasOverrides = getAliasDependencyOverrides(pkg);
-	if (aliasOverrides) {
-		// We need the full package URL to key packageConfigs, so build an explicit baseUrl.
-		let baseUrl = pathToFileURL(path.resolve(".") + "/");
-		let pkgOverride = applyAliasOverrides(pkg, aliasOverrides);
-		generatorOptions = {
-			...generatorOptions,
-			baseUrl,
-			packageConfigs: {
-				[baseUrl.href]: pkgOverride,
-				[`${baseUrl.href}package.json`]: pkgOverride,
-			},
-		};
-	}
+	let aliasOptions = fixAliases(pkg);
+	Object.assign(generatorOptions, aliasOptions);
 
 	let generator = new ImportMapGenerator(generatorOptions);
 
