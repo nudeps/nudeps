@@ -15,31 +15,23 @@ export function fixAliases (pkg) {
 		return;
 	}
 
-	let overrides = {};
-	for (let [name, spec] of Object.entries(pkg.dependencies)) {
-		if (typeof spec === "string" && spec.startsWith("npm:")) {
-			overrides[name] = `./node_modules/${name}`;
-		}
-	}
+	let aliases = Object.entries(pkg.dependencies).flatMap(([name, spec]) =>
+		spec?.startsWith("npm:") ? name : []);
 
-	if (Object.keys(overrides).length === 0) {
+	if (aliases.length === 0) {
 		return;
 	}
 
 	// We need the full package URL to key packageConfigs, so build an explicit baseUrl.
 	let baseUrl = pathToFileURL(path.resolve(".") + "/");
-	let pkgOverride = {
-		...pkg,
-		dependencies: {
-			...(pkg.dependencies ?? {}),
-			...overrides,
-		},
-	};
 
 	return {
-		// baseUrl,
 		packageConfigs: {
-			[baseUrl.href]: pkgOverride,
+			[baseUrl.href]: {
+				dependencies: Object.fromEntries(
+					aliases.map(([name]) => [name, `./node_modules/${name}`]),
+				),
+			},
 		},
 	};
 }
