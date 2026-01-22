@@ -4,7 +4,14 @@
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 import { getConfig } from "./config.js";
-import { readJSONSync, writeJSONSync, getTopLevelModules, isDirectoryEmptySync } from "./util.js";
+import {
+	readJSONSync,
+	writeJSONSync,
+	getTopLevelModules,
+	isDirectoryEmptySync,
+	getAliasDependencyOverrides,
+	applyAliasOverrides,
+} from "./util.js";
 import {
 	writeFileSync,
 	renameSync,
@@ -267,30 +274,4 @@ export default async function (options) {
 	}
 	info.push(`Import map with ${stats.entries} entries generated successfully at ${config.map}.`);
 	console.log(`[nudeps] ${info.join(" ")}`);
-}
-
-function getAliasDependencyOverrides (pkg) {
-	let deps = pkg?.dependencies;
-	if (!deps) {
-		return null;
-	}
-
-	let overrides = {};
-	for (let [name, spec] of Object.entries(deps)) {
-		if (typeof spec === "string" && spec.startsWith("npm:")) {
-			overrides[name] = `./node_modules/${name}`;
-		}
-	}
-
-	return Object.keys(overrides).length > 0 ? overrides : null;
-}
-
-function applyAliasOverrides (pkg, overrides) {
-	return {
-		...pkg,
-		dependencies: {
-			...(pkg.dependencies ?? {}),
-			...overrides,
-		},
-	};
 }
