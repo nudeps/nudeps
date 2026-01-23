@@ -12,8 +12,12 @@ export function fixDependencies (pkg) {
 	}
 
 	let deps = pkg.dependencies;
-	let fixedAliases = fixAliases(deps) ?? {};
-	let fixedGitHubPackages = fixGitHubPackages(deps) ?? {};
+	let fixedAliases = fixAliases(deps);
+	let fixedGitHubPackages = fixGitHubPackages(deps);
+
+	if (!fixedAliases && !fixedGitHubPackages) {
+		return;
+	}
 
 	// We need the full package URL to key packageConfigs, so build an explicit baseUrl.
 	let baseUrl = pathToFileURL(path.resolve(".") + "/");
@@ -22,8 +26,8 @@ export function fixDependencies (pkg) {
 		packageConfigs: {
 			[baseUrl.href]: {
 				dependencies: {
-					...fixedAliases,
-					...fixedGitHubPackages,
+					...(fixedAliases ?? {}),
+					...(fixedGitHubPackages ?? {}),
 				},
 			},
 		},
