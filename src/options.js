@@ -35,6 +35,7 @@ export default {
 
 			// Dotfiles
 			"**/.*",
+			{ not: "**/.gitignore" },
 
 			"{*,@*/*}/package.json",
 			"{*,@*/*}/{package,pnpm}-lock.json",
