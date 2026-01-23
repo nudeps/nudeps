@@ -23,16 +23,18 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 1. [How does it work?](#how-does-it-work)
 2. [Nudeps vs JSPM](#nudeps-vs-jspm)
 	1. [Do I need nudeps or JSPM?](#do-i-need-nudeps-or-jspm)
-3. [Installation](#installation)
+3. [Current limitations](#current-limitations)
+4. [Roadmap](#roadmap)
+5. [Installation](#installation)
 	1. [Local installation](#local-installation)
 	2. [Global installation](#global-installation)
 	3. [Automatically run nudeps when dependencies change](#automatically-run-nudeps-when-dependencies-change)
-4. [Config options](#config-options)
-5. [Commands](#commands)
+6. [Config options](#config-options)
+7. [Commands](#commands)
 	1. [`nudeps`](#nudeps-1)
 	2. [`nudeps --prune`](#nudeps---prune)
 	3. [`nudeps --init`](#nudeps---init)
-6. [FAQ](#faq)
+8. [FAQ](#faq)
 	1. [Which browsers are supported?](#which-browsers-are-supported)
 	2. [Does this support pnpm/bun/yarn/etc.?](#does-this-support-pnpmbunyarnetc)
 	3. [Why does it copy the entire dependency directory and not just the files I import?](#why-does-it-copy-the-entire-dependency-directory-and-not-just-the-files-i-import)
@@ -40,9 +42,10 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 	5. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
 	6. [Why doesn't Nudeps have an option to add integrity hashes to the import map?](#why-doesnt-nudeps-have-an-option-to-add-integrity-hashes-to-the-import-map)
 	7. [How are CJS (CommonJS) packages handled?](#how-are-cjs-commonjs-packages-handled)
-7. [Troubleshooting](#troubleshooting)
-	1. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
-	2. [Packages that use extension-less paths](#packages-that-use-extension-less-paths)
+9. [Troubleshooting](#troubleshooting)
+	1. [Getting an error about a specifier failing to resolve](#getting-an-error-about-a-specifier-failing-to-resolve)
+	2. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
+	3. [Packages that use extension-less paths](#packages-that-use-extension-less-paths)
 
 ## How does it work?
 
@@ -106,6 +109,18 @@ Here is a handy table to compare the two:
 | Import map automatically updated as you install packages                | ✅     | ❌        |
 | Supports CDNs like unpkg, jsdelivr, etc.                                | ❌     | ✅        |
 | Self-host dependencies                                                  | ✅     | ❌        |
+
+## Current limitations
+
+- Directly installing repos as dependencies does not work yet. ([#23](https://github.com/nudeps/nudeps/issues/23))
+- Non-prefix wildcard exports (e.g. `/*` to `./dist/*.ts.js`) are only added to import map when actually used ([#25](https://github.com/nudeps/nudeps/issues/25))
+
+## Roadmap
+
+Enhancements we're working on next:
+
+- Limit which files are copied to `client_modules` either via whitelist or blacklist ([#26](https://github.com/nudeps/nudeps/issues/26))
+- Exclude certain files by default ([#27](https://github.com/nudeps/nudeps/issues/27))
 
 ## Installation
 
@@ -255,6 +270,16 @@ To disable this, set the `cjs` option to `false` and both these packages and the
 ## Troubleshooting
 
 While most packages should work fine, some packages make certain over-reaching assumptions about the environment they are running in.
+
+### Getting an error about a specifier failing to resolve
+
+There are a few cases where not all specifiers supported by a package can be detected upfront, and are only added when actually used in your code.
+This is not frequent enough to warrant continuously running a watcher for every edit, but it can happen occassionally (e.g. see [#25](https://github.com/nudeps/nudeps/issues/25)).
+
+Before investigating further:
+
+1. Make sure your entry points are declared correctly in your `package.json`
+2. Run `npx nudeps`
 
 ### Package assumes a bundler is being used
 
