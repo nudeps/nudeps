@@ -7,6 +7,8 @@ import { ImportMapGenerator, ImportMap } from "./map.js";
 import ModulePath from "./util/path.js";
 
 export default class Nudeps {
+	stats = { entries: 0, copied: 0, deleted: 0 };
+
 	constructor ({ config }) {
 		this.config = config;
 		this.oldConfig = readJSONSync(".nudeps/config.json");

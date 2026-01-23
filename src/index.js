@@ -117,8 +117,7 @@ export default async function (options) {
 	let existingDirs = new Set(getTopLevelModules(config.dir).map(d => config.dir + "/" + d));
 	let toDelete = new Set(existingDirs);
 
-	const stats = { entries: 0, copied: 0, deleted: 0 };
-	const map = nudeps.map;
+	const { map, stats } = nudeps;
 
 	for (let { specifier, url, map: subMap } of map) {
 		if (!url.includes("node_modules/")) {
