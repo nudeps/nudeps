@@ -136,12 +136,6 @@ export default async function (options) {
 		subMap[specifier] = urlFromMap;
 		stats.entries++;
 		toCopy[modulePath.nodeDir] ??= modulePath.localDir;
-
-		if (modulePath.isNested) {
-			// Delete nested node_modules directory
-			let parentPath = [modulePath.parent.localDir, "node_modules", modulePath.packageName];
-			toDelete.add(parentPath.join("/"));
-		}
 	}
 
 	if (map.scopes) {
@@ -167,7 +161,16 @@ export default async function (options) {
 		}
 		else {
 			stats.copied++;
-			cpSync(from, to, { recursive: true });
+			cpSync(from, to, {
+				recursive: true,
+				filter: (src, dest) => {
+					// Skip nested node_modules directories
+					if (src.indexOf("node_modules/") !== src.lastIndexOf("node_modules")) {
+						return false;
+					}
+					return true;
+				},
+			});
 		}
 	}
 
