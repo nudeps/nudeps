@@ -6,6 +6,7 @@ import { readJSONSync, fixDependencies } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import ModulePath from "./util/path.js";
 import { globSync } from "node:fs";
+import { matchesGlob } from "node:path";
 
 export default class Nudeps {
 	stats = { entries: 0, copied: 0, deleted: 0 };
@@ -79,20 +80,22 @@ export default class Nudeps {
 		console.error("[nudeps]", ...messages);
 	}
 
-	getIgnoredPaths () {
-		let { ignore } = this.config;
-		if (!ignore || !ignore.length) {
-			return [];
+	isPathIncluded (path) {
+		if (path.indexOf("node_modules/") !== path.lastIndexOf("node_modules")) {
+			// Skip nested node_modules directories
+			return false;
 		}
 
-		let patterns = ignore.filter(i => !i.not);
-		let exclude = ignore.filter(i => i.not);
+		let isIncluded = true;
+		for (let p of this.config.files) {
+			if (isIncluded === !p.exclude) {
+				// We only need to look at patterns that would change the inclusion status
+				continue;
+			}
 
-		let paths = globSync(patterns, {
-			cwd: this.dir,
-			exclude,
-		});
-
-		return paths;
+			let pattern = p.exclude ?? p.include ?? p;
+			let matches = matchesGlob(path, pattern);
+			isIncluded &&= p.exclude ? !matches : matches;
+		}
 	}
 }

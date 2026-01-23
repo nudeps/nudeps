@@ -165,13 +165,7 @@ export default async function (options) {
 				dereference: true,
 				preserveTimestamps: true,
 				recursive: true,
-				filter: (src, dest) => {
-					// Skip nested node_modules directories
-					if (src.indexOf("node_modules/") !== src.lastIndexOf("node_modules")) {
-						return false;
-					}
-					return true;
-				},
+				filter: src => nudeps.isPathIncluded(src),
 			});
 		}
 	}
