@@ -30,6 +30,7 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 	2. [Global installation](#global-installation)
 	3. [Automatically run nudeps when dependencies change](#automatically-run-nudeps-when-dependencies-change)
 6. [Config options](#config-options)
+	1. [Ignoring files from client modules](#ignoring-files-from-client-modules)
 7. [Commands](#commands)
 	1. [`nudeps`](#nudeps-1)
 	2. [`nudeps --prune`](#nudeps---prune)
@@ -183,10 +184,23 @@ Some command line options allow for a shorthand one letter syntax, which is list
 | Directory            | `dir`           | `--dir`     | `-d`           | `./client_modules` | Directory to copy deployed dependencies to, relative to project root. It will be created if it does not exist. It is assumed that Nudeps owns this directory, do not use a directory path that you use for other things.                                                     |
 | Import map           | `map`           | `--map`     | `-m`           | `importmap.js`     | File path for import map injection script, relative to project root. Nudeps needs to be able to own this file, do not input a file you use for other things too.                                                                                                             |
 | Prune                | `prune`         | `--prune`   |                | `false`            | Whether to subset only to specifiers used by the package entry points (`true`), or include all direct dependencies anyway.                                                                                                                                                   |
+| Ignore files         | `ignore`        | -           | -              | See below          | Any files to exclude from being copied to the target directory. Useful for server-side dependencies. When providing via the command line option, comma-separate and do not include any spaces. They will still be included if actively used in your code.                    |
 | Exclude              | `exclude`       | `--exclude` | `-e`           | `[]`               | Any packages to exclude from import map even though they appear in `dependencies`. Useful for server-side dependencies. When providing via the command line option, comma-separate and do not include any spaces. They will still be included if actively used in your code. |
 | External config file | -               | `--config`  | `-c`           | `nudeps.js`        | File path for nudeps configuration, relative to project root. It should export an object literal with the configuration options as keys.                                                                                                                                     |
 | Overrides            | `overrides`     | -           | -              | `{}`               | Overrides for the import map, using `./node_modules/` paths. Set a key to `undefined` to remove it from the map.                                                                                                                                                             |
 | CommonJS             | `cjs`           | `--cjs`     | -              | `true`             | Whether to add a CommonJS shim to the import if any CJS packages are detected. Setting to `false` will omit both the shim and these packages from the import map.                                                                                                            |
+
+### Ignoring files from client modules
+
+By default, Nudeps will ignore the following files:
+
+- `readme` or `README` files with any extension
+- Files and directories starting with a dot
+- `package.json`, `package-lock.json`, `pnpm-lock.json` files at the top level of any package
+
+You can add additional globs (per Node’s native glob syntax) to be ignored by providing an array of strings.
+You can also provide globs to be included by providing them as an object with the glob as a `not` property.
+For example, to include `package.json` files you'd use `{ not: "**/package.json" }`.
 
 ## Commands
 

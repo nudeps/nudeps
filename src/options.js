@@ -28,4 +28,20 @@ export default {
 	cjs: {
 		default: true,
 	},
+	ignore: {
+		default: [
+			// Readme files with any extension
+			"**/{readme,README}.*",
+
+			// Dotfiles
+			"**/.*",
+
+			"{*,@*/*}/package.json",
+			"{*,@*/*}/{package,pnpm}-lock.json",
+		],
+		transform (value) {
+			value = Array.isArray(value) ? value : [value];
+			return [...this.default, ...value];
+		},
+	},
 };

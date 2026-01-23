@@ -5,6 +5,7 @@
 import { readJSONSync, fixDependencies } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import ModulePath from "./util/path.js";
+import { globSync } from "node:fs";
 
 export default class Nudeps {
 	stats = { entries: 0, copied: 0, deleted: 0 };
@@ -76,5 +77,22 @@ export default class Nudeps {
 
 	error (...messages) {
 		console.error("[nudeps]", ...messages);
+	}
+
+	getIgnoredPaths () {
+		let { ignore } = this.config;
+		if (!ignore || !ignore.length) {
+			return [];
+		}
+
+		let patterns = ignore.filter(i => !i.not);
+		let exclude = ignore.filter(i => i.not);
+
+		let paths = globSync(patterns, {
+			cwd: this.dir,
+			exclude,
+		});
+
+		return paths;
 	}
 }
