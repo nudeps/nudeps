@@ -75,11 +75,18 @@ export async function getConfig () {
 	let ret = {};
 	for (let key in availableOptions) {
 		let option = availableOptions[key];
-		ret[key] = args[key] ?? config[key] ?? option.default;
+		ret[key] = args[key] ?? config[key];
 
-		if (option.validate && !option.validate(ret[key])) {
-			delete ret[key];
+		if (ret[key] !== undefined) {
+			if (option.validate && !option.validate(ret[key])) {
+				delete ret[key];
+			}
+			else if (option.transform) {
+				ret[key] = option.transform(ret[key]);
+			}
 		}
+
+		ret[key] ??= option.default;
 	}
 
 	return ret;
