@@ -26,8 +26,8 @@ export function fixDependencies (pkg) {
 		packageConfigs: {
 			[baseUrl.href]: {
 				dependencies: {
-					...(fixedAliases ?? {}),
-					...(fixedGitHubPackages ?? {}),
+					...fixedAliases,
+					...fixedGitHubPackages,
 				},
 			},
 		},
