@@ -85,8 +85,8 @@ export default async function (options) {
 			try {
 				await generator.install(dep);
 			}
-			catch (retryError) {
-				console.error(`Error installing ${dep}: ${retryError.message}`);
+			catch (e) {
+				console.error(`Error installing ${dep}: ${e.message}`);
 			}
 		}
 	}
