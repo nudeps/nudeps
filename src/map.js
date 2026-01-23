@@ -40,7 +40,7 @@ export class ImportMapGenerator extends Generator {
 		}
 		catch (error) {
 			try {
-				let ret = await this.install({
+				let ret = await super.install({
 					alias,
 					target,
 					subpaths: false,
