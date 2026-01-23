@@ -39,10 +39,7 @@ export default class Nudeps {
 		// so we override the root package config to point alias deps at their local node_modules paths
 		// and remove the github: prefix from GitHub deps to avoid freezes.
 		// See https://github.com/jspm/jspm/issues/2687 and https://github.com/jspm/jspm/issues/2688
-		let additionalOptions = fixDependencies(this.pkg);
-		if (additionalOptions) {
-			Object.assign(generatorOptions, additionalOptions);
-		}
+		Object.assign(generatorOptions, fixDependencies(this.pkg));
 
 		let value = new ImportMapGenerator(generatorOptions);
 		Object.defineProperty(this, "generator", { value, configurable: true });
