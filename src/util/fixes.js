@@ -36,7 +36,7 @@ export function fixDependencies (pkg) {
  * @param {object} deps Mapping of dependencies from package.json
  * @returns {object} Mapping of fixed dependencies
  */
-function fixAliases (deps) {
+function fixAliases (deps = {}) {
 	let aliases = Object.entries(deps).flatMap(([name, spec]) =>
 		spec?.startsWith("npm:") ? name : []);
 
@@ -53,7 +53,7 @@ function fixAliases (deps) {
  * @param {object} deps Mapping of dependencies from package.json
  * @returns {object} Mapping of fixed dependencies
  */
-function fixGitHubPackages (deps) {
+function fixGitHubPackages (deps = {}) {
 	let urls = Object.entries(deps).filter(([name, spec]) => spec?.startsWith("github:"));
 
 	if (urls.length === 0) {
