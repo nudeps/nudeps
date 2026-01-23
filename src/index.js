@@ -171,6 +171,8 @@ export default async function (options) {
 		}
 	}
 
+	const deleteIfEmpty = new Set();
+
 	for (let dir of toDelete) {
 		if (existsSync(dir)) {
 			stats.deleted++;
@@ -178,14 +180,26 @@ export default async function (options) {
 		}
 
 		let parentDir = dir.split("/").slice(0, -1).join("/");
-		if (parentDir === config.dir) {
+
+		if (parentDir !== config.dir) {
+			deleteIfEmpty.add(parentDir);
 			continue;
 		}
+	}
 
-		// Delete the parent directory if empty
-		if (existsSync(parentDir) && isDirectoryEmptySync(parentDir)) {
-			stats.deleted++;
+	for (let parentDir of deleteIfEmpty) {
+		try {
+			console.log("Deleted parent directory", parentDir);
 			rmdirSync(parentDir);
+			stats.deleted++;
+		}
+		catch (e) {
+			if (e.code === "ENOTEMPTY" || e.code === "EEXIST") {
+				// Directory is not empty, skip
+				continue;
+			}
+
+			throw e;
 		}
 	}
 
