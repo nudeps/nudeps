@@ -2,7 +2,7 @@
  * Main entry point
  */
 
-import { readJSONSync, fixAliases } from "./util.js";
+import { readJSONSync, fixDependencies } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import ModulePath from "./util/path.js";
 import { globSync } from "node:fs";
@@ -36,11 +36,11 @@ export default class Nudeps {
 	get generator () {
 		let generatorOptions = { commonJS: this.config.cjs };
 
-		// JSPM Generator does not support npm aliases (npm:), so we override the
-		// root package config to point alias deps at their local node_modules paths.
-		// See https://github.com/jspm/jspm/issues/2687
-		let aliasOptions = fixAliases(this.pkg);
-		Object.assign(generatorOptions, aliasOptions);
+		// JSPM Generator does not support npm aliases (npm:) and partially supports GitHub URLs,
+		// so we override the root package config to point alias deps at their local node_modules paths
+		// and remove the github: prefix from GitHub deps to avoid freezes.
+		// See https://github.com/jspm/jspm/issues/2687 and https://github.com/jspm/jspm/issues/2688
+		Object.assign(generatorOptions, fixDependencies(this.pkg));
 
 		let value = new ImportMapGenerator(generatorOptions);
 		Object.defineProperty(this, "generator", { value, configurable: true });
