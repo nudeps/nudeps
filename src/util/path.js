@@ -1,7 +1,5 @@
-import { readJSONSync } from "./fs.js";
-import availableOptions from "../options.js";
-
 export default class ModulePath {
+	nudeps = null;
 	packages = [];
 	parent = null;
 	path = "";
@@ -10,11 +8,9 @@ export default class ModulePath {
 	filePath = "";
 
 	static all = {};
-	static packages;
-	static localDir = availableOptions.dir.default;
 
-	constructor (path) {
-		this.constructor.packages ??= readJSONSync("package-lock.json")?.packages;
+	constructor (path, nudeps) {
+		this.nudeps = nudeps;
 
 		if (Array.isArray(path)) {
 			this.path = path.join("/");
@@ -41,7 +37,7 @@ export default class ModulePath {
 		this.filePath = this.parts.join("/") ?? "";
 
 		this.parent = this.isNested
-			? this.constructor.from([this.base, ...this.packages.slice(0, -1)])
+			? this.constructor.from([this.base, ...this.packages.slice(0, -1)], this.nudeps)
 			: null;
 	}
 
@@ -58,16 +54,16 @@ export default class ModulePath {
 	}
 
 	get version () {
-		return ModulePath.packages[this.lockKey]?.version;
+		return this.nudeps.packages[this.lockKey]?.version;
 	}
 
 	get packageName () {
-		return this.constructor.packages[this.lockKey]?.name ?? this.packages.at(-1);
+		return this.nudeps.packages[this.lockKey]?.name ?? this.packages.at(-1);
 	}
 
 	get localDir () {
 		let versionSuffix = this.version ? "@" + this.version : "";
-		return [ModulePath.localDir, this.packageName + versionSuffix].join("/");
+		return [this.nudeps.dir, this.packageName + versionSuffix].join("/");
 	}
 
 	get localParentDir () {}
@@ -88,9 +84,9 @@ export default class ModulePath {
 		return this.path;
 	}
 
-	static from (path) {
+	static from (path, nudeps) {
 		if (!this.all[path]) {
-			this.all[path] = new ModulePath(path);
+			this.all[path] = new ModulePath(path, nudeps);
 		}
 		return this.all[path];
 	}

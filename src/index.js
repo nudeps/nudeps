@@ -3,13 +3,7 @@
  */
 import * as path from "node:path";
 import { getConfig } from "./config.js";
-import {
-	readJSONSync,
-	writeJSONSync,
-	getTopLevelModules,
-	isDirectoryEmptySync,
-	fixAliases,
-} from "./util.js";
+import { readJSONSync, writeJSONSync, getTopLevelModules, isDirectoryEmptySync } from "./util.js";
 import {
 	writeFileSync,
 	renameSync,
@@ -20,12 +14,12 @@ import {
 	cpSync,
 } from "node:fs";
 import { cp } from "node:fs/promises";
-import { ImportMapGenerator, ImportMap } from "./map.js";
-import ModulePath from "./util/path.js";
+import Nudeps from "./nudeps.js";
 
 export default async function (options) {
 	let config = Object.assign(await getConfig(), options);
-	let oldConfig = readJSONSync(".nudeps/config.json");
+	let nudeps = new Nudeps({ config });
+	let oldConfig = nudeps.oldConfig;
 
 	let cacheExists = existsSync(".nudeps");
 	if (cacheExists && config.init) {
@@ -49,35 +43,19 @@ export default async function (options) {
 		}
 	}
 
-	const pkg = readJSONSync("./package.json");
-
-	if (!pkg) {
-		throw new Error("package.json not found or invalid");
-	}
-
-	let generatorOptions = { commonJS: config.cjs };
-
-	// JSPM Generator does not support npm aliases (npm:), so we override the
-	// root package config to point alias deps at their local node_modules paths.
-	// See https://github.com/jspm/jspm/issues/2687
-	let aliasOptions = fixAliases(pkg);
-	Object.assign(generatorOptions, aliasOptions);
-
-	let generator = new ImportMapGenerator(generatorOptions);
-
-	// Ensure the generator has completed tracing before we inspect its trace cache.
+	const generator = nudeps.generator;
 	try {
-		await generator.install(pkg.name, ".");
+		await generator.install(nudeps.pkg.name, ".");
 	}
 	catch (e) {
-		console.error(`[nudeps] Failed to install root package. ${e.message}`);
+		nudeps.error(`Failed to install root package. ${e.message}`);
 	}
 
-	if (!config.prune && pkg.dependencies) {
+	if (!config.prune && nudeps.pkg.dependencies) {
 		let exclude = new Set(config.exclude ?? []);
 		let lastPruneDeps = readJSONSync(".nudeps/package.json")?.dependencies ?? {};
 
-		for (const dep in pkg.dependencies) {
+		for (const dep in nudeps.pkg.dependencies) {
 			if (exclude.has(dep) || lastPruneDeps[dep]) {
 				continue;
 			}
@@ -86,7 +64,7 @@ export default async function (options) {
 				await generator.install(dep);
 			}
 			catch (e) {
-				console.error(`Error installing ${dep}: ${e.message}`);
+				nudeps.error(`Error installing ${dep}: ${e.message}`);
 			}
 		}
 	}
@@ -102,32 +80,24 @@ export default async function (options) {
 				await generator.install(
 					"cjs-browser-shim",
 					"./node_modules/nudeps/node_modules/cjs-browser-shim",
+					{ noRetry: true },
 				);
 			}
 
-			let cjsPackages = [
-				...new Set(cjsEntries.map(([url]) => ModulePath.from(url).packageName)),
-			];
-			let directCjsDeps = cjsPackages.filter(packageName => packageName in pkg.dependencies);
+			let cjsPackages = [...new Set(cjsEntries.map(([url]) => nudeps.path(url).packageName))];
+			let directCjsDeps = cjsPackages.filter(
+				packageName => packageName in nudeps.pkg.dependencies,
+			);
+
 			let requireMsg = "";
 			if (directCjsDeps.length > 0) {
 				requireMsg = `Use require() to import these packages: ${directCjsDeps.join(", ")}.`;
 			}
-			console.info(
-				`[nudeps] ${cjsPackages.length} CommonJS packages detected, adding cjs-browser-shim. ${requireMsg} Disable with --cjs=false`,
+			nudeps.info(
+				`${cjsPackages.length} CommonJS packages detected, adding cjs-browser-shim. ${requireMsg} Disable with --cjs=false`,
 			);
 		}
 	}
-
-	let map = new ImportMap(generator);
-
-	map.cleanupScopes();
-
-	if (config.overrides) {
-		map.applyOverrides(config.overrides);
-	}
-
-	let packages = readJSONSync("package-lock.json")?.packages;
 
 	let dirExists = existsSync(config.dir);
 	if (config.init && dirExists) {
@@ -147,10 +117,8 @@ export default async function (options) {
 	let existingDirs = new Set(getTopLevelModules(config.dir).map(d => config.dir + "/" + d));
 	let toDelete = new Set(existingDirs);
 
-	ModulePath.localDir = config.dir;
-	ModulePath.packages = packages;
-
 	const stats = { entries: 0, copied: 0, deleted: 0 };
+	const map = nudeps.map;
 
 	for (let { specifier, url, map: subMap } of map) {
 		if (!url.includes("node_modules/")) {
@@ -158,7 +126,7 @@ export default async function (options) {
 			continue;
 		}
 
-		let modulePath = ModulePath.from(url);
+		let modulePath = nudeps.path(url);
 
 		let urlFromMap = path.relative(path.dirname(config.map), modulePath.localPath); // Note: path.relative() might normalize away the trailing slash for directories
 		urlFromMap = urlFromMap.startsWith(".") ? urlFromMap : "./" + urlFromMap;
@@ -184,10 +152,7 @@ export default async function (options) {
 			}
 
 			// Rewrite scope itself
-			let scopeFromMap = path.relative(
-				path.dirname(config.map),
-				ModulePath.from(scope).localDir,
-			);
+			let scopeFromMap = path.relative(path.dirname(config.map), nudeps.path(scope).localDir);
 			scopeFromMap = scopeFromMap.startsWith(".") ? scopeFromMap : "./" + scopeFromMap;
 			let localDir = scopeFromMap;
 			map.scopes[localDir] = map.scopes[scope];
@@ -250,5 +215,5 @@ export default async function (options) {
 		);
 	}
 	info.push(`Import map with ${stats.entries} entries generated successfully at ${config.map}.`);
-	console.log(`[nudeps] ${info.join(" ")}`);
+	nudeps.info(...info);
 }
