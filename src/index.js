@@ -177,11 +177,11 @@ export default async function (options) {
 			rmSync(dir, { recursive: true });
 		}
 
-		let parentDir = path.dirname(dir);
 
 		if (parentDir === config.dir) {
 			continue;
 		}
+		let parentDir = dir.split("/").slice(0, -1).join("/");
 
 		// Delete the parent directory if empty
 		if (existsSync(parentDir) && isDirectoryEmptySync(parentDir)) {
