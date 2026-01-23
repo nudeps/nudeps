@@ -97,7 +97,7 @@ export default async function (options) {
 
 		if (cjsEntries.length > 0) {
 			try {
-				await generator.install("cjs-browser-shim");
+				await generator.install("cjs-browser-shim", undefined, { noRetry: true });
 			}
 			catch (e) {
 				await generator.install(

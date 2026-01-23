@@ -29,7 +29,7 @@ export class ImportMapGenerator extends Generator {
 		this.commonJS = commonJS;
 	}
 
-	async install (alias, target = `./node_modules/${alias}`, installOptions = {}) {
+	async install (alias, target = `./node_modules/${alias}`, { noRetry, ...installOptions } = {}) {
 		try {
 			return await super.install({
 				alias,
@@ -39,6 +39,10 @@ export class ImportMapGenerator extends Generator {
 			});
 		}
 		catch (error) {
+			if (noRetry) {
+				throw error;
+			}
+
 			try {
 				let ret = await super.install({
 					alias,
