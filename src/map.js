@@ -30,12 +30,30 @@ export class ImportMapGenerator extends Generator {
 	}
 
 	async install (alias, target = `./node_modules/${alias}`, installOptions = {}) {
-		return await super.install({
-			alias,
-			target,
-			subpaths: true,
-			...installOptions,
-		});
+		try {
+			return await super.install({
+				alias,
+				target,
+				subpaths: true,
+				...installOptions,
+			});
+		}
+		catch (error) {
+			try {
+				let ret = await this.install({
+					alias,
+					target,
+					subpaths: false,
+					...installOptions,
+				});
+				console.warn(`[nudeps] Failed to trace subpaths for ${alias}: ${error.message}.`);
+				return ret;
+			}
+			catch (retryError) {
+				// Didn't help, just throw original error
+				throw error;
+			}
+		}
 	}
 
 	getEntries (fn) {

@@ -70,7 +70,7 @@ export default async function (options) {
 		await generator.install(pkg.name, ".");
 	}
 	catch (e) {
-		console.warn(`[nudeps] Failed to install root package. ${e.message}`);
+		console.error(`[nudeps] Failed to install root package. ${e.message}`);
 	}
 
 	if (!config.prune && pkg.dependencies) {
@@ -85,16 +85,8 @@ export default async function (options) {
 			try {
 				await generator.install(dep);
 			}
-			catch (error) {
-				console.warn(
-					`[nudeps] Failed to trace all subpaths for ${dep}. Retrying with entry point only. ${error.message}`,
-				);
-				try {
-					await generator.install(dep, undefined, { subpaths: false });
-				}
-				catch (retryError) {
-					console.error(`Error installing ${dep}: ${retryError.message}`);
-				}
+			catch (retryError) {
+				console.error(`Error installing ${dep}: ${retryError.message}`);
 			}
 		}
 	}
