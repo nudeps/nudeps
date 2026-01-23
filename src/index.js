@@ -159,6 +159,7 @@ export default async function (options) {
 		}
 	}
 
+	// Copy package directories
 	for (let from in toCopy) {
 		let to = toCopy[from];
 		if (existingDirs.has(to)) {
@@ -176,7 +177,7 @@ export default async function (options) {
 			rmSync(dir, { recursive: true });
 		}
 
-		let parentDir = dir.split("/").slice(0, -1).join("/");
+		let parentDir = path.dirname(dir);
 
 		if (parentDir === config.dir) {
 			continue;
@@ -189,6 +190,7 @@ export default async function (options) {
 		}
 	}
 
+	// Write import map
 	if (oldConfig && oldConfig.map !== config.map && existsSync(oldConfig.map)) {
 		// Remove old import map
 		rmSync(oldConfig.map);
