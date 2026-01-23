@@ -91,9 +91,8 @@ export default async function (options) {
 		}
 	}
 
-	let cjsEntries = [];
 	if (config.cjs !== false) {
-		cjsEntries = generator.getEntries(entry => entry?.format === "commonjs");
+		let cjsEntries = generator.getEntries(entry => entry?.format === "commonjs");
 
 		if (cjsEntries.length > 0) {
 			try {
