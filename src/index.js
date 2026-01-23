@@ -162,6 +162,8 @@ export default async function (options) {
 		else {
 			stats.copied++;
 			cpSync(from, to, {
+				dereference: true,
+				preserveTimestamps: true,
 				recursive: true,
 				filter: (src, dest) => {
 					// Skip nested node_modules directories
