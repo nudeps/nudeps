@@ -114,6 +114,7 @@ Here is a handy table to compare the two:
 
 - Directly installing repos as dependencies does not work yet. ([#23](https://github.com/nudeps/nudeps/issues/23))
 - Non-prefix wildcard exports (e.g. `/*` to `./dist/*.ts.js`) are only added to import map when actually used ([#25](https://github.com/nudeps/nudeps/issues/25))
+- Specifiers will not work in web workers ([#19](https://github.com/nudeps/nudeps/issues/19))
 
 ## Roadmap
 
