@@ -86,7 +86,7 @@ export default async function (options) {
 
 			let cjsPackages = [...new Set(cjsEntries.map(([url]) => nudeps.path(url).packageName))];
 			let directCjsDeps = cjsPackages.filter(
-				packageName => packageName in nudeps.pkg.dependencies,
+				packageName => packageName in (nudeps.pkg.dependencies ?? {}),
 			);
 
 			let requireMsg = "";
