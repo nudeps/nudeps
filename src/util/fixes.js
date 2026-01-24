@@ -13,9 +13,9 @@ export function fixDependencies (pkg) {
 
 	let deps = pkg.dependencies;
 	let fixedAliases = fixAliases(deps);
-	let fixedGitHubPackages = fixGitHubPackages(deps);
+	let fixedGitPackages = fixGitPackages(deps);
 
-	if (!fixedAliases && !fixedGitHubPackages) {
+	if (!fixedAliases && !fixedGitPackages) {
 		return;
 	}
 
@@ -27,7 +27,7 @@ export function fixDependencies (pkg) {
 			[baseUrl.href]: {
 				dependencies: {
 					...fixedAliases,
-					...fixedGitHubPackages,
+					...fixedGitPackages,
 				},
 			},
 		},
@@ -52,17 +52,17 @@ function fixAliases (deps = {}) {
 }
 
 /**
- * Handle GitHub URLs in package.json dependencies
+ * Handle git*-prefixed Git URLs in package.json dependencies
  * Workaround for https://github.com/jspm/jspm/issues/2688
  * @param {object} deps Mapping of dependencies from package.json
  * @returns {object} Mapping of fixed dependencies
  */
-function fixGitHubPackages (deps = {}) {
-	let urls = Object.entries(deps).filter(([name, spec]) => spec?.startsWith("github:"));
+function fixGitPackages (deps = {}) {
+	let urls = Object.entries(deps).filter(([name, spec]) => /^git.+:/.test(spec));
 
 	if (urls.length === 0) {
 		return;
 	}
 
-	return Object.fromEntries(urls.map(([name, spec]) => [name, spec.replace(/^github:/, "")]));
+	return Object.fromEntries(urls.map(([name, spec]) => [name, spec.replace(/^git.+:/, "")]));
 }
