@@ -189,7 +189,6 @@ export default async function (options) {
 
 	for (let parentDir of deleteIfEmpty) {
 		try {
-			console.log("Deleted parent directory", parentDir);
 			rmdirSync(parentDir);
 			stats.deleted++;
 		}
