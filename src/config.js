@@ -81,12 +81,13 @@ export async function getConfig () {
 			if (option.validate && !option.validate(ret[key])) {
 				delete ret[key];
 			}
-			else if (option.transform) {
-				ret[key] = option.transform(ret[key]);
-			}
 		}
 
 		ret[key] ??= option.default;
+
+		if (option.normalize) {
+			ret[key] = option.normalize(ret[key]);
+		}
 	}
 
 	return ret;
