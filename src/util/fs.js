@@ -45,3 +45,20 @@ export function isDirectoryEmptySync (path) {
 export function importCwdRelative (pathFromCwd) {
 	return import(pathToFileURL(path.resolve(process.cwd(), pathFromCwd)).href);
 }
+
+/**
+ * Matches a path against a glob pattern or array of glob patterns
+ * Like `path.matchesGlob()`, but supports arrays of patterns.
+ * If array is provided, returns true if any of the patterns match.
+ * @param { string } path - The path to match
+ * @param { string | string[] } glob - The glob pattern or array of patterns
+ * @returns { boolean } Whether the path matches the glob pattern
+ */
+export function matchesGlob (filePath, glob) {
+	if (Array.isArray(glob)) {
+		console.log({ filePath, glob });
+		return glob.some(g => path.matchesGlob(filePath, g));
+	}
+
+	return path.matchesGlob(filePath, glob);
+}

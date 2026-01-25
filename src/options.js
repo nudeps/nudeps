@@ -28,22 +28,21 @@ export default {
 	cjs: {
 		default: true,
 	},
-	files: {
+	ignore: {
 		default: [
 			// Readme files with any extension
-			{ exclude: "**/{readme,README}.*" },
+			"{readme,README}.*",
 
 			// Dotfiles
-			{ exclude: "**/.*" },
-			"**/.gitignore",
+			".*",
 
-			{ exclude: "package.json" },
-			{ exclude: "{package,pnpm}-lock.json" },
+			// Package files
+			"package.json",
+			"{package,pnpm}-lock.json",
 		],
-		transform (value) {
+		normalize: value => {
 			value = Array.isArray(value) ? value : [value];
-			value = [...this.default, ...value];
-			value = value.map(p => "node_modules/{*,@*/*}/" + p);
+			value = value.map(p => (typeof p === "string" ? { exclude: p } : p));
 			return value;
 		},
 	},
