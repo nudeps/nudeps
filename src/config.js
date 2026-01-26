@@ -83,10 +83,11 @@ export async function getConfig () {
 			}
 		}
 
-		ret[key] ??= option.default;
-
 		if (option.normalize) {
-			ret[key] = option.normalize(ret[key]);
+			ret[key] = option.normalize(ret[key], option.default);
+		}
+		else {
+			ret[key] ??= option.default;
 		}
 	}
 

@@ -40,10 +40,16 @@ export default {
 			"package.json",
 			"{package,pnpm}-lock.json",
 		],
-		normalize: value => {
-			value = Array.isArray(value) ? value : [value];
-			value = value.map(p => (typeof p === "string" ? { exclude: p } : p));
-			return value;
+		normalize: (value, defaultValue) => {
+			if (value) {
+				value = Array.isArray(value) ? value : [value];
+				value.unshift(...defaultValue);
+			}
+			else {
+				value = defaultValue;
+			}
+
+			return value.map(p => (typeof p === "string" ? { exclude: p } : p));
 		},
 	},
 };
