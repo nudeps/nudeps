@@ -21,7 +21,9 @@ export default class Nudeps {
 		this.config = config;
 		this.oldConfig = readJSONSync(".nudeps/config.json");
 
-		this.existingDirs = new Set(getTopLevelModules(config.dir).map(d => config.dir + "/" + d));
+		this.existingDirs = new Set(
+			config.init ? [] : getTopLevelModules(config.dir).map(d => config.dir + "/" + d),
+		);
 		this.toDelete = new Set(this.existingDirs);
 		this.hasIgnoreExceptions = this.config.ignore.some(p => p.include);
 		this.hasDeepGlobs = this.config.ignore.some(p => (p.include ?? p.exclude)?.includes("/"));
