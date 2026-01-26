@@ -22,17 +22,26 @@ export function writeJSONSync (path, data, indent = "\t") {
 }
 
 export function getTopLevelModules (directory = "./node_modules") {
-	return readdirSync(directory).flatMap(dir => {
-		if (statSync(path.join(directory, dir)).isFile()) {
+	try {
+		return readdirSync(directory).flatMap(dir => {
+			if (statSync(path.join(directory, dir)).isFile()) {
+				return [];
+			}
+
+			if (dir[0] === "@") {
+				return readdirSync(path.join(directory, dir)).flatMap(subdir => `${dir}/${subdir}`);
+			}
+
+			return dir;
+		});
+	}
+	catch (e) {
+		if (e.code === "ENOENT") {
 			return [];
 		}
 
-		if (dir[0] === "@") {
-			return readdirSync(path.join(directory, dir)).flatMap(subdir => `${dir}/${subdir}`);
-		}
-
-		return dir;
-	});
+		throw e;
+	}
 }
 
 export function isDirectoryEmptySync (path) {
@@ -44,4 +53,20 @@ export function isDirectoryEmptySync (path) {
 
 export function importCwdRelative (pathFromCwd) {
 	return import(pathToFileURL(path.resolve(process.cwd(), pathFromCwd)).href);
+}
+
+/**
+ * Matches a path against a glob pattern or array of glob patterns
+ * Like `path.matchesGlob()`, but supports arrays of patterns.
+ * If array is provided, returns true if any of the patterns match.
+ * @param { string } path - The path to match
+ * @param { string | string[] } glob - The glob pattern or array of patterns
+ * @returns { boolean } Whether the path matches the glob pattern
+ */
+export function matchesGlob (filePath, glob) {
+	if (Array.isArray(glob)) {
+		return glob.some(g => path.matchesGlob(filePath, g));
+	}
+
+	return path.matchesGlob(filePath, glob);
 }

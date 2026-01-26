@@ -30,6 +30,7 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 	2. [Global installation](#global-installation)
 	3. [Automatically run nudeps when dependencies change](#automatically-run-nudeps-when-dependencies-change)
 6. [Config options](#config-options)
+	1. [Restricting which files are deployed from dependencies](#restricting-which-files-are-deployed-from-dependencies)
 7. [Commands](#commands)
 	1. [`nudeps`](#nudeps-1)
 	2. [`nudeps --prune`](#nudeps---prune)
@@ -37,11 +38,10 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 8. [FAQ](#faq)
 	1. [Which browsers are supported?](#which-browsers-are-supported)
 	2. [Does this support pnpm/bun/yarn/etc.?](#does-this-support-pnpmbunyarnetc)
-	3. [Why does it copy the entire dependency directory and not just the files I import?](#why-does-it-copy-the-entire-dependency-directory-and-not-just-the-files-i-import)
-	4. [Why does it add the version number to the directory name?](#why-does-it-add-the-version-number-to-the-directory-name)
-	5. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
-	6. [Why doesn't Nudeps have an option to add integrity hashes to the import map?](#why-doesnt-nudeps-have-an-option-to-add-integrity-hashes-to-the-import-map)
-	7. [How are CJS (CommonJS) packages handled?](#how-are-cjs-commonjs-packages-handled)
+	3. [Why does it add the version number to the directory name?](#why-does-it-add-the-version-number-to-the-directory-name)
+	4. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
+	5. [Why doesn't Nudeps have an option to add integrity hashes to the import map?](#why-doesnt-nudeps-have-an-option-to-add-integrity-hashes-to-the-import-map)
+	6. [How are CJS (CommonJS) packages handled?](#how-are-cjs-commonjs-packages-handled)
 9. [Troubleshooting](#troubleshooting)
 	1. [Getting an error about a specifier failing to resolve](#getting-an-error-about-a-specifier-failing-to-resolve)
 	2. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
@@ -183,10 +183,39 @@ Some command line options allow for a shorthand one letter syntax, which is list
 | Directory            | `dir`           | `--dir`     | `-d`           | `./client_modules` | Directory to copy deployed dependencies to, relative to project root. It will be created if it does not exist. It is assumed that Nudeps owns this directory, do not use a directory path that you use for other things.                                                     |
 | Import map           | `map`           | `--map`     | `-m`           | `importmap.js`     | File path for import map injection script, relative to project root. Nudeps needs to be able to own this file, do not input a file you use for other things too.                                                                                                             |
 | Prune                | `prune`         | `--prune`   |                | `false`            | Whether to subset only to specifiers used by the package entry points (`true`), or include all direct dependencies anyway.                                                                                                                                                   |
+| Ignore files         | `ignore`        | -           | -              | See below          | Any files to exclude from being copied to the target directory. See below for more details.                                                                                                                                                                                  |
 | Exclude              | `exclude`       | `--exclude` | `-e`           | `[]`               | Any packages to exclude from import map even though they appear in `dependencies`. Useful for server-side dependencies. When providing via the command line option, comma-separate and do not include any spaces. They will still be included if actively used in your code. |
 | External config file | -               | `--config`  | `-c`           | `nudeps.js`        | File path for nudeps configuration, relative to project root. It should export an object literal with the configuration options as keys.                                                                                                                                     |
 | Overrides            | `overrides`     | -           | -              | `{}`               | Overrides for the import map, using `./node_modules/` paths. Set a key to `undefined` to remove it from the map.                                                                                                                                                             |
 | CommonJS             | `cjs`           | `--cjs`     | -              | `true`             | Whether to add a CommonJS shim to the import if any CJS packages are detected. Setting to `false` will omit both the shim and these packages from the import map.                                                                                                            |
+
+### Restricting which files are deployed from dependencies
+
+By default, Nudeps will copy everything in each package except for the following:
+
+- `readme` or `README` files with any extension
+- Files and directories starting with a dot
+- `package.json`, `package-lock.json`, `pnpm-lock.json` files at the top level of any package
+
+**Why not just restrict to copying `*.js` files by default?**
+Because this allows dependencies to fetch other files dynamically, e.g. stylesheets, images, data files, etc.
+This is particularly important for UI libraries, component libraries, etc.
+Since files are only fetched when used, this does not impact actual bandwidth usage.
+And if you’re trusting a package to run JS in your domain anyway, the additional risk from copying its entire package directory is tiny.
+
+That said, there are cases where you _know_ you won’t need certain files.
+You can add additional globs (per Node’s native glob syntax) to be included or excluded by providing globs to the `ignore` option.
+Its value can be either an array or a singular value.
+Each glob can be provided as a raw string (glob to exclude) or an object with an `include` or `exclude` property.
+The values of these properties can also be arrays of strings or objects.
+Globs are relative to the package root.
+
+The semantics are similar to a `.gitignore` file, meaning that negative globs can only undo globs that precede them.
+
+For example:
+
+- To include `package.json` files you'd use `ignore: { include: "package.json" }`.
+- To only copy `*.js` files and nothing else you'd use `ignore: [{ exclude: "**/*" }, { include: "**/*.js" } ]`. (but see above why this is not recommended)
 
 ## Commands
 
@@ -230,10 +259,6 @@ However, Nudeps should however work with any other package managers that follow 
 - `package.json` file format
 
 You're welcome to contribute support for other package managers, but please let me know first so we can discuss the best approach.
-
-### Why does it copy the entire dependency directory and not just the files I import?
-
-Because this allows dependencies to fetch other files dynamically, e.g. stylesheets, images, etc.
 
 ### Why does it add the version number to the directory name?
 

@@ -5,13 +5,28 @@
 import { readJSONSync, fixDependencies } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import ModulePath from "./util/path.js";
+import { matchesGlob } from "./util/fs.js";
+
+import { getTopLevelModules } from "./util.js";
+import { existsSync, rmSync, rmdirSync, cpSync } from "node:fs";
+import * as path from "node:path";
 
 export default class Nudeps {
 	stats = { entries: 0, copied: 0, deleted: 0 };
+	toCopy = {};
+	toDelete = null;
+	toDeleteIfEmpty = new Set();
 
 	constructor ({ config }) {
 		this.config = config;
 		this.oldConfig = readJSONSync(".nudeps/config.json");
+
+		this.existingDirs = new Set(
+			config.init ? [] : getTopLevelModules(config.dir).map(d => config.dir + "/" + d),
+		);
+		this.toDelete = new Set(this.existingDirs);
+		this.hasIgnoreExceptions = this.config.ignore.some(p => p.include);
+		this.hasDeepGlobs = this.config.ignore.some(p => (p.include ?? p.exclude)?.includes("/"));
 	}
 
 	get pkg () {
@@ -76,5 +91,93 @@ export default class Nudeps {
 
 	error (...messages) {
 		console.error("[nudeps]", ...messages);
+	}
+
+	/**
+	 * Check if a path is ignored by the ignore configuration
+	 * @param {*} path
+	 * @returns
+	 */
+	isPathIgnored (path) {
+		if (!path) {
+			return false;
+		}
+
+		// If we traverse backwards we can stop once we find a pattern that would change the inclusion status
+		for (let i = this.config.ignore.length - 1; i >= 0; i--) {
+			let p = this.config.ignore[i];
+
+			let glob = p.exclude ?? p.include;
+			let matches = matchesGlob(path, glob);
+
+			if (matches) {
+				return Boolean(p.exclude);
+			}
+		}
+
+		return false;
+	}
+
+	copyPackages () {
+		let { config, existingDirs, toCopy, toDelete, toDeleteIfEmpty, stats } = this;
+
+		// Copy package directories
+		for (let from in toCopy) {
+			let to = toCopy[from];
+			if (existingDirs.has(to)) {
+				toDelete.delete(to);
+			}
+			else {
+				stats.copied++;
+				cpSync(from, to, {
+					dereference: true,
+					preserveTimestamps: true,
+					recursive: true,
+					filter: src => {
+						// Path from package root
+						let relativePath = path.relative(from, src);
+
+						if (
+							relativePath.includes("node_modules/") ||
+							relativePath.endsWith("node_modules")
+						) {
+							// Always skip nested node_modules directories
+							return false;
+						}
+
+						return !this.isPathIgnored(relativePath);
+					},
+				});
+			}
+		}
+
+		for (let dir of toDelete) {
+			if (existsSync(dir)) {
+				stats.deleted++;
+				rmSync(dir, { recursive: true });
+			}
+
+			let parentDir = dir.split("/").slice(0, -1).join("/");
+
+			if (parentDir !== config.dir) {
+				toDeleteIfEmpty.add(parentDir);
+				continue;
+			}
+		}
+
+		for (let parentDir of toDeleteIfEmpty) {
+			try {
+				rmdirSync(parentDir);
+				stats.deleted++;
+			}
+			catch (e) {
+				if (e.code === "ENOTEMPTY" || e.code === "EEXIST") {
+					// Directory is not empty, skip
+					continue;
+				}
+
+				throw e;
+			}
+		}
 	}
 }

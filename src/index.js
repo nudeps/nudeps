@@ -113,9 +113,8 @@ export default async function (options) {
 	// Extract top-level directories, copy them over to config.dir
 	// using the package version at the end of the directory (e.g. @foo/bar@3.1.2 instead of @foo/bar)
 	// and update the import map to use that directory instead
-	let toCopy = {};
-	let existingDirs = new Set(getTopLevelModules(config.dir).map(d => config.dir + "/" + d));
-	let toDelete = new Set(existingDirs);
+
+	let { toCopy } = nudeps;
 
 	const { map, stats } = nudeps;
 
@@ -153,59 +152,7 @@ export default async function (options) {
 		}
 	}
 
-	// Copy package directories
-	for (let from in toCopy) {
-		let to = toCopy[from];
-		if (existingDirs.has(to)) {
-			toDelete.delete(to);
-		}
-		else {
-			stats.copied++;
-			cpSync(from, to, {
-				dereference: true,
-				preserveTimestamps: true,
-				recursive: true,
-				filter: (src, dest) => {
-					// Skip nested node_modules directories
-					if (src.indexOf("node_modules/") !== src.lastIndexOf("node_modules")) {
-						return false;
-					}
-					return true;
-				},
-			});
-		}
-	}
-
-	const deleteIfEmpty = new Set();
-
-	for (let dir of toDelete) {
-		if (existsSync(dir)) {
-			stats.deleted++;
-			rmSync(dir, { recursive: true });
-		}
-
-		let parentDir = dir.split("/").slice(0, -1).join("/");
-
-		if (parentDir !== config.dir) {
-			deleteIfEmpty.add(parentDir);
-			continue;
-		}
-	}
-
-	for (let parentDir of deleteIfEmpty) {
-		try {
-			rmdirSync(parentDir);
-			stats.deleted++;
-		}
-		catch (e) {
-			if (e.code === "ENOTEMPTY" || e.code === "EEXIST") {
-				// Directory is not empty, skip
-				continue;
-			}
-
-			throw e;
-		}
-	}
+	nudeps.copyPackages();
 
 	// Write import map
 	if (oldConfig && oldConfig.map !== config.map && existsSync(oldConfig.map)) {
