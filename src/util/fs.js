@@ -22,17 +22,26 @@ export function writeJSONSync (path, data, indent = "\t") {
 }
 
 export function getTopLevelModules (directory = "./node_modules") {
-	return readdirSync(directory).flatMap(dir => {
-		if (statSync(path.join(directory, dir)).isFile()) {
+	try {
+		return readdirSync(directory).flatMap(dir => {
+			if (statSync(path.join(directory, dir)).isFile()) {
+				return [];
+			}
+
+			if (dir[0] === "@") {
+				return readdirSync(path.join(directory, dir)).flatMap(subdir => `${dir}/${subdir}`);
+			}
+
+			return dir;
+		});
+	}
+	catch (e) {
+		if (e.code === "ENOENT") {
 			return [];
 		}
 
-		if (dir[0] === "@") {
-			return readdirSync(path.join(directory, dir)).flatMap(subdir => `${dir}/${subdir}`);
-		}
-
-		return dir;
-	});
+		throw e;
+	}
 }
 
 export function isDirectoryEmptySync (path) {
