@@ -135,7 +135,10 @@ export default class Nudeps {
 						// Path from package root
 						let relativePath = path.relative(from, src);
 
-						if (relativePath.includes("node_modules/")) {
+						if (
+							relativePath.includes("node_modules/") ||
+							relativePath.endsWith("node_modules")
+						) {
 							// Always skip nested node_modules directories
 							return false;
 						}
