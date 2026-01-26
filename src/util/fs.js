@@ -56,7 +56,6 @@ export function importCwdRelative (pathFromCwd) {
  */
 export function matchesGlob (filePath, glob) {
 	if (Array.isArray(glob)) {
-		console.log({ filePath, glob });
 		return glob.some(g => path.matchesGlob(filePath, g));
 	}
 
