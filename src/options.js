@@ -49,7 +49,17 @@ export default {
 				value = defaultValue;
 			}
 
-			return value.map(p => (typeof p === "string" ? { exclude: p } : p));
+			value = value.map(p => {
+				p = typeof p === "string" ? { exclude: p } : p;
+
+				if (p.packageName && !Array.isArray(p.packageName)) {
+					p.packageName = [p.packageName];
+				}
+
+				return p;
+			});
+
+			return value;
 		},
 	},
 };

@@ -98,7 +98,7 @@ export default class Nudeps {
 	 * @param {*} path
 	 * @returns
 	 */
-	isPathIgnored (path) {
+	isPathIgnored (path, packageName) {
 		if (!path) {
 			return false;
 		}
@@ -106,6 +106,10 @@ export default class Nudeps {
 		// If we traverse backwards we can stop once we find a pattern that would change the inclusion status
 		for (let i = this.config.ignore.length - 1; i >= 0; i--) {
 			let p = this.config.ignore[i];
+
+			if (p.packageName && !p.packageName.includes(packageName)) {
+				continue;
+			}
 
 			let glob = p.exclude ?? p.include;
 			let matches = matchesGlob(path, glob);
@@ -145,7 +149,8 @@ export default class Nudeps {
 							return false;
 						}
 
-						return !this.isPathIgnored(relativePath);
+						let { packageName } = this.path(src);
+						return !this.isPathIgnored(relativePath, packageName);
 					},
 				});
 			}
