@@ -21,19 +21,19 @@ export function writeJSONSync (path, data, indent = "\t") {
 	return writeFileSync(path, JSON.stringify(data, null, indent));
 }
 
-export function getTopLevelModules (directory = "./node_modules") {
+export function readDirectorySync (directory, { type } = {}) {
 	try {
-		return readdirSync(directory).flatMap(dir => {
-			if (statSync(path.join(directory, dir)).isFile()) {
-				return [];
-			}
+		// TODO use withFileTypes option instead of filtering by statSync after
+		let ret = readdirSync(directory);
 
-			if (dir[0] === "@") {
-				return readdirSync(path.join(directory, dir)).flatMap(subdir => `${dir}/${subdir}`);
-			}
+		if (type) {
+			ret = ret.filter(item =>
+				statSync(path.join(directory, item))[
+					type === "directory" ? "isDirectory" : "isFile"
+				]());
+		}
 
-			return dir;
-		});
+		return ret;
 	}
 	catch (e) {
 		if (e.code === "ENOENT") {
@@ -42,6 +42,18 @@ export function getTopLevelModules (directory = "./node_modules") {
 
 		throw e;
 	}
+}
+
+export function getTopLevelModules (directory = "./node_modules") {
+	return readDirectorySync(directory, { type: "directory" }).flatMap(dir => {
+		if (dir[0] === "@") {
+			return readDirectorySync(path.join(directory, dir), { type: "directory" }).flatMap(
+				subdir => `${dir}/${subdir}`,
+			);
+		}
+
+		return dir;
+	});
 }
 
 export function isDirectoryEmptySync (path) {
