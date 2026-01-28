@@ -2,7 +2,7 @@
  * Utils for generating and manipulating import maps
  */
 import { Generator } from "@jspm/generator";
-import { readFileSync } from "node:fs";
+import { readFileSync, globSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
@@ -27,6 +27,22 @@ export class ImportMapGenerator extends Generator {
 		});
 
 		this.commonJS = commonJS;
+
+		this.provider.getFileList = function (url) {
+			// Convert url to path
+			let filePath = path.relative(process.cwd(), fileURLToPath(url));
+			let urls = globSync("**/*", {
+				cwd: filePath,
+				absolute: true,
+				exclude: ["node_modules/**"],
+			});
+
+			return new Set(urls);
+		};
+	}
+
+	get provider () {
+		return this.traceMap.resolver.pm;
 	}
 
 	async install (alias, target = `./node_modules/${alias}`, { noRetry, ...installOptions } = {}) {
