@@ -24,25 +24,24 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 2. [Nudeps vs JSPM](#nudeps-vs-jspm)
 	1. [Do I need nudeps or JSPM?](#do-i-need-nudeps-or-jspm)
 3. [Current limitations](#current-limitations)
-4. [Roadmap](#roadmap)
-5. [Installation](#installation)
+4. [Installation](#installation)
 	1. [Local installation](#local-installation)
 	2. [Global installation](#global-installation)
 	3. [Automatically run nudeps when dependencies change](#automatically-run-nudeps-when-dependencies-change)
-6. [Config options](#config-options)
+5. [Config options](#config-options)
 	1. [Restricting which files are deployed from dependencies](#restricting-which-files-are-deployed-from-dependencies)
-7. [Commands](#commands)
+6. [Commands](#commands)
 	1. [`nudeps`](#nudeps-1)
 	2. [`nudeps --prune`](#nudeps---prune)
 	3. [`nudeps --init`](#nudeps---init)
-8. [FAQ](#faq)
+7. [FAQ](#faq)
 	1. [Which browsers are supported?](#which-browsers-are-supported)
 	2. [Does this support pnpm/bun/yarn/etc.?](#does-this-support-pnpmbunyarnetc)
 	3. [Why does it add the version number to the directory name?](#why-does-it-add-the-version-number-to-the-directory-name)
 	4. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
 	5. [Why doesn't Nudeps have an option to add integrity hashes to the import map?](#why-doesnt-nudeps-have-an-option-to-add-integrity-hashes-to-the-import-map)
 	6. [How are CJS (CommonJS) packages handled?](#how-are-cjs-commonjs-packages-handled)
-9. [Troubleshooting](#troubleshooting)
+8. [Troubleshooting](#troubleshooting)
 	1. [Getting an error about a specifier failing to resolve](#getting-an-error-about-a-specifier-failing-to-resolve)
 	2. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
 	3. [Packages that use extension-less paths](#packages-that-use-extension-less-paths)
@@ -100,6 +99,7 @@ Here is a handy table to compare the two:
 | Feature                                                                 | nudeps | JSPM      |
 | ----------------------------------------------------------------------- | ------ | --------- |
 | Use specifiers both in your own code, and in code you distribute.       | ✅     | ✅        |
+| Manages copying the right dependencies out of `node_modules`            | ✅     | ❌        |
 | Use dependencies without having to transpile your _own_ code.           | ✅     | ✅        |
 | No "browser bundle" nonsense: common transitive dependencies are shared | ✅     | ✅        |
 | Separate files are kept separate and cached separately.                 | ✅     | ✅        |
@@ -115,13 +115,6 @@ Here is a handy table to compare the two:
 - Directly installing repos as dependencies does not work yet. ([#23](https://github.com/nudeps/nudeps/issues/23))
 - Non-prefix wildcard exports (e.g. `/*` to `./dist/*.ts.js`) are only added to import map when actually used ([#25](https://github.com/nudeps/nudeps/issues/25))
 - Specifiers will not work in web workers ([#19](https://github.com/nudeps/nudeps/issues/19))
-
-## Roadmap
-
-Enhancements we're working on next:
-
-- Limit which files are copied to `client_modules` either via whitelist or blacklist ([#26](https://github.com/nudeps/nudeps/issues/26))
-- Exclude certain files by default ([#27](https://github.com/nudeps/nudeps/issues/27))
 
 ## Installation
 
