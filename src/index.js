@@ -3,16 +3,8 @@
  */
 import * as path from "node:path";
 import { getConfig } from "./config.js";
-import { readJSONSync, writeJSONSync, getTopLevelModules, isDirectoryEmptySync } from "./util.js";
-import {
-	writeFileSync,
-	renameSync,
-	existsSync,
-	mkdirSync,
-	rmSync,
-	rmdirSync,
-	cpSync,
-} from "node:fs";
+import { readJSONSync, writeJSONSync } from "./util.js";
+import { writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { cp } from "node:fs/promises";
 import Nudeps from "./nudeps.js";
 
