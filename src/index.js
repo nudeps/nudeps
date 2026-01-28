@@ -171,6 +171,8 @@ export default async function (options) {
 			`${stats.copied} directories added, and ${stats.deleted} deleted from ${config.dir}.`,
 		);
 	}
-	info.push(`Import map with ${stats.entries} entries generated successfully at ${config.map}.`);
+	info.push(
+		`Import map with ${stats.entries} entries generated successfully at ${config.map}. Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms.`,
+	);
 	nudeps.info(...info);
 }

@@ -12,7 +12,7 @@ import { existsSync, rmSync, rmdirSync, cpSync } from "node:fs";
 import * as path from "node:path";
 
 export default class Nudeps {
-	stats = { entries: 0, copied: 0, deleted: 0 };
+	stats = { entries: 0, copied: 0, deleted: 0, startTime: performance.now() };
 	toCopy = {};
 	toDelete = null;
 	toDeleteIfEmpty = new Set();
@@ -79,6 +79,10 @@ export default class Nudeps {
 
 	get dir () {
 		return this.config.dir;
+	}
+
+	get elapsedTime () {
+		return performance.now() - this.stats.startTime;
 	}
 
 	path (url) {
