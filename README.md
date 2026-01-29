@@ -211,6 +211,8 @@ For example:
 - To include `package.json` files you'd use `ignore: { include: "package.json" }`.
 - To only copy `*.js` files and nothing else you'd use `ignore: [{ exclude: "**/*" }, { include: "**/*.js" } ]`. (but see above why this is not recommended)
 
+To restrict rules to specific packages, you can provide the rule as an object and add one or more (as an array) package names via the `packageName` property.
+
 ## Commands
 
 ### `nudeps`
