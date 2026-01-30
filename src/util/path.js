@@ -61,21 +61,31 @@ export default class ModulePath {
 		return this.nudeps.packages[this.lockKey]?.name ?? this.packages.at(-1);
 	}
 
+	/**
+	 * Get client_modules directory for the package (including version etc)
+	 */
 	get localDir () {
 		let versionSuffix = this.version ? "@" + this.version : "";
 		return [this.nudeps.dir, this.packageName + versionSuffix].join("/");
 	}
 
-	get localParentDir () {}
-
+	/**
+	 * Get corresponding path in client_modules
+	 */
 	get localPath () {
 		return [this.localDir, this.filePath].join("/");
 	}
 
+	/**
+	 * node_modules directory
+	 */
 	get nodeDir () {
 		return [this.base, this.lockKey].join("/");
 	}
 
+	/**
+	 * node_modules directory of parent
+	 */
 	get topNodeDir () {
 		return [this.base, this.topLockKey].join("/");
 	}
