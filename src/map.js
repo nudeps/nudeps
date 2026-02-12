@@ -27,18 +27,6 @@ export class ImportMapGenerator extends Generator {
 		});
 
 		this.commonJS = commonJS;
-
-		this.provider.getFileList = function (url) {
-			// Convert url to path
-			let filePath = path.relative(process.cwd(), fileURLToPath(url));
-			let urls = globSync("**/*", {
-				cwd: filePath,
-				absolute: true,
-				exclude: ["node_modules/**"],
-			});
-
-			return new Set(urls);
-		};
 	}
 
 	get provider () {
