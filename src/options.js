@@ -62,4 +62,7 @@ export default {
 			return value;
 		},
 	},
+	preserveSymlinks: {
+		default: false,
+	},
 };

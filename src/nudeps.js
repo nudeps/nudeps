@@ -96,6 +96,22 @@ export default class Nudeps {
 	 * @param {*} path
 	 * @returns
 	 */
+	dereference (packageName, version) {
+		switch (typeof this.config.preserveSymlinks) {
+			case "boolean":
+				return !this.config.preserveSymlinks;
+			case "function":
+				return !this.config.preserveSymlinks({packageName, version});
+		}
+
+		if (Array.isArray(this.config.preserveSymlinks)) {
+			// Array of package names
+			return !this.config.preserveSymlinks.includes(packageName);
+		}
+
+		return true;
+	}
+
 	isPathIgnored (path, packageName) {
 		if (!path) {
 			return false;
@@ -131,8 +147,10 @@ export default class Nudeps {
 			}
 			else {
 				stats.copied++;
+				let mp = this.path(from);
+				let {packageName, version} = mp;
 				cpSync(from, to, {
-					dereference: true,
+					dereference: this.dereference(packageName, version),
 					preserveTimestamps: true,
 					recursive: true,
 					filter: src => {
