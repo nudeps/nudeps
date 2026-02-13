@@ -94,7 +94,7 @@ export default class ModulePath {
 	 * node_modules directory
 	 */
 	get nodeDir () {
-		return [this.base, this.lockKey].join("/");
+		return [this.base, this.rawLockKey].join("/");
 	}
 
 	/**
