@@ -1,3 +1,5 @@
+import * as nodePath from "node:path";
+
 export default class ModulePath {
 	nudeps = null;
 	packages = [];
@@ -22,8 +24,12 @@ export default class ModulePath {
 		}
 
 		let index = this.parts.indexOf("node_modules");
+		this.isExternal = index === -1;
 
-		if (index > -1) {
+		if (this.isExternal) {
+			this.base = nodePath.relative(process.cwd(), nodePath.dirname(this.path));
+		}
+		else {
 			this.base = this.parts.splice(0, index).join("/");
 
 			while (this.parts[0] === "node_modules") {
@@ -45,8 +51,16 @@ export default class ModulePath {
 		return this.packages.length > 1;
 	}
 
+	get packageInfo () {
+		return this.nudeps.pkgLock.packages[this.rawLockKey] ?? null;
+	}
+
+	get rawLockKey () {
+		return this.packages.length > 0 ? this.packages.map(pkg => "node_modules/" + pkg).join("/") : this.base;
+	}
+
 	get lockKey () {
-		return this.packages.map(pkg => "node_modules/" + pkg).join("/");
+		return this.nudeps.pkgLock.resolveKey(this.rawLockKey);
 	}
 
 	get topLockKey () {
@@ -54,11 +68,11 @@ export default class ModulePath {
 	}
 
 	get version () {
-		return this.nudeps.packages[this.lockKey]?.version;
+		return this.packageInfo?.version;
 	}
 
 	get packageName () {
-		return this.nudeps.packages[this.lockKey]?.name ?? this.packages.at(-1);
+		return this.packageInfo?.name ?? this.packages.at(-1);
 	}
 
 	/**
@@ -95,9 +109,14 @@ export default class ModulePath {
 	}
 
 	static from (path, nudeps) {
+		if (Array.isArray(path)) {
+			path = path.join("/");
+		}
+
 		if (!this.all[path]) {
 			this.all[path] = new ModulePath(path, nudeps);
 		}
+
 		return this.all[path];
 	}
 }
