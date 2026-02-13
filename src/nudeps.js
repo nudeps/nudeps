@@ -10,6 +10,7 @@ import { matchesGlob } from "./util/fs.js";
 import { getTopLevelModules } from "./util.js";
 import { existsSync, rmSync, rmdirSync, cpSync } from "node:fs";
 import * as path from "node:path";
+import PackageLock from "./util/package-lock.js";
 
 export default class Nudeps {
 	stats = { entries: 0, copied: 0, deleted: 0, startTime: performance.now() };
@@ -39,10 +40,11 @@ export default class Nudeps {
 	}
 
 	get pkgLock () {
-		let value = readJSONSync("package-lock.json");
-		if (!value) {
+		let data = readJSONSync("package-lock.json");
+		if (!data) {
 			throw new Error("package-lock.json not found or invalid");
 		}
+		let value = new PackageLock(data);
 		Object.defineProperty(this, "pkgLock", { value, configurable: true });
 		return value;
 	}
