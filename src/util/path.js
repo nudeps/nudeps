@@ -53,12 +53,32 @@ export default class ModulePath {
 		return "node_modules/" + this.packages[0];
 	}
 
+	get lockEntry () {
+		return this.nudeps.packages[this.lockKey];
+	}
+
 	get version () {
-		return this.nudeps.packages[this.lockKey]?.version;
+		let entry = this.lockEntry;
+
+		// file: protocol packages are symlinks in package-lock.json:
+		// their node_modules entry has { link: true, resolved: "<path>" }
+		// but no version — the version is in the entry at the resolved path
+		if (entry?.link) {
+			entry = this.nudeps.packages[entry.resolved];
+		}
+
+		return entry?.version;
 	}
 
 	get packageName () {
-		return this.nudeps.packages[this.lockKey]?.name ?? this.packages.at(-1);
+		let entry = this.lockEntry;
+
+		// Same as version: follow the link to get the actual package name
+		if (entry?.link) {
+			entry = this.nudeps.packages[entry.resolved];
+		}
+
+		return entry?.name ?? this.packages.at(-1);
 	}
 
 	/**

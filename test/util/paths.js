@@ -1,25 +1,34 @@
-import ModulePath from "../../src/util/paths.js";
+import ModulePath from "../../src/util/path.js";
 
-ModulePath.packages = new Proxy(
-	{},
-	{
-		has (target, prop) {
-			return prop.startsWith("node_modules/") || prop in target;
+let mockNudeps = {
+	dir: "./client_modules",
+	packages: new Proxy(
+		{
+			// Simulate a file: protocol (linked) package in package-lock.json
+			"node_modules/linked-pkg": { link: true, resolved: "../../some/path" },
+			"../../some/path": { name: "linked-pkg", version: "4.5.6" },
 		},
-		get (target, prop) {
-			if (prop.startsWith("node_modules/")) {
-				return { version: "1.2.3" };
-			}
-			return target[prop];
+		{
+			has (target, prop) {
+				return prop.startsWith("node_modules/") || prop in target;
+			},
+			get (target, prop) {
+				if (prop in target) {
+					return target[prop];
+				}
+				if (prop.startsWith("node_modules/")) {
+					return { version: "1.2.3" };
+				}
+			},
 		},
-	},
-);
+	),
+};
 
 export default {
 	run (prop) {
 		let path = this.parent.name;
 
-		return new ModulePath(path)[prop];
+		return new ModulePath(path, mockNudeps)[prop];
 	},
 	tests: [
 		{
@@ -143,6 +152,23 @@ export default {
 				{
 					arg: "topNodeDir",
 					expect: "./node_modules/foo",
+				},
+			],
+		},
+		{
+			name: "./node_modules/linked-pkg/dist/index.js",
+			tests: [
+				{
+					arg: "version",
+					expect: "4.5.6",
+				},
+				{
+					arg: "packageName",
+					expect: "linked-pkg",
+				},
+				{
+					arg: "localDir",
+					expect: "./client_modules/linked-pkg@4.5.6",
 				},
 			],
 		},
