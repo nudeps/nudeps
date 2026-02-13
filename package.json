@@ -25,7 +25,7 @@
 	],
 	"scripts": {
 		"release": "release-it",
-		"test": "npx htest"
+		"test": "npx htest ./test/index.js"
 	},
 	"devDependencies": {
 		"htest.dev": "^0.0.21",
