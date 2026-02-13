@@ -1,4 +1,4 @@
-import ModulePath from "../../src/util/paths.js";
+import ModulePath from "../../src/util/path.js";
 
 ModulePath.packages = new Proxy(
 	{},
