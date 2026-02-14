@@ -62,6 +62,9 @@ export default {
 			return value;
 		},
 	},
+	symlink: {
+		default: ({isExternal}) => isExternal,
+	},
 	preserveSymlinks: {
 		default: false,
 	},

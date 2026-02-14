@@ -20,4 +20,8 @@ export default class PackageLock {
 	resolveKey (key) {
 		return this.#resolvedKeys[key] ?? key;
 	}
+
+	isExternal (key) {
+		return key in this.#resolvedKeys;
+	}
 }

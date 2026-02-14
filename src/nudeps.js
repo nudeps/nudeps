@@ -8,7 +8,7 @@ import ModulePath from "./util/path.js";
 import { matchesGlob } from "./util/fs.js";
 
 import { getTopLevelModules } from "./util.js";
-import { existsSync, rmSync, rmdirSync, cpSync } from "node:fs";
+import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
 import PackageLock from "./util/package-lock.js";
 
@@ -112,6 +112,16 @@ export default class Nudeps {
 		}
 
 		return true;
+	}
+
+	shouldSymlink (mp) {
+		let {symlink} = this.config;
+
+		if (typeof symlink === "boolean") {
+			return symlink;
+		}
+
+		return symlink(mp);
 	}
 
 	isPathIgnored (path, packageName) {

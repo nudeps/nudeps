@@ -24,9 +24,9 @@ export default class ModulePath {
 		}
 
 		let index = this.parts.indexOf("node_modules");
-		this.isExternal = index === -1;
+		let isExternal = index === -1;
 
-		if (this.isExternal) {
+		if (isExternal) {
 			this.base = nodePath.relative(process.cwd(), nodePath.dirname(this.path));
 		}
 		else {
@@ -49,6 +49,10 @@ export default class ModulePath {
 
 	get isNested () {
 		return this.packages.length > 1;
+	}
+
+	get isExternal () {
+		return this.nudeps.pkgLock.isExternal(this.rawLockKey);
 	}
 
 	get packageInfo () {
