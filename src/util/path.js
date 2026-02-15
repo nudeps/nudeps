@@ -55,8 +55,66 @@ export default class ModulePath {
 		return this.nudeps.pkgLock.isExternal(this.rawLockKey);
 	}
 
+	/**
+	 * If this module is a transitive dep of a local/linked dep, returns the resolved path
+	 * of that local dep (e.g., "../vue"). Returns undefined otherwise.
+	 *
+	 * Case A: base matches a resolved path of a linked dep (e.g., base="../vue")
+	 * Case B: nested under an external package (e.g., packages=["ext-pkg", "dep"])
+	 */
+	get externalBase () {
+		let pkgLock = this.nudeps.pkgLock;
+
+		// Case A: base is a non-trivial path pointing to a local dep
+		if (this.base && this.base !== "." && pkgLock.findKeyByResolvedPath(this.base)) {
+			return this.base;
+		}
+
+		// Case B: nested under an external (linked) package
+		if (this.isNested && pkgLock.isExternal(this.topLockKey)) {
+			return pkgLock.resolveKey(this.topLockKey);
+		}
+	}
+
+	/**
+	 * For transitive deps of local deps, returns the ModulePath for the local dep itself
+	 */
+	get externalParent () {
+		let base = this.externalBase;
+		if (!base) {
+			return null;
+		}
+
+		let parentKey = this.nudeps.pkgLock.findKeyByResolvedPath(base);
+		if (!parentKey) {
+			return null;
+		}
+
+		// Create a ModulePath for the local dep itself (e.g., "./node_modules/nudeps-demo-vue")
+		return this.constructor.from("./" + parentKey, this.nudeps);
+	}
+
 	get packageInfo () {
-		return this.nudeps.pkgLock.packages[this.rawLockKey] ?? null;
+		let info = this.nudeps.pkgLock.packages[this.rawLockKey] ?? null;
+
+		if (!info && this.externalBase) {
+			// Fall back to child lockfile for transitive deps of local deps
+			let childLock = this.nudeps.childLock(this.externalBase);
+			if (childLock) {
+				let childKey;
+				if (this.base && this.base !== "." && this.base === this.externalBase) {
+					// Case A: use rawLockKey as-is
+					childKey = this.rawLockKey;
+				}
+				else {
+					// Case B: strip the parent package
+					childKey = this.packages.slice(1).map(p => "node_modules/" + p).join("/");
+				}
+				info = childLock.packages[childKey] ?? null;
+			}
+		}
+
+		return info;
 	}
 
 	get rawLockKey () {
@@ -80,11 +138,29 @@ export default class ModulePath {
 	}
 
 	/**
-	 * Get client_modules directory for the package (including version etc)
+	 * Get client_modules directory for the package (including version etc).
+	 * For transitive deps of local deps, nests under the local dep's client_modules.
 	 */
 	get localDir () {
 		let versionSuffix = this.version ? "@" + this.version : "";
-		return [this.nudeps.dir, this.packageName + versionSuffix].join("/");
+		let versionedName = this.packageName + versionSuffix;
+
+		if (this.externalBase) {
+			// Check if the main lockfile already has the same package@version
+			let mainInfo = this.nudeps.pkgLock.packages["node_modules/" + this.packageName];
+			if (mainInfo?.version === this.version) {
+				// Reuse the standard path
+				return [this.nudeps.dir, versionedName].join("/");
+			}
+
+			// Nest under the local dep's client_modules
+			let parent = this.externalParent;
+			if (parent) {
+				return parent.localDir + "/client_modules/" + versionedName;
+			}
+		}
+
+		return [this.nudeps.dir, versionedName].join("/");
 	}
 
 	/**

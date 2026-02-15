@@ -69,6 +69,27 @@ export default class Nudeps {
 		return value;
 	}
 
+	#childLocks = {};
+
+	/**
+	 * Load and cache a child package's lockfile for resolving transitive deps of local deps
+	 * @param {string} resolvedPath - Resolved path to the local dep (e.g., "../vue")
+	 * @returns {PackageLock|null}
+	 */
+	childLock (resolvedPath) {
+		if (!(resolvedPath in this.#childLocks)) {
+			let data = readJSONSync(`${ resolvedPath }/package-lock.json`);
+			if (data) {
+				this.#childLocks[resolvedPath] = new PackageLock(data);
+			}
+			else {
+				this.info(`Warning: No package-lock.json found at ${ resolvedPath }`);
+				this.#childLocks[resolvedPath] = null;
+			}
+		}
+		return this.#childLocks[resolvedPath];
+	}
+
 	get packages () {
 		return this.pkgLock?.packages ?? {};
 	}

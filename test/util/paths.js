@@ -1,25 +1,118 @@
 import ModulePath from "../../src/util/path.js";
 
-ModulePath.packages = new Proxy(
-	{},
-	{
-		has (target, prop) {
-			return prop.startsWith("node_modules/") || prop in target;
-		},
+// Mock PackageLock that returns { version: "1.2.3" } for any node_modules/ key
+let defaultPkgLock = {
+	packages: new Proxy({}, {
 		get (target, prop) {
-			if (prop.startsWith("node_modules/")) {
+			if (typeof prop === "string" && prop.startsWith("node_modules/")) {
 				return { version: "1.2.3" };
 			}
 			return target[prop];
 		},
+	}),
+	resolveKey (key) { return key; },
+	isExternal () { return false; },
+	findKeyByResolvedPath () {},
+	externalEntries: [],
+};
+
+let defaultNudeps = {
+	pkgLock: defaultPkgLock,
+	dir: "./client_modules",
+	childLock () { return null; },
+};
+
+// Case A mock: transitive dep reached via local dep's resolved path (base = "../vue")
+let caseAPkgLock = {
+	packages: {
+		"node_modules/nudeps-demo-vue": { version: "0.0.1", name: "nudeps-demo-vue" },
 	},
-);
+	resolveKey (key) { return key; },
+	isExternal () { return false; },
+	findKeyByResolvedPath (path) {
+		if (path === "../vue") return "node_modules/nudeps-demo-vue";
+	},
+	externalEntries: [],
+};
+
+let caseANudeps = {
+	pkgLock: caseAPkgLock,
+	dir: "./client_modules",
+	childLock (path) {
+		if (path === "../vue") {
+			return {
+				packages: { "node_modules/vue": { version: "3.5.26", name: "vue" } },
+			};
+		}
+		return null;
+	},
+};
+
+// Case A with reuse: main lockfile also has vue@3.5.26
+let caseAReusePkgLock = {
+	packages: {
+		"node_modules/nudeps-demo-vue": { version: "0.0.1", name: "nudeps-demo-vue" },
+		"node_modules/vue": { version: "3.5.26", name: "vue" },
+	},
+	resolveKey (key) { return key; },
+	isExternal () { return false; },
+	findKeyByResolvedPath (path) {
+		if (path === "../vue") return "node_modules/nudeps-demo-vue";
+	},
+	externalEntries: [],
+};
+
+let caseAReuseNudeps = {
+	pkgLock: caseAReusePkgLock,
+	dir: "./client_modules",
+	childLock (path) {
+		if (path === "../vue") {
+			return {
+				packages: { "node_modules/vue": { version: "3.5.26", name: "vue" } },
+			};
+		}
+		return null;
+	},
+};
+
+// Case B mock: nested under an external (linked) package
+let caseBPkgLock = {
+	packages: {
+		"node_modules/ext-pkg": { version: "1.0.0", name: "ext-pkg" },
+	},
+	resolveKey (key) {
+		if (key === "node_modules/ext-pkg") return "../ext";
+		return key;
+	},
+	isExternal (key) {
+		return key === "node_modules/ext-pkg";
+	},
+	findKeyByResolvedPath (path) {
+		if (path === "../ext") return "node_modules/ext-pkg";
+	},
+	externalEntries: [["node_modules/ext-pkg", "../ext"]],
+};
+
+let caseBNudeps = {
+	pkgLock: caseBPkgLock,
+	dir: "./client_modules",
+	childLock (path) {
+		if (path === "../ext") {
+			return {
+				packages: { "node_modules/dep": { version: "2.0.0", name: "dep" } },
+			};
+		}
+		return null;
+	},
+};
 
 export default {
 	run (prop) {
 		let path = this.parent.name;
-
-		return new ModulePath(path)[prop];
+		let nudeps = this.parent.nudeps ?? defaultNudeps;
+		// Clear cache to avoid cross-contamination between test groups
+		ModulePath.all = {};
+		return new ModulePath(path, nudeps)[prop];
 	},
 	tests: [
 		{
@@ -180,6 +273,67 @@ export default {
 				{
 					arg: "version",
 					expect: "1.2.3",
+				},
+			],
+		},
+		// Case A: transitive dep via local dep's resolved path
+		{
+			name: "../vue/node_modules/vue/dist/vue.esm-bundler.js",
+			nudeps: caseANudeps,
+			tests: [
+				{
+					arg: "externalBase",
+					expect: "../vue",
+				},
+				{
+					arg: "version",
+					expect: "3.5.26",
+				},
+				{
+					arg: "packageName",
+					expect: "vue",
+				},
+				{
+					arg: "localDir",
+					expect: "./client_modules/nudeps-demo-vue@0.0.1/client_modules/vue@3.5.26",
+				},
+			],
+		},
+		// Case A with reuse: main lockfile has the same package@version
+		{
+			name: "../vue/node_modules/vue/dist/vue.esm-bundler.js",
+			nudeps: caseAReuseNudeps,
+			tests: [
+				{
+					arg: "externalBase",
+					expect: "../vue",
+				},
+				{
+					arg: "localDir",
+					expect: "./client_modules/vue@3.5.26",
+				},
+			],
+		},
+		// Case B: nested under external (linked) package
+		{
+			name: "./node_modules/ext-pkg/node_modules/dep/index.js",
+			nudeps: caseBNudeps,
+			tests: [
+				{
+					arg: "externalBase",
+					expect: "../ext",
+				},
+				{
+					arg: "version",
+					expect: "2.0.0",
+				},
+				{
+					arg: "packageName",
+					expect: "dep",
+				},
+				{
+					arg: "localDir",
+					expect: "./client_modules/ext-pkg@1.0.0/client_modules/dep@2.0.0",
 				},
 			],
 		},

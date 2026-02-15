@@ -126,7 +126,9 @@ export default async function (options) {
 		}
 		subMap[specifier] = urlFromMap;
 		stats.entries++;
-		toCopy[modulePath.nodeDir] ??= modulePath.localDir;
+		if (!modulePath.externalBase) {
+			toCopy[modulePath.nodeDir] ??= modulePath.localDir;
+		}
 	}
 
 	if (map.scopes) {
