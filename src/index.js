@@ -2,6 +2,7 @@
  * Main entry point
  */
 import * as path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { getConfig } from "./config.js";
 import { readJSONSync, writeJSONSync } from "./util.js";
 import { writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
@@ -41,6 +42,8 @@ export default async function (options) {
 	}
 	catch (e) {
 		nudeps.error(`Failed to install root package. ${e.message}`);
+		// Store the error for potential manual mapping later
+		var rootInstallError = e;
 	}
 
 	if (!config.prune && nudeps.pkg.dependencies) {
@@ -58,6 +61,30 @@ export default async function (options) {
 			catch (e) {
 				nudeps.error(`Error installing ${dep}: ${e.message}`);
 			}
+		}
+	}
+
+	// If root package installation failed due to missing dependencies in the entry point,
+	// add it manually after all dependencies are installed using JSPM's resolver.
+	// We do this AFTER dependency installation because generator.install() regenerates the
+	// import map, which would overwrite any mappings added earlier.
+	// See https://github.com/nudeps/nudeps/issues/30
+	// Note: string prefix match on JSPM error message — may need updating if JSPM changes it.
+	if (rootInstallError?.message.startsWith("Cannot find package")) {
+		try {
+			let entryPoint = await generator.traceMap.resolver.resolveExport(
+				pathToFileURL(process.cwd() + "/").href,
+				".",
+				false,
+				false,
+				nudeps.pkg.name,
+			);
+			entryPoint = path.relative(process.cwd(), fileURLToPath(entryPoint));
+			entryPoint = entryPoint.startsWith(".") ? entryPoint : `./${entryPoint}`;
+			generator.map.set(nudeps.pkg.name, entryPoint);
+		}
+		catch (e) {
+			nudeps.error(`Failed to manually resolve root package entry point. ${e.message}`);
 		}
 	}
 
