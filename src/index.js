@@ -69,17 +69,23 @@ export default async function (options) {
 	// We do this AFTER dependency installation because generator.install() regenerates the
 	// import map, which would overwrite any mappings added earlier.
 	// See https://github.com/nudeps/nudeps/issues/30
+	// Note: string prefix match on JSPM error message — may need updating if JSPM changes it.
 	if (rootInstallError?.message.startsWith("Cannot find package")) {
-		let entryPoint = await generator.traceMap.resolver.resolveExport(
-			pathToFileURL(process.cwd() + "/").href,
-			".",
-			false,
-			false,
-			nudeps.pkg.name,
-		);
-		entryPoint = path.relative(process.cwd(), fileURLToPath(entryPoint));
-		entryPoint = entryPoint.startsWith(".") ? entryPoint : `./${entryPoint}`;
-		generator.map.set(nudeps.pkg.name, entryPoint);
+		try {
+			let entryPoint = await generator.traceMap.resolver.resolveExport(
+				pathToFileURL(process.cwd() + "/").href,
+				".",
+				false,
+				false,
+				nudeps.pkg.name,
+			);
+			entryPoint = path.relative(process.cwd(), fileURLToPath(entryPoint));
+			entryPoint = entryPoint.startsWith(".") ? entryPoint : `./${entryPoint}`;
+			generator.map.set(nudeps.pkg.name, entryPoint);
+		}
+		catch (e) {
+			nudeps.error(`Failed to manually resolve root package entry point. ${e.message}`);
+		}
 	}
 
 	if (config.cjs !== false) {
