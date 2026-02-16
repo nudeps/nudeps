@@ -1,5 +1,5 @@
 export default class PackageLock {
-	#resolvedKeys = {};
+	external = {};
 
 	constructor (data) {
 		let raw = data.packages ?? {};
@@ -9,7 +9,7 @@ export default class PackageLock {
 			if (info.link) {
 				// Resolve link to the actual package info object
 				this.packages[key] = raw[info.resolved];
-				this.#resolvedKeys[key] = info.resolved;
+				this.external[key] = info.resolved;
 			}
 			else {
 				this.packages[key] = info;
@@ -18,11 +18,11 @@ export default class PackageLock {
 	}
 
 	resolveKey (key) {
-		return this.#resolvedKeys[key] ?? key;
+		return this.external[key] ?? key;
 	}
 
 	isExternal (key) {
-		return key in this.#resolvedKeys;
+		return key in this.external;
 	}
 
 	/**
@@ -31,18 +31,10 @@ export default class PackageLock {
 	 * @returns {string|undefined} The lock key, or undefined if not found
 	 */
 	findKeyByResolvedPath (resolvedPath) {
-		for (let [key, resolved] of Object.entries(this.#resolvedKeys)) {
+		for (let [key, resolved] of Object.entries(this.external)) {
 			if (resolved === resolvedPath) {
 				return key;
 			}
 		}
-	}
-
-	/**
-	 * Iterate [key, resolvedPath] pairs for all external (linked) entries
-	 * @returns {[string, string][]}
-	 */
-	get externalEntries () {
-		return Object.entries(this.#resolvedKeys);
 	}
 }

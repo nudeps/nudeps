@@ -2,24 +2,33 @@ import ModulePath from "../../src/util/path.js";
 
 // Mock PackageLock that returns { version: "1.2.3" } for any node_modules/ key
 let defaultPkgLock = {
-	packages: new Proxy({}, {
-		get (target, prop) {
-			if (typeof prop === "string" && prop.startsWith("node_modules/")) {
-				return { version: "1.2.3" };
-			}
-			return target[prop];
+	packages: new Proxy(
+		{},
+		{
+			get (target, prop) {
+				if (typeof prop === "string" && prop.startsWith("node_modules/")) {
+					return { version: "1.2.3" };
+				}
+				return target[prop];
+			},
 		},
-	}),
-	resolveKey (key) { return key; },
-	isExternal () { return false; },
+	),
+	resolveKey (key) {
+		return key;
+	},
+	isExternal () {
+		return false;
+	},
 	findKeyByResolvedPath () {},
-	externalEntries: [],
+	external: {},
 };
 
 let defaultNudeps = {
 	pkgLock: defaultPkgLock,
 	dir: "./client_modules",
-	childLock () { return null; },
+	childLock () {
+		return null;
+	},
 };
 
 // Case A mock: transitive dep reached via local dep's resolved path (base = "../vue")
@@ -27,12 +36,16 @@ let caseAPkgLock = {
 	packages: {
 		"node_modules/nudeps-demo-vue": { version: "0.0.1", name: "nudeps-demo-vue" },
 	},
-	resolveKey (key) { return key; },
-	isExternal () { return false; },
+	resolveKey (key) {
+		return key;
+	},
+	isExternal () {
+		return false;
+	},
 	findKeyByResolvedPath (path) {
 		if (path === "../vue") return "node_modules/nudeps-demo-vue";
 	},
-	externalEntries: [],
+	external: {},
 };
 
 let caseANudeps = {
@@ -54,12 +67,16 @@ let caseAReusePkgLock = {
 		"node_modules/nudeps-demo-vue": { version: "0.0.1", name: "nudeps-demo-vue" },
 		"node_modules/vue": { version: "3.5.26", name: "vue" },
 	},
-	resolveKey (key) { return key; },
-	isExternal () { return false; },
+	resolveKey (key) {
+		return key;
+	},
+	isExternal () {
+		return false;
+	},
 	findKeyByResolvedPath (path) {
 		if (path === "../vue") return "node_modules/nudeps-demo-vue";
 	},
-	externalEntries: [],
+	external: {},
 };
 
 let caseAReuseNudeps = {
@@ -90,7 +107,7 @@ let caseBPkgLock = {
 	findKeyByResolvedPath (path) {
 		if (path === "../ext") return "node_modules/ext-pkg";
 	},
-	externalEntries: [["node_modules/ext-pkg", "../ext"]],
+	external: { "node_modules/ext-pkg": "../ext" },
 };
 
 let caseBNudeps = {
