@@ -13,7 +13,7 @@ import * as path from "node:path";
 import PackageLock from "./util/package-lock.js";
 
 export default class Nudeps {
-	stats = { entries: 0, copied: 0, deleted: 0, startTime: performance.now() };
+	stats = { entries: 0, copied: 0, deleted: 0, linked: 0, startTime: performance.now() };
 	toCopy = {};
 	toDelete = null;
 	toDeleteIfEmpty = new Set();
@@ -172,16 +172,27 @@ export default class Nudeps {
 	copyPackages () {
 		let { config, existingDirs, toCopy, toDelete, toDeleteIfEmpty, stats } = this;
 
-		// Copy package directories
+		// Copy (or symlink) package directories
 		for (let from in toCopy) {
 			let to = toCopy[from];
 			if (existingDirs.has(to)) {
 				toDelete.delete(to);
 			}
 			else {
-				stats.copied++;
 				let mp = this.path(from);
-				let {packageName, version} = mp;
+
+				if (this.shouldSymlink(mp)) {
+					// Create a symlink to the resolved local path
+					let resolvedPath = this.pkgLock.resolveKey(mp.rawLockKey);
+					let target = path.relative(path.dirname(to), resolvedPath);
+					mkdirSync(path.dirname(to), { recursive: true });
+					symlinkSync(target, to, "dir");
+					stats.linked++;
+					continue;
+				}
+
+				stats.copied++;
+				let { packageName, version } = mp;
 				cpSync(from, to, {
 					dereference: this.dereference(packageName, version),
 					preserveTimestamps: true,
