@@ -4,8 +4,8 @@
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { getConfig } from "./config.js";
-import { readJSONSync, writeJSONSync } from "./util.js";
 import { writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { readJSONSync, writeJSONSync, createGitignoredDir } from "./util.js";
 import { cp } from "node:fs/promises";
 import Nudeps from "./nudeps.js";
 
@@ -21,9 +21,7 @@ export default async function (options) {
 	}
 
 	if (!cacheExists) {
-		// First run
-		mkdirSync(".nudeps");
-		writeFileSync(".nudeps/.gitignore", "*");
+		createGitignoredDir(".nudeps");
 	}
 	else if (oldConfig) {
 		if (config.dir !== oldConfig.dir && existsSync(oldConfig.dir)) {
@@ -125,8 +123,7 @@ export default async function (options) {
 	}
 
 	if (!dirExists) {
-		mkdirSync(config.dir, { recursive: true });
-		writeFileSync(path.join(config.dir, ".gitignore"), "*");
+		createGitignoredDir(config.dir);
 	}
 
 	// Extract top-level directories, copy them over to config.dir

@@ -2,6 +2,7 @@ import {
 	readFileSync,
 	writeFileSync,
 	existsSync,
+	mkdirSync,
 	readdirSync,
 	statSync,
 	opendirSync,
@@ -61,6 +62,17 @@ export function isDirectoryEmptySync (path) {
 	const entry = dir.readSync();
 	dir.closeSync();
 	return entry === null;
+}
+
+/**
+ * Create a directory (if it doesn't exist) with a .gitignore that ignores everything in it.
+ * @param {string} dir
+ */
+export function createGitignoredDir (dir) {
+	if (!existsSync(dir)) {
+		mkdirSync(dir, { recursive: true });
+		writeFileSync(path.join(dir, ".gitignore"), "*");
+	}
 }
 
 export function importCwdRelative (pathFromCwd) {
