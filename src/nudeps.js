@@ -78,12 +78,12 @@ export default class Nudeps {
 	 */
 	childLock (resolvedPath) {
 		if (!(resolvedPath in this.#childLocks)) {
-			let data = readJSONSync(`${ resolvedPath }/package-lock.json`);
+			let data = readJSONSync(`${resolvedPath}/package-lock.json`);
 			if (data) {
 				this.#childLocks[resolvedPath] = new PackageLock(data);
 			}
 			else {
-				this.info(`Warning: No package-lock.json found at ${ resolvedPath }`);
+				this.info(`Warning: No package-lock.json found at ${resolvedPath}`);
 				this.#childLocks[resolvedPath] = null;
 			}
 		}
@@ -124,7 +124,7 @@ export default class Nudeps {
 			case "boolean":
 				return !this.config.preserveSymlinks;
 			case "function":
-				return !this.config.preserveSymlinks({packageName, version});
+				return !this.config.preserveSymlinks({ packageName, version });
 		}
 
 		if (Array.isArray(this.config.preserveSymlinks)) {
@@ -136,7 +136,7 @@ export default class Nudeps {
 	}
 
 	shouldSymlink (mp) {
-		let {symlink} = this.config;
+		let { symlink } = this.config;
 
 		if (typeof symlink === "boolean") {
 			return symlink;
