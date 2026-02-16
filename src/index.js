@@ -4,7 +4,7 @@
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { getConfig } from "./config.js";
-import { writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { readJSONSync, writeJSONSync, createGitignoredDir } from "./util.js";
 import { cp } from "node:fs/promises";
 import Nudeps from "./nudeps.js";
@@ -178,8 +178,16 @@ export default async function (options) {
 		rmSync(oldConfig.map);
 	}
 
-	mkdirSync(path.dirname(config.map), { recursive: true });
-	writeFileSync(config.map, map.js);
+	// Detect whether the map actually changed (used to skip propagation on no-ops,
+	// which also naturally breaks cycles between mutually-local deps).
+	let mapContent = map.js;
+	let existingMap = existsSync(config.map) ? readFileSync(config.map, "utf8") : null;
+	let mapChanged = mapContent !== existingMap;
+
+	if (mapChanged) {
+		mkdirSync(path.dirname(config.map), { recursive: true });
+		writeFileSync(config.map, mapContent);
+	}
 
 	// intentionally async.
 	// Nothing immediately hinges on the result of this, and we're not going to run update immediately after.
@@ -197,8 +205,15 @@ export default async function (options) {
 			`${stats.copied} directories added, and ${stats.deleted} deleted from ${config.dir}.`,
 		);
 	}
-	info.push(
-		`Import map with ${stats.entries} entries generated successfully at ${config.map}. Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms.`,
-	);
+	if (mapChanged) {
+		info.push(
+			`Import map with ${stats.entries} entries generated successfully at ${config.map}. Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms.`,
+		);
+	}
+	else {
+		info.push(
+			`Import map unchanged (${stats.entries} entries). Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms.`,
+		);
+	}
 	nudeps.info(...info);
 }
