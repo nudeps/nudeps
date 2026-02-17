@@ -34,14 +34,17 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 	1. [`nudeps`](#nudeps-1)
 	2. [`nudeps --prune`](#nudeps---prune)
 	3. [`nudeps --init`](#nudeps---init)
-7. [FAQ](#faq)
+7. [Local dependencies](#local-dependencies)
+	1. [Registration](#registration)
+	2. [Propagation](#propagation)
+8. [FAQ](#faq)
 	1. [Which browsers are supported?](#which-browsers-are-supported)
 	2. [Does this support pnpm/bun/yarn/etc.?](#does-this-support-pnpmbunyarnetc)
 	3. [Why does it add the version number to the directory name?](#why-does-it-add-the-version-number-to-the-directory-name)
 	4. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
 	5. [Why doesn't Nudeps have an option to add integrity hashes to the import map?](#why-doesnt-nudeps-have-an-option-to-add-integrity-hashes-to-the-import-map)
 	6. [How are CJS (CommonJS) packages handled?](#how-are-cjs-commonjs-packages-handled)
-8. [Troubleshooting](#troubleshooting)
+9. [Troubleshooting](#troubleshooting)
 	1. [Getting an error about a specifier failing to resolve](#getting-an-error-about-a-specifier-failing-to-resolve)
 	2. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
 	3. [Packages that use extension-less paths](#packages-that-use-extension-less-paths)
@@ -232,6 +235,23 @@ You can set `prune: true` in your config file to always prune dependencies but t
 ### `nudeps --init`
 
 Force initialization, even if nudeps has already run.
+Note that this also clears the list of local dependents (see below). They will re-register the next time they run nudeps.
+
+## Local dependencies
+
+When you have local dependencies (installed via `npm install ../other-repo`), nudeps automatically handles propagation between them, but there are a few things you need to know about it.
+
+### Registration
+
+Each time nudeps runs, it registers itself as a dependent of each of its local dependencies by writing its relative path to the dep's `.nudeps/local-dependents.json`.
+If a local dependency doesn't have nudeps installed, a warning is printed suggesting you run `npx nudeps install` there.
+
+### Propagation
+
+When nudeps detects that the generated import map has actually changed (content differs from the file on disk), it reads `.nudeps/local-dependents.json` and runs `npx nudeps` in each listed dependent.
+This ensures that when package B's dependencies change, any repo A that depends on B locally gets its import map updated automatically.
+
+Circular local dependencies (A depends on B and B depends on A) are handled naturally: propagation only triggers when the map content changes, so cycles terminate once the maps converge.
 
 ## FAQ
 

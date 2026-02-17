@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { getConfig } from "./config.js";
 import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { readJSONSync, writeJSONSync, createGitignoredDir } from "./util.js";
+import { execSync } from "node:child_process";
 import { cp } from "node:fs/promises";
 import Nudeps from "./nudeps.js";
 
@@ -16,6 +17,8 @@ export default async function (options) {
 
 	let cacheExists = existsSync(".nudeps");
 	if (cacheExists && config.init) {
+		// Note: this also clears local-dependents.json. Dependents will
+		// re-register themselves the next time they run nudeps.
 		rmSync(".nudeps", { recursive: true });
 		cacheExists = false;
 	}
@@ -216,4 +219,51 @@ export default async function (options) {
 		);
 	}
 	nudeps.info(...info);
+
+	// Register this repo as a dependent of each local dep, so they can propagate changes back.
+	for (let [lockKey, resolvedPath] of Object.entries(nudeps.pkgLock.external)) {
+		if (!existsSync(resolvedPath)) {
+			continue;
+		}
+
+		// Warn if nudeps isn't installed in the dep (propagation won't work without it)
+		let depInfo = nudeps.packages[lockKey];
+		if (!depInfo?.dependencies?.nudeps && !depInfo?.devDependencies?.nudeps) {
+			nudeps.info(
+				`Local dependency at ${resolvedPath} doesn't have nudeps installed. ` +
+					`Run "npx nudeps install" there to enable propagation.`,
+			);
+		}
+
+		// Ensure .nudeps/ exists in the dep, then add ourselves to its dependents list
+		let depNudepsDir = path.join(resolvedPath, ".nudeps");
+		createGitignoredDir(depNudepsDir);
+
+		let dependentsFile = path.join(depNudepsDir, "local-dependents.json");
+		let dependents = readJSONSync(dependentsFile) ?? [];
+		let relPath = path.relative(resolvedPath, ".");
+
+		if (!dependents.includes(relPath)) {
+			dependents.push(relPath);
+			writeJSONSync(dependentsFile, dependents);
+		}
+	}
+
+	// Propagate: if our map changed, trigger the dependencies hook in repos that depend on
+	// this one locally. --if-present silently skips if no hook is configured.
+	// Content-based comparison naturally breaks cycles (map converges → no change → stops).
+	if (mapChanged) {
+		let dependents = readJSONSync(".nudeps/local-dependents.json");
+
+		for (let entry of dependents ?? []) {
+			nudeps.info(`Propagating to dependent: ${entry}`);
+
+			try {
+				execSync("npm run dependencies --if-present", { cwd: entry, stdio: "inherit" });
+			}
+			catch (e) {
+				nudeps.error(`Failed to propagate to ${entry}: ${e.message}`);
+			}
+		}
+	}
 }
