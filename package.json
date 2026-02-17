@@ -24,7 +24,7 @@
 		"src"
 	],
 	"scripts": {
-		"release": "release-it",
+		"release": "npm login && release-it",
 		"test": "npx htest ./test/index.js"
 	},
 	"devDependencies": {
