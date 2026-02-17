@@ -241,6 +241,10 @@ Note that this also clears the list of local dependents (see below). They will r
 
 When you have local dependencies (installed via `npm install ../other-repo`), nudeps automatically handles propagation between them, but there are a few things you need to know about it.
 
+- You need Nudeps on both sides of the dependency for things to work
+- Instead of copying `other-repo` to `client_modules/other-repo@<version>` by default it creates a symlink. You can tweak the `symlink` option to change this.
+- Since the npm `dependencies` hook does not fire when the dependencies of `other-repo` change (see npm bug [#8984](https://github.com/npm/cli/issues/8984)), Nudeps on `other-repo` will run `npm run dependencies --if-present` in its own dependencies to trigger nudeps in them.
+
 ### Registration
 
 Each time nudeps runs, it registers itself as a dependent of each of its local dependencies by writing its relative path to the dep's `.nudeps/local-dependents.json`.
