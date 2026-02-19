@@ -183,7 +183,7 @@ export default async function (options) {
 
 	// Detect whether the map actually changed (used to skip propagation on no-ops,
 	// which also naturally breaks cycles between mutually-local deps).
-	let mapContent = map.js;
+	let mapContent = map.toJS({ module: config.module });
 	let existingMap = existsSync(config.map) ? readFileSync(config.map, "utf8") : null;
 	let mapChanged = mapContent !== existingMap;
 

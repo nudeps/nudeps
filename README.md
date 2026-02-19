@@ -166,7 +166,9 @@ Then, to use the import map in your app, include this script in your HTML before
 ```
 
 > [!IMPORTANT]
-> This script needs to be included before any module scripts are loaded or it won't work!
+> By default, this script needs to be included **before any module scripts are loaded, and must be included as a regular script, not a module script.**
+> If you want to include it as `<script type="module" src="importmap.js">` instead, set the `module` option to `true` in your nudeps config.
+> Please note this may make your import map not work in all browsers (as of February 2026, only Safari seems to support this).
 
 ## Config options
 
@@ -182,6 +184,7 @@ Some command line options allow for a shorthand one letter syntax, which is list
 | Exclude              | `exclude`       | `--exclude` | `-e`           | `[]`               | Any packages to exclude from import map even though they appear in `dependencies`. Useful for server-side dependencies. When providing via the command line option, comma-separate and do not include any spaces. They will still be included if actively used in your code. |
 | External config file | -               | `--config`  | `-c`           | `nudeps.js`        | File path for nudeps configuration, relative to project root. It should export an object literal with the configuration options as keys.                                                                                                                                     |
 | Overrides            | `overrides`     | -           | -              | `{}`               | Overrides for the import map, using `./node_modules/` paths. Set a key to `undefined` to remove it from the map.                                                                                                                                                             |
+| Module               | `module`        | `--module`  | -              | `false`            | Set to `true` if the import map script will be loaded as `<script type="module">`. Please note that **this will reduce browser support**, as certain browsers do not support injecting import maps after any module has started loading.                                     |
 | CommonJS             | `cjs`           | `--cjs`     | -              | `true`             | Whether to add a CommonJS shim to the import if any CJS packages are detected. Setting to `false` will omit both the shim and these packages from the import map.                                                                                                            |
 
 ### Restricting which files are deployed from dependencies

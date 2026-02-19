@@ -25,6 +25,9 @@ export default {
 	overrides: {
 		cli: false,
 	},
+	module: {
+		default: false,
+	},
 	cjs: {
 		default: true,
 	},

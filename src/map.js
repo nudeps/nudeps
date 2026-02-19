@@ -176,11 +176,21 @@ export class ImportMap {
 		return deepAssign(this.map, overrides);
 	}
 
-	get js () {
-		let injectMap = readFileSync(path.join(__dirname, "inject-map.js"));
+	/**
+	 * Generate a self-contained JS script that injects the import map into the document.
+	 * When `module` is true, uses `import.meta.url` for URL rebasing and appends to `<head>`.
+	 * When false (default), uses `document.currentScript`.
+	 * @param {object} options
+	 * @param {boolean} [options.module=false] - Whether the script will be loaded as a module.
+	 */
+	toJS ({ module = false } = {}) {
+		let injectMap = readFileSync(path.join(__dirname, "inject-map.js"), "utf8");
+
+		let mapUrl = module ? "import.meta.url" : "document.currentScript?.src";
+
 		return `(()=>{
 let map = ${JSON.stringify(this.map, null, "\t")};
-let cS = document.currentScript;
+let mapUrl = ${mapUrl};
 ${injectMap}
 })();
 `;
