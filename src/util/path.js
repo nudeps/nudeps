@@ -108,7 +108,10 @@ export default class ModulePath {
 				}
 				else {
 					// Case B: strip the parent package
-					childKey = this.packages.slice(1).map(p => "node_modules/" + p).join("/");
+					childKey = this.packages
+						.slice(1)
+						.map(p => "node_modules/" + p)
+						.join("/");
 				}
 				info = childLock.packages[childKey] ?? null;
 			}
@@ -118,7 +121,9 @@ export default class ModulePath {
 	}
 
 	get rawLockKey () {
-		return this.packages.length > 0 ? this.packages.map(pkg => "node_modules/" + pkg).join("/") : this.base;
+		return this.packages.length > 0
+			? this.packages.map(pkg => "node_modules/" + pkg).join("/")
+			: this.base;
 	}
 
 	get lockKey () {
@@ -135,6 +140,50 @@ export default class ModulePath {
 
 	get packageName () {
 		return this.packageInfo?.name ?? this.packages.at(-1);
+	}
+
+	/**
+	 * The name the package was installed under in node_modules.
+	 * Differs from packageName when npm aliases are used (e.g. `npm install foo@npm:bar`).
+	 */
+	get installName () {
+		return this.packages.at(-1);
+	}
+
+	get aliases () {
+		return this.#getAliases();
+	}
+
+	/**
+	 * Resolve alias config into alias paths for this package.
+	 * Supports string, function, array, and object forms. Recurses for arrays.
+	 * @param {*} [alias] - Alias config value; defaults to this.nudeps.config.alias
+	 * @returns {string[]}
+	 */
+	#getAliases (alias = this.nudeps.config.alias) {
+		if (!alias) {
+			return [];
+		}
+
+		if (Array.isArray(alias)) {
+			return alias.flatMap(item => this.#getAliases(item));
+		}
+
+		if (typeof alias === "string") {
+			return this.packageName === alias || this.installName === alias ? [alias] : [];
+		}
+
+		// Object form: resolve to value via key lookup, then fall through
+		if (typeof alias === "object") {
+			alias = alias[this.installName] ?? alias[this.packageName];
+		}
+
+		// Function form (top-level or object value)
+		if (typeof alias === "function") {
+			alias = alias(this);
+		}
+
+		return alias == null ? [] : [alias].flat();
 	}
 
 	/**

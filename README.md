@@ -30,6 +30,7 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 	3. [Automatically run nudeps when dependencies change](#automatically-run-nudeps-when-dependencies-change)
 5. [Config options](#config-options)
 	1. [Restricting which files are deployed from dependencies](#restricting-which-files-are-deployed-from-dependencies)
+	2. [Aliases](#aliases)
 6. [Commands](#commands)
 	1. [`nudeps`](#nudeps-1)
 	2. [`nudeps --prune`](#nudeps---prune)
@@ -186,6 +187,7 @@ Some command line options allow for a shorthand one letter syntax, which is list
 | Overrides            | `overrides`     | -           | -              | `{}`               | Overrides for the import map, using `./node_modules/` paths. Set a key to `undefined` to remove it from the map.                                                                                                                                                             |
 | Module               | `module`        | `--module`  | -              | `false`            | Set to `true` if the import map script will be loaded as `<script type="module">`. Please note that **this will reduce browser support**, as certain browsers do not support injecting import maps after any module has started loading.                                     |
 | CommonJS             | `cjs`           | `--cjs`     | -              | `true`             | Whether to add a CommonJS shim to the import if any CJS packages are detected. Setting to `false` will omit both the shim and these packages from the import map.                                                                                                            |
+| Alias                | `alias`         | `--alias`   | -              | -                  | Create unversioned symlinks in `client_modules` pointing to versioned directories. Useful for stable URLs to package assets (CSS, images, etc.). See [Aliases](#aliases) below.                                                                                              |
 
 ### Restricting which files are deployed from dependencies
 
@@ -216,6 +218,62 @@ For example:
 - To only copy `*.js` files and nothing else you'd use `ignore: [{ exclude: "**/*" }, { include: "**/*.js" } ]`. (but see above why this is not recommended)
 
 To restrict rules to specific packages, you can provide the rule as an object and add one or more (as an array) package names via the `packageName` property.
+
+### Aliases
+
+While the import map handles JavaScript specifier resolution, you may need to reference package files directly by URL — for example, CSS files, images, or other assets.
+Because package directories include version numbers (e.g., `client_modules/open-props@2.0.4/`), these URLs break every time a dependency is updated.
+
+The `alias` option solves this by creating unversioned symlinks alongside the versioned directories:
+
+```
+client_modules/open-props → client_modules/open-props@2.0.4
+```
+
+This lets you use stable paths like `client_modules/open-props/open-props.min.css` in your HTML and CSS.
+
+The `alias` option supports several forms:
+
+**String** — alias a single package by name:
+
+```js
+alias: "open-props"
+```
+
+**Function** — dynamic aliases for all packages:
+
+```js
+// Alias every package to its unversioned name
+alias: ({packageName}) => packageName
+```
+
+**Array** — alias multiple packages:
+
+```js
+alias: ["open-props", "tailwindcss"]
+```
+
+**Object** — map package names to custom alias paths:
+
+```js
+alias: {
+	"open-props": "open-props",
+	"tailwindcss": "tw",
+}
+```
+
+Functions can also be used as object values for per-package logic:
+
+```js
+alias: {
+	"open-props": ({version}) => `open-props-v${version.split(".")[0]}`,
+}
+```
+
+When an alias is removed from the config (or its package is uninstalled), the symlink is automatically cleaned up on the next run.
+
+> **npm aliases:** When using npm aliases (e.g. `npm install my-props@npm:open-props`), string and object forms match against both the install name (`my-props`) and the real package name (`open-props`), with install name taking priority in object lookups.
+> Function forms receive both as `{ packageName, version, installName }`, letting you distinguish multiple installs of the same package.
 
 ## Commands
 

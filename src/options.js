@@ -71,4 +71,5 @@ export default {
 	preserveSymlinks: {
 		default: false,
 	},
+	alias: {},
 };

@@ -8,13 +8,14 @@ import ModulePath from "./util/path.js";
 import { matchesGlob } from "./util/fs.js";
 
 import { getTopLevelModules } from "./util.js";
-import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
+import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync, lstatSync } from "node:fs";
 import * as path from "node:path";
 import PackageLock from "./util/package-lock.js";
 
 export default class Nudeps {
-	stats = { entries: 0, copied: 0, deleted: 0, linked: 0, startTime: performance.now() };
+	stats = { entries: 0, copied: 0, deleted: 0, linked: 0, aliased: 0, startTime: performance.now() };
 	toCopy = {};
+	toAlias = {};
 	toDelete = null;
 	toDeleteIfEmpty = new Set();
 
@@ -214,6 +215,27 @@ export default class Nudeps {
 					},
 				});
 			}
+		}
+
+		// Create alias symlinks (unversioned paths pointing to versioned directories)
+		for (let aliasPath in this.toAlias) {
+			let target = this.toAlias[aliasPath];
+
+			if (existingDirs.has(aliasPath)) {
+				toDelete.delete(aliasPath);
+
+				if (!lstatSync(aliasPath).isSymbolicLink()) {
+					this.info(`Warning: Cannot create alias "${aliasPath}" — a non-symlink already exists`);
+					continue;
+				}
+
+				rmSync(aliasPath);
+			}
+
+			let relTarget = path.relative(path.dirname(aliasPath), target);
+			mkdirSync(path.dirname(aliasPath), { recursive: true });
+			symlinkSync(relTarget, aliasPath, "dir");
+			stats.aliased++;
 		}
 
 		for (let dir of toDelete) {
