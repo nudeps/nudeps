@@ -8,12 +8,28 @@ import ModulePath from "./util/path.js";
 import { matchesGlob } from "./util/fs.js";
 
 import { getTopLevelModules } from "./util.js";
-import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync, lstatSync } from "node:fs";
+import {
+	existsSync,
+	rmSync,
+	rmdirSync,
+	cpSync,
+	symlinkSync,
+	unlinkSync,
+	mkdirSync,
+	lstatSync,
+} from "node:fs";
 import * as path from "node:path";
 import PackageLock from "./util/package-lock.js";
 
 export default class Nudeps {
-	stats = { entries: 0, copied: 0, deleted: 0, linked: 0, aliased: 0, startTime: performance.now() };
+	stats = {
+		entries: 0,
+		copied: 0,
+		deleted: 0,
+		linked: 0,
+		aliased: 0,
+		startTime: performance.now(),
+	};
 	toCopy = {};
 	toAlias = {};
 	toDelete = null;
@@ -225,11 +241,13 @@ export default class Nudeps {
 				toDelete.delete(aliasPath);
 
 				if (!lstatSync(aliasPath).isSymbolicLink()) {
-					this.info(`Warning: Cannot create alias "${aliasPath}" — a non-symlink already exists`);
+					this.info(
+						`Warning: Cannot create alias "${aliasPath}" — a non-symlink already exists`,
+					);
 					continue;
 				}
 
-				rmSync(aliasPath);
+				unlinkSync(aliasPath);
 			}
 
 			let relTarget = path.relative(path.dirname(aliasPath), target);
