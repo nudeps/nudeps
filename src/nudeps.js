@@ -8,16 +8,7 @@ import ModulePath from "./util/path.js";
 import { matchesGlob } from "./util/fs.js";
 
 import { getTopLevelModules } from "./util.js";
-import {
-	existsSync,
-	rmSync,
-	rmdirSync,
-	cpSync,
-	symlinkSync,
-	unlinkSync,
-	mkdirSync,
-	lstatSync,
-} from "node:fs";
+import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
 import PackageLock from "./util/package-lock.js";
 
@@ -233,29 +224,6 @@ export default class Nudeps {
 			}
 		}
 
-		// Create alias symlinks (unversioned paths pointing to versioned directories)
-		for (let aliasPath in this.toAlias) {
-			let target = this.toAlias[aliasPath];
-
-			if (existingDirs.has(aliasPath)) {
-				toDelete.delete(aliasPath);
-
-				if (!lstatSync(aliasPath).isSymbolicLink()) {
-					this.info(
-						`Warning: Cannot create alias "${aliasPath}" — a non-symlink already exists`,
-					);
-					continue;
-				}
-
-				unlinkSync(aliasPath);
-			}
-
-			let relTarget = path.relative(path.dirname(aliasPath), target);
-			mkdirSync(path.dirname(aliasPath), { recursive: true });
-			symlinkSync(relTarget, aliasPath, "dir");
-			stats.aliased++;
-		}
-
 		for (let dir of toDelete) {
 			if (existsSync(dir)) {
 				stats.deleted++;
@@ -268,6 +236,15 @@ export default class Nudeps {
 				toDeleteIfEmpty.add(parentDir);
 				continue;
 			}
+		}
+
+		// Create alias symlinks (unversioned paths pointing to versioned directories)
+		for (let aliasPath in this.toAlias) {
+			let target = this.toAlias[aliasPath];
+			let relTarget = path.relative(path.dirname(aliasPath), target);
+			mkdirSync(path.dirname(aliasPath), { recursive: true });
+			symlinkSync(relTarget, aliasPath, "dir");
+			stats.aliased++;
 		}
 
 		for (let parentDir of toDeleteIfEmpty) {
