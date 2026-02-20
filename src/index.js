@@ -158,6 +158,15 @@ export default async function (options) {
 		}
 	}
 
+	if (config.alias) {
+		for (let from in toCopy) {
+			let mp = nudeps.path(from);
+			for (let alias of mp.aliases) {
+				nudeps.toAlias[config.dir + "/" + alias] = toCopy[from];
+			}
+		}
+	}
+
 	if (map.scopes) {
 		for (let scope in map.scopes) {
 			if (!scope.includes("node_modules/")) {
@@ -203,10 +212,16 @@ export default async function (options) {
 	writeJSONSync(".nudeps/config.json", config);
 
 	let info = [];
-	if (stats.copied + stats.deleted > 0) {
-		info.push(
-			`${stats.copied} directories added, and ${stats.deleted} deleted from ${config.dir}.`,
-		);
+	if (stats.copied + stats.deleted + stats.aliased > 0) {
+		let parts = ["copied", "deleted", "aliased"]
+			.filter(p => stats[p] > 0)
+			.map(p => `${stats[p]} ${p}`);
+
+		let msg =
+			parts.length > 2
+				? parts.slice(0, -1).join(", ") + ", and " + parts.at(-1)
+				: parts.join(" and ");
+		info.push(msg + ` in ${config.dir}.`);
 	}
 	if (mapChanged) {
 		info.push(
