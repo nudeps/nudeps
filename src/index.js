@@ -158,15 +158,6 @@ export default async function (options) {
 		}
 	}
 
-	if (config.alias) {
-		for (let from in toCopy) {
-			let mp = nudeps.path(from);
-			for (let alias of mp.aliases) {
-				nudeps.toAlias[config.dir + "/" + alias] = toCopy[from];
-			}
-		}
-	}
-
 	if (map.scopes) {
 		for (let scope in map.scopes) {
 			if (!scope.includes("node_modules/")) {

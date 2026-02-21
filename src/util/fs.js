@@ -6,6 +6,9 @@ import {
 	readdirSync,
 	statSync,
 	opendirSync,
+	symlinkSync,
+	readlinkSync,
+	rmSync,
 } from "node:fs";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -73,6 +76,35 @@ export function createGitignoredDir (dir) {
 		mkdirSync(dir, { recursive: true });
 		writeFileSync(path.join(dir, ".gitignore"), "*");
 	}
+}
+
+/**
+ * Create a symlink, optionally replacing an existing one.
+ * With `force`, removes any existing entry at `linkPath` before creating.
+ * With `skipIfCorrect`, skips creation if the symlink already points to `target`.
+ * @param {string} target - The symlink target (what it points to)
+ * @param {string} linkPath - Where to create the symlink
+ * @param {"dir"|"file"|"junction"} [type] - Symlink type (passed to symlinkSync)
+ * @param {{ force?: boolean, skipIfCorrect?: boolean }} [options]
+ * @returns {boolean} Whether a new symlink was created
+ */
+export function ensureSymlink (target, linkPath, type, { force, skipIfCorrect } = {}) {
+	if (force || skipIfCorrect) {
+		try {
+			if (skipIfCorrect && readlinkSync(linkPath) === target) {
+				return false;
+			}
+		}
+		catch {}
+
+		if (force) {
+			rmSync(linkPath, { recursive: true, force: true });
+		}
+	}
+
+	mkdirSync(path.dirname(linkPath), { recursive: true });
+	symlinkSync(target, linkPath, type);
+	return true;
 }
 
 export function importCwdRelative (pathFromCwd) {

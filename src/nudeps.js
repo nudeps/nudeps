@@ -5,7 +5,7 @@
 import { readJSONSync } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import ModulePath from "./util/path.js";
-import { matchesGlob } from "./util/fs.js";
+import { matchesGlob, ensureSymlink } from "./util/fs.js";
 
 import { getTopLevelModules } from "./util.js";
 import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
@@ -22,7 +22,6 @@ export default class Nudeps {
 		startTime: performance.now(),
 	};
 	toCopy = {};
-	toAlias = {};
 	toDelete = null;
 	toDeleteIfEmpty = new Set();
 
@@ -183,22 +182,20 @@ export default class Nudeps {
 		// Copy (or symlink) package directories
 		for (let from in toCopy) {
 			let to = toCopy[from];
+			let mp = this.path(from);
+
 			if (existingDirs.has(to)) {
 				toDelete.delete(to);
 			}
+			else if (this.shouldSymlink(mp)) {
+				// Create a symlink to the resolved local path
+				let resolvedPath = this.pkgLock.resolveKey(mp.rawLockKey);
+				let target = path.relative(path.dirname(to), resolvedPath);
+				mkdirSync(path.dirname(to), { recursive: true });
+				symlinkSync(target, to, "dir");
+				stats.linked++;
+			}
 			else {
-				let mp = this.path(from);
-
-				if (this.shouldSymlink(mp)) {
-					// Create a symlink to the resolved local path
-					let resolvedPath = this.pkgLock.resolveKey(mp.rawLockKey);
-					let target = path.relative(path.dirname(to), resolvedPath);
-					mkdirSync(path.dirname(to), { recursive: true });
-					symlinkSync(target, to, "dir");
-					stats.linked++;
-					continue;
-				}
-
 				stats.copied++;
 				let { packageName, version } = mp;
 				cpSync(from, to, {
@@ -222,6 +219,23 @@ export default class Nudeps {
 					},
 				});
 			}
+
+			// Create alias symlinks (unversioned paths pointing to versioned directories)
+			if (config.alias) {
+				for (let alias of mp.aliases) {
+					let aliasPath = config.dir + "/" + alias;
+					let relTarget = path.relative(path.dirname(aliasPath), to);
+					let exists = existingDirs.has(aliasPath);
+
+					if (exists) {
+						toDelete.delete(aliasPath);
+					}
+
+					if (ensureSymlink(relTarget, aliasPath, "dir", { force: exists, skipIfCorrect: exists })) {
+						stats.aliased++;
+					}
+				}
+			}
 		}
 
 		for (let dir of toDelete) {
@@ -236,15 +250,6 @@ export default class Nudeps {
 				toDeleteIfEmpty.add(parentDir);
 				continue;
 			}
-		}
-
-		// Create alias symlinks (unversioned paths pointing to versioned directories)
-		for (let aliasPath in this.toAlias) {
-			let target = this.toAlias[aliasPath];
-			let relTarget = path.relative(path.dirname(aliasPath), target);
-			mkdirSync(path.dirname(aliasPath), { recursive: true });
-			symlinkSync(relTarget, aliasPath, "dir");
-			stats.aliased++;
 		}
 
 		for (let parentDir of toDeleteIfEmpty) {
