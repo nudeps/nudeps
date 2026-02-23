@@ -61,14 +61,14 @@ function readExternalConfig (args) {
 }
 
 /**
- * Recursively resolve a mode's defaults by following its `mode` (parent) key.
+ * Recursively resolve a mode's option defaults by following its `mode` (parent) key.
  * Child values override parent values. Detects cycles to prevent infinite loops.
  * @param {string} name - Mode name to resolve
  * @param {object} allModes - All available modes (built-in + custom)
  * @param {Set} [seen] - Tracks visited modes for cycle detection
  * @returns {object} Merged defaults for this mode chain
  */
-function resolveMode (name, allModes, seen = new Set()) {
+export function resolveDefaults (name, allModes, seen = new Set()) {
 	if (name === undefined) {
 		return {};
 	}
@@ -87,7 +87,7 @@ function resolveMode (name, allModes, seen = new Set()) {
 	seen.add(name);
 
 	let { mode: parent, ...ownDefaults } = allModes[name];
-	let parentDefaults = resolveMode(parent, allModes, seen);
+	let parentDefaults = resolveDefaults(parent, allModes, seen);
 
 	return { ...parentDefaults, ...ownDefaults };
 }
@@ -109,7 +109,7 @@ export async function getConfig () {
 	let mode = args.mode ?? config.mode;
 	let customModes = config.modes ?? {};
 	let allModes = { ...builtInModes, ...customModes };
-	let modeDefaults = resolveMode(mode, allModes);
+	let modeDefaults = resolveDefaults(mode, allModes);
 
 	let ret = {};
 	for (let key in availableOptions) {
