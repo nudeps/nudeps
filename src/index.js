@@ -7,7 +7,6 @@ import { getConfig } from "./config.js";
 import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { readJSONSync, writeJSONSync, createGitignoredDir } from "./util.js";
 import { execSync } from "node:child_process";
-import { cp } from "node:fs/promises";
 import Nudeps from "./nudeps.js";
 
 export default async function (options) {
@@ -49,10 +48,9 @@ export default async function (options) {
 
 	if (!config.prune && nudeps.pkg.dependencies) {
 		let exclude = new Set(config.exclude ?? []);
-		let lastPruneDeps = readJSONSync(".nudeps/package.json")?.dependencies ?? {};
 
 		for (const dep in nudeps.pkg.dependencies) {
-			if (exclude.has(dep) || lastPruneDeps[dep]) {
+			if (exclude.has(dep)) {
 				continue;
 			}
 
@@ -192,13 +190,6 @@ export default async function (options) {
 		writeFileSync(config.map, mapContent);
 	}
 
-	// intentionally async.
-	// Nothing immediately hinges on the result of this, and we're not going to run update immediately after.
-	if (config.prune) {
-		// Save package.json at the last prune so we don't re-add packages that were pruned
-		// (unless they are actually used now)
-		cp("package.json", ".nudeps/package.json");
-	}
 
 	writeJSONSync(".nudeps/config.json", config);
 
