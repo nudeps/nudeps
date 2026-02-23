@@ -14,14 +14,18 @@ export default {
 		parse: v => v.split(","),
 		default: [],
 	},
-	prune: {},
+	prune: {
+		default: false,
+	},
 	config: {
 		flag: "c",
 		default: "nudeps.js",
 		validate: v => existsSync(v),
 		file: false,
 	},
-	init: {},
+	init: {
+		default: false,
+	},
 	overrides: {
 		cli: false,
 	},
