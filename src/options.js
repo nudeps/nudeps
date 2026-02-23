@@ -66,7 +66,7 @@ export default {
 		},
 	},
 	symlink: {
-		default: ({isExternal}) => isExternal,
+		default: ({ isExternal }) => isExternal,
 	},
 	preserveSymlinks: {
 		default: false,
