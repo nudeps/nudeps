@@ -31,6 +31,7 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 5. [Config options](#config-options)
 	1. [Restricting which files are deployed from dependencies](#restricting-which-files-are-deployed-from-dependencies)
 	2. [Aliases](#aliases)
+	3. [Modes](#modes)
 6. [Commands](#commands)
 	1. [`nudeps`](#nudeps-1)
 	2. [`nudeps --prune`](#nudeps---prune)
@@ -178,8 +179,9 @@ Some command line options allow for a shorthand one letter syntax, which is list
 
 | Option               | Config file key | CLI option  | CLI short flag | Default            | Description                                                                                                                                                                                                                                                                  |
 | -------------------- | --------------- | ----------- | -------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mode                 | `mode`          | `--mode`    | `-m`           | -                  | Activate a mode preset that sets multiple option defaults at once. Built-in modes: `dev`, `prod`. See [Modes](#modes) below.                                                                                                                                                 |
 | Directory            | `dir`           | `--dir`     | `-d`           | `./client_modules` | Directory to copy deployed dependencies to, relative to project root. It will be created if it does not exist. It is assumed that Nudeps owns this directory, do not use a directory path that you use for other things.                                                     |
-| Import map           | `map`           | `--map`     | `-m`           | `importmap.js`     | File path for import map injection script, relative to project root. Nudeps needs to be able to own this file, do not input a file you use for other things too.                                                                                                             |
+| Import map           | `map`           | `--map`     | `-o`           | `importmap.js`     | File path for import map injection script, relative to project root. Nudeps needs to be able to own this file, do not input a file you use for other things too.                                                                                                             |
 | Prune                | `prune`         | `--prune`   |                | `false`            | Whether to subset only to specifiers used by the package entry points (`true`), or include all direct dependencies anyway.                                                                                                                                                   |
 | Ignore files         | `ignore`        | -           | -              | See below          | Any files to exclude from being copied to the target directory. See below for more details.                                                                                                                                                                                  |
 | Exclude              | `exclude`       | `--exclude` | `-e`           | `[]`               | Any packages to exclude from import map even though they appear in `dependencies`. Useful for server-side dependencies. When providing via the command line option, comma-separate and do not include any spaces. They will still be included if actively used in your code. |
@@ -274,6 +276,59 @@ When an alias is removed from the config (or its package is uninstalled), the sy
 
 > **npm aliases:** When using npm aliases (e.g. `npm install my-props@npm:open-props`), string and object forms match against both the install name (`my-props`) and the real package name (`open-props`), with install name taking priority in object lookups.
 > Function forms receive both as `{ packageName, version, installName }`, letting you distinguish multiple installs of the same package.
+
+### Modes
+
+Modes let you switch between sets of option defaults with a single flag. Two modes are built in:
+
+| Mode   | Defaults                        |
+| ------ | ------------------------------- |
+| `dev`  | `symlink: true`                 |
+| `prod` | `symlink: false`, `prune: true` |
+
+Use a mode from the CLI:
+
+```bash
+npx nudeps -m dev
+npx nudeps --mode=prod
+```
+
+Or set it in your config file:
+
+```js
+export default {
+	mode: "dev",
+};
+```
+
+**Priority:** CLI args override config file values, which override mode defaults, which override hard defaults.
+For example, `npx nudeps -m prod --prune=false` will use `prod` defaults but keep `prune` off.
+
+#### Custom modes
+
+You can define your own modes via the `modes` key in the config file. Custom modes are merged with the built-in ones (and can override them):
+
+```js
+export default {
+	mode: "staging",
+	modes: {
+		staging: { symlink: false, prune: false },
+	},
+};
+```
+
+Modes can extend other modes by including a `mode` key. The child mode inherits all parent defaults and can override individual values:
+
+```js
+export default {
+	mode: "staging",
+	modes: {
+		staging: { mode: "prod", prune: false }, // inherits prod's symlink: false, overrides prune
+	},
+};
+```
+
+If an unknown mode is specified, a warning is printed listing the available modes.
 
 ## Commands
 

@@ -6,6 +6,7 @@ import { importCwdRelative } from "./util.js";
 import { existsSync } from "node:fs";
 import minimist from "minimist";
 import availableOptions from "./options.js";
+import builtInModes from "./modes.js";
 
 function readArgs (argv = process.argv.slice(2)) {
 	let args = minimist(argv);
@@ -60,6 +61,38 @@ function readExternalConfig (args) {
 }
 
 /**
+ * Recursively resolve a mode's defaults by following its `mode` (parent) key.
+ * Child values override parent values. Detects cycles to prevent infinite loops.
+ * @param {string} name - Mode name to resolve
+ * @param {object} allModes - All available modes (built-in + custom)
+ * @param {Set} [seen] - Tracks visited modes for cycle detection
+ * @returns {object} Merged defaults for this mode chain
+ */
+function resolveMode (name, allModes, seen = new Set()) {
+	if (name === undefined) {
+		return {};
+	}
+
+	if (!(name in allModes)) {
+		let available = Object.keys(allModes).join(", ");
+		console.warn(`Unknown mode "${ name }". Available modes: ${ available }`);
+		return {};
+	}
+
+	if (seen.has(name)) {
+		console.warn(`Circular mode reference detected: ${ name }`);
+		return {};
+	}
+
+	seen.add(name);
+
+	let { mode: parent, ...ownDefaults } = allModes[name];
+	let parentDefaults = resolveMode(parent, allModes, seen);
+
+	return { ...parentDefaults, ...ownDefaults };
+}
+
+/**
  * Get the resolved config regardless of where settings come from
  * @returns
  */
@@ -72,10 +105,16 @@ export async function getConfig () {
 		config = await config;
 	}
 
+	// Resolve mode and its defaults
+	let mode = args.mode ?? config.mode;
+	let customModes = config.modes ?? {};
+	let allModes = { ...builtInModes, ...customModes };
+	let modeDefaults = resolveMode(mode, allModes);
+
 	let ret = {};
 	for (let key in availableOptions) {
 		let option = availableOptions[key];
-		ret[key] = args[key] ?? config[key];
+		ret[key] = args[key] ?? config[key] ?? modeDefaults[key];
 
 		if (ret[key] !== undefined) {
 			if (option.validate && !option.validate(ret[key])) {
