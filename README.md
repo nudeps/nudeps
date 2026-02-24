@@ -28,13 +28,13 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 	1. [Local installation](#local-installation)
 	2. [Global installation](#global-installation)
 	3. [Automatically run nudeps when dependencies change](#automatically-run-nudeps-when-dependencies-change)
-5. [Config options](#config-options)
+5. [Usage](#usage)
+6. [Config options](#config-options)
 	1. [Restricting which files are deployed from dependencies](#restricting-which-files-are-deployed-from-dependencies)
 	2. [Aliases](#aliases)
-6. [Commands](#commands)
-	1. [`nudeps`](#nudeps-1)
-	2. [`nudeps --prune`](#nudeps---prune)
-	3. [`nudeps --init`](#nudeps---init)
+	3. [Modes](#modes)
+	4. [Pruning (`nudeps --prune`)](#pruning-nudeps---prune)
+	5. [Force initialization (`nudeps --init`)](#force-initialization-nudeps---init)
 7. [Local dependencies](#local-dependencies)
 	1. [Registration](#registration)
 	2. [Propagation](#propagation)
@@ -125,7 +125,7 @@ You can install nudeps as a devDependency, locally in each project or globally t
 
 ### Local installation
 
-This can be useful for signaling to collaborators that nudeps is required to work on the project.
+This can be useful for signaling to collaborators that nudeps is required to work on the project or if you’d rather avoid global installs.
 
 ```bash
 npm install nudeps -D
@@ -171,15 +171,27 @@ Then, to use the import map in your app, include this script in your HTML before
 > If you want to include it as `<script type="module" src="importmap.js">` instead, set the `module` option to `true` in your nudeps config.
 > Please note this may make your import map not work in all browsers (as of February 2026, only Safari seems to support this).
 
+## Usage
+
+Run `npx nudeps` to initialize or update as needed.
+
+This takes care of:
+
+- Copying dependencies to the target directory
+- Generating a new import map
+
+Several options are available to customize the behavior, which are documented below.
+
 ## Config options
 
 Each of the following options is available either as a config file key, or a command line option (e.g. `foo` would be `--foo`).
-Some command line options allow for a shorthand one letter syntax, which is listed after a slash.
+Some command line options also allow for a shorthand one letter syntax (e.g. `-d foo` instead of `--dir=foo`) which is listed under "CLI short flag".
 
 | Option               | Config file key | CLI option  | CLI short flag | Default            | Description                                                                                                                                                                                                                                                                  |
 | -------------------- | --------------- | ----------- | -------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mode                 | `mode`          | `--mode`    | `-m`           | -                  | Activate a mode preset that sets multiple option defaults at once. Built-in modes: `dev`, `prod`. See [Modes](#modes) below.                                                                                                                                                 |
 | Directory            | `dir`           | `--dir`     | `-d`           | `./client_modules` | Directory to copy deployed dependencies to, relative to project root. It will be created if it does not exist. It is assumed that Nudeps owns this directory, do not use a directory path that you use for other things.                                                     |
-| Import map           | `map`           | `--map`     | `-m`           | `importmap.js`     | File path for import map injection script, relative to project root. Nudeps needs to be able to own this file, do not input a file you use for other things too.                                                                                                             |
+| Import map           | `map`           | `--map`     | `-o`           | `importmap.js`     | File path for import map injection script, relative to project root. Nudeps needs to be able to own this file, do not input a file you use for other things too.                                                                                                             |
 | Prune                | `prune`         | `--prune`   |                | `false`            | Whether to subset only to specifiers used by the package entry points (`true`), or include all direct dependencies anyway.                                                                                                                                                   |
 | Ignore files         | `ignore`        | -           | -              | See below          | Any files to exclude from being copied to the target directory. See below for more details.                                                                                                                                                                                  |
 | Exclude              | `exclude`       | `--exclude` | `-e`           | `[]`               | Any packages to exclude from import map even though they appear in `dependencies`. Useful for server-side dependencies. When providing via the command line option, comma-separate and do not include any spaces. They will still be included if actively used in your code. |
@@ -237,20 +249,20 @@ The `alias` option supports several forms:
 **String** — alias a single package by name:
 
 ```js
-alias: "open-props"
+alias: "open-props";
 ```
 
 **Function** — dynamic aliases for all packages:
 
 ```js
 // Alias every package to its unversioned name
-alias: ({packageName}) => packageName
+alias: ({ packageName }) => packageName;
 ```
 
 **Array** — alias multiple packages:
 
 ```js
-alias: ["open-props", "tailwindcss"]
+alias: ["open-props", "tailwindcss"];
 ```
 
 **Object** — map package names to custom alias paths:
@@ -275,17 +287,67 @@ When an alias is removed from the config (or its package is uninstalled), the sy
 > **npm aliases:** When using npm aliases (e.g. `npm install my-props@npm:open-props`), string and object forms match against both the install name (`my-props`) and the real package name (`open-props`), with install name taking priority in object lookups.
 > Function forms receive both as `{ packageName, version, installName }`, letting you distinguish multiple installs of the same package.
 
-## Commands
+### Modes
 
-### `nudeps`
+Modes let you switch between sets of option defaults with a single flag. Two modes are built in:
 
-Initialize or update as needed.
-Takes care of
+| Mode   | Defaults                        |
+| ------ | ------------------------------- |
+| `dev`  | `symlink: true`                 |
+| `prod` | `symlink: false`, `prune: true` |
 
-- Copying dependencies to the target directory
-- Generating a new import map
+Use a mode from the CLI:
 
-### `nudeps --prune`
+```bash
+npx nudeps -m dev
+npx nudeps --mode=prod
+```
+
+Or set it in your config file:
+
+```js
+export default {
+	mode: "dev",
+};
+```
+
+**Priority:** CLI args override config file values, which override mode defaults, which override hard defaults.
+For example, `npx nudeps -m prod --prune=false` will use `prod` defaults but keep `prune` off.
+
+#### Custom modes
+
+You can define your own modes via the `modes` key in the config file. Custom modes are merged with the built-in ones (and can override them):
+
+```js
+export default {
+	modes: {
+		staging: {
+			symlink: false,
+			prune: false,
+		},
+	},
+};
+```
+
+You can now run `npx nudeps -m staging` to use these defaults.
+
+Modes can extend other modes by including a `mode` key. The child mode inherits all parent defaults and can override individual values:
+
+```js
+export default {
+	modes: {
+		staging: {
+			// inherits prod's symlink: false, overrides prune
+			mode: "prod",
+			prune: false,
+		},
+	},
+};
+```
+
+If an unknown mode is specified, a warning is printed listing the available modes.
+
+### Pruning (`nudeps --prune`)
 
 Subset copied dependencies and import map to only those used by your own package entry points.
 Subsequent runs of `nudeps` will respect previously pruned dependencies (unless you use `--init`).
@@ -293,7 +355,7 @@ This allows you to use dependencies immediately as they are added, without havin
 
 You can set `prune: true` in your config file to always prune dependencies but then you will need to re-run it when your code changes.
 
-### `nudeps --init`
+### Force initialization (`nudeps --init`)
 
 Force initialization, even if nudeps has already run.
 Note that this also clears the list of local dependents (see below). They will re-register the next time they run nudeps.
@@ -322,7 +384,7 @@ Circular local dependencies (A depends on B and B depends on A) are handled natu
 
 ### Which browsers are supported?
 
-Nudeps works in pretty much every browser that supports import maps, which is [all of them](https://caniuse.com/import-maps) at this point, including:
+When the import map injection script is included as a non-module script before any module scripts are loaded, Nudeps works in pretty much every browser that supports import maps, which is [all of them](https://caniuse.com/import-maps) at this point, including:
 
 - Chrome **89+**
 - Safari **16.4+**

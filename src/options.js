@@ -5,8 +5,12 @@ export default {
 		flag: "d",
 		default: "./client_modules",
 	},
-	map: {
+	mode: {
 		flag: "m",
+		cli: true,
+	},
+	map: {
+		flag: "o",
 		default: "importmap.js",
 	},
 	exclude: {
@@ -70,7 +74,7 @@ export default {
 		},
 	},
 	symlink: {
-		default: ({isExternal}) => isExternal,
+		default: ({ isExternal }) => isExternal,
 	},
 	preserveSymlinks: {
 		default: false,
