@@ -29,9 +29,9 @@ export default class Nudeps {
 		this.config = config;
 		this.oldConfig = readJSONSync(".nudeps/config.json");
 
-		this.existingDirs = new Set(
-			config.init ? [] : getTopLevelModules(config.dir).map(d => config.dir + "/" + d),
-		);
+		let { dirs, symlinks } = config.init ? { dirs: [], symlinks: [] } : getTopLevelModules(config.dir);
+		this.existingDirs = new Set(dirs.map(d => config.dir + "/" + d));
+		this.existingSymlinks = new Set(symlinks.map(d => config.dir + "/" + d));
 		this.toDelete = new Set(this.existingDirs);
 		this.hasIgnoreExceptions = this.config.ignore.some(p => p.include);
 		this.hasDeepGlobs = this.config.ignore.some(p => (p.include ?? p.exclude)?.includes("/"));
@@ -177,14 +177,22 @@ export default class Nudeps {
 	}
 
 	copyPackages () {
-		let { config, existingDirs, toCopy, toDelete, toDeleteIfEmpty, stats } = this;
+		let { config, existingDirs, existingSymlinks, toCopy, toDelete, toDeleteIfEmpty, stats } = this;
 
 		// Copy (or symlink) package directories
 		for (let from in toCopy) {
 			let to = toCopy[from];
 			let mp = this.path(from);
 
-			if (existingDirs.has(to)) {
+			let exists = existingDirs.has(to);
+			let needsRecreate = exists && (existingSymlinks.has(to) !== this.shouldSymlink(mp));
+
+			if (needsRecreate) {
+				rmSync(to, { recursive: true });
+				toDelete.delete(to);
+			}
+
+			if (exists && !needsRecreate) {
 				toDelete.delete(to);
 			}
 			else if (this.shouldSymlink(mp)) {

@@ -4,7 +4,6 @@ import {
 	existsSync,
 	mkdirSync,
 	readdirSync,
-	statSync,
 	opendirSync,
 	symlinkSync,
 	readlinkSync,
@@ -25,19 +24,25 @@ export function writeJSONSync (path, data, indent = "\t") {
 	return writeFileSync(path, JSON.stringify(data, null, indent));
 }
 
+/**
+ * Read a directory's contents, returning entries with name and symlink info.
+ * Uses `withFileTypes` to avoid separate `statSync` calls.
+ * @param {string} directory
+ * @param {{ type?: "directory" | "file" }} [options]
+ * @returns {{ name: string, isSymlink: boolean }[]}
+ */
 export function readDirectorySync (directory, { type } = {}) {
 	try {
-		// TODO use withFileTypes option instead of filtering by statSync after
-		let ret = readdirSync(directory);
+		let entries = readdirSync(directory, { withFileTypes: true });
 
-		if (type) {
-			ret = ret.filter(item =>
-				statSync(path.join(directory, item))[
-					type === "directory" ? "isDirectory" : "isFile"
-				]());
+		if (type === "directory") {
+			entries = entries.filter(d => d.isDirectory() || d.isSymbolicLink());
+		}
+		else if (type === "file") {
+			entries = entries.filter(d => d.isFile());
 		}
 
-		return ret;
+		return entries.map(d => ({ name: d.name, isSymlink: d.isSymbolicLink() }));
 	}
 	catch (e) {
 		if (e.code === "ENOENT") {
@@ -48,16 +53,30 @@ export function readDirectorySync (directory, { type } = {}) {
 	}
 }
 
+/**
+ * Get all top-level modules in a directory, handling scoped packages.
+ * @param {string} [directory]
+ * @returns {{ dirs: string[], symlinks: string[] }} `symlinks` is a subset of `dirs`
+ */
 export function getTopLevelModules (directory = "./node_modules") {
-	return readDirectorySync(directory, { type: "directory" }).flatMap(dir => {
-		if (dir[0] === "@") {
-			return readDirectorySync(path.join(directory, dir), { type: "directory" }).flatMap(
-				subdir => `${dir}/${subdir}`,
-			);
-		}
+	let dirs = [];
+	let symlinks = [];
 
-		return dir;
-	});
+	for (let { name, isSymlink } of readDirectorySync(directory, { type: "directory" })) {
+		if (name[0] === "@") {
+			for (let sub of readDirectorySync(path.join(directory, name), { type: "directory" })) {
+				let full = `${name}/${sub.name}`;
+				dirs.push(full);
+				if (sub.isSymlink) symlinks.push(full);
+			}
+		}
+		else {
+			dirs.push(name);
+			if (isSymlink) symlinks.push(name);
+		}
+	}
+
+	return { dirs, symlinks };
 }
 
 export function isDirectoryEmptySync (path) {
