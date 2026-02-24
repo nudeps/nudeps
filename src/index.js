@@ -136,6 +136,8 @@ export default async function (options) {
 	const { map, stats } = nudeps;
 
 	for (let { specifier, url, map: subMap } of map) {
+		stats.entries++;
+
 		if (!url.includes("node_modules/")) {
 			// Nothing to copy or rewrite
 			continue;
@@ -150,7 +152,6 @@ export default async function (options) {
 			urlFromMap += "/";
 		}
 		subMap[specifier] = urlFromMap;
-		stats.entries++;
 		if (!modulePath.externalBase) {
 			toCopy[modulePath.nodeDir] ??= modulePath.localDir;
 		}
