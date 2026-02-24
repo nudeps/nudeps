@@ -8,7 +8,7 @@ import ModulePath from "./util/path.js";
 import { matchesGlob, ensureSymlink } from "./util/fs.js";
 
 import { getTopLevelModules } from "./util.js";
-import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
+import { existsSync, lstatSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
 import PackageLock from "./util/package-lock.js";
 
@@ -185,9 +185,21 @@ export default class Nudeps {
 			let mp = this.path(from);
 
 			if (existingDirs.has(to)) {
-				toDelete.delete(to);
+				let isSymlink = lstatSync(to).isSymbolicLink();
+
+				if (isSymlink === this.shouldSymlink(mp)) {
+					// Existing state matches desired state, keep as-is
+					toDelete.delete(to);
+				}
+				else {
+					// Mismatch (e.g. switched between dev/prod mode) — remove and recreate
+					rmSync(to, { recursive: true });
+					existingDirs.delete(to);
+					toDelete.delete(to);
+				}
 			}
-			else if (this.shouldSymlink(mp)) {
+
+			if (!existingDirs.has(to) && this.shouldSymlink(mp)) {
 				// Create a symlink to the resolved local path
 				let resolvedPath = this.pkgLock.resolveKey(mp.rawLockKey);
 				let target = path.relative(path.dirname(to), resolvedPath);
@@ -195,7 +207,7 @@ export default class Nudeps {
 				symlinkSync(target, to, "dir");
 				stats.linked++;
 			}
-			else {
+			else if (!existingDirs.has(to)) {
 				stats.copied++;
 				let { packageName, version } = mp;
 				cpSync(from, to, {
