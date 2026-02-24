@@ -62,13 +62,17 @@ function readExternalConfig (args) {
 
 /**
  * Recursively resolve a mode's option defaults by following its `mode` (parent) key.
- * Child values override parent values. Detects cycles to prevent infinite loops.
+ * Child values override parent values. When a cycle is detected (e.g. a custom mode
+ * extending a same-named built-in like `prod: { mode: "prod", ... }`), falls back
+ * to resolving the parent from built-in modes before giving up.
  * @param {string} name - Mode name to resolve
  * @param {object} allModes - All available modes (built-in + custom)
- * @param {Set} [seen] - Tracks visited modes for cycle detection
+ * @param {object} [options]
+ * @param {object} [options.baseModes] - Fallback modes for cycle resolution (defaults to built-in modes)
+ * @param {Set} [options.seen] - Tracks visited modes for cycle detection
  * @returns {object} Merged defaults for this mode chain
  */
-export function resolveDefaults (name, allModes, seen = new Set()) {
+export function resolveDefaults (name, allModes, { baseModes = builtInModes, seen = new Set() } = {}) {
 	if (name === undefined) {
 		return {};
 	}
@@ -80,6 +84,12 @@ export function resolveDefaults (name, allModes, seen = new Set()) {
 	}
 
 	if (seen.has(name)) {
+		// Cycle — fall back to built-in modes if available (supports
+		// custom modes extending same-named built-ins, e.g. prod: { mode: "prod", ... })
+		if (baseModes && name in baseModes) {
+			return resolveDefaults(name, baseModes, { baseModes: null, seen: new Set() });
+		}
+
 		console.warn(`Circular mode reference detected: ${ name }`);
 		return {};
 	}
@@ -87,7 +97,7 @@ export function resolveDefaults (name, allModes, seen = new Set()) {
 	seen.add(name);
 
 	let { mode: parent, ...ownDefaults } = allModes[name];
-	let parentDefaults = resolveDefaults(parent, allModes, seen);
+	let parentDefaults = resolveDefaults(parent, allModes, { baseModes, seen });
 
 	return { ...parentDefaults, ...ownDefaults };
 }

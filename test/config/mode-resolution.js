@@ -37,6 +37,21 @@ export default {
 			],
 		},
 		{
+			name: "custom mode extending same-named built-in",
+			data: {
+				modes: {
+					...builtInModes,
+					prod: { mode: "prod", prune: false },
+				},
+			},
+			tests: [
+				{
+					arg: "prod",
+					expect: { symlink: false, prune: false },
+				},
+			],
+		},
+		{
 			name: "deep inheritance chain",
 			data: {
 				modes: {

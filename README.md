@@ -345,6 +345,19 @@ export default {
 };
 ```
 
+This also works for overriding built-in modes — use the same name to extend the built-in with your own defaults:
+
+```js
+export default {
+	modes: {
+		prod: {
+			mode: "prod", // extends built-in prod
+			prune: false, // but disables pruning
+		},
+	},
+};
+```
+
 If an unknown mode is specified, a warning is printed listing the available modes.
 
 ### Pruning (`nudeps --prune`)
