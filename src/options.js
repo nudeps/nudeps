@@ -5,8 +5,12 @@ export default {
 		flag: "d",
 		default: "./client_modules",
 	},
-	map: {
+	mode: {
 		flag: "m",
+		cli: true,
+	},
+	map: {
+		flag: "o",
 		default: "importmap.js",
 	},
 	exclude: {
@@ -14,14 +18,18 @@ export default {
 		parse: v => v.split(","),
 		default: [],
 	},
-	prune: {},
+	prune: {
+		default: false,
+	},
 	config: {
 		flag: "c",
 		default: "nudeps.js",
 		validate: v => existsSync(v),
 		file: false,
 	},
-	init: {},
+	init: {
+		default: false,
+	},
 	overrides: {
 		cli: false,
 	},
