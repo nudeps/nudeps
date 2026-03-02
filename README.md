@@ -10,7 +10,14 @@ Yes, you read that right.
 - ✅ **No transpilation or bundling** needed for either your code or your dependencies
 - ✅ **Granular cache busting**, only for modules that change version
 - ✅ **No additional client-side code** you need to run [^1]
-- ✅ **Even CJS packages work!** (experimental)
+  ental)
+
+Even edge cases work:
+
+- ✅ CJS packages(experimental)
+- ✅ Local packages (`npm install ../foo`)
+- ✅ Git dependencies (`npm install git+https://github.com/foo/bar.git`)
+- ✅ npm aliases (`npm install vue2@npm:vue@2`)
 
 [^1]: Except for CJS packages, which require a shim that is automatically included.
 
