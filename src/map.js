@@ -21,6 +21,7 @@ export class ImportMapGenerator extends Generator {
 			defaultProvider: "nodemodules",
 			env: ["production", "browser", "module"],
 			flattenScopes: false,
+			combineSubpaths: "both",
 			commonJS: true,
 			ignore: getNodeBuiltins(),
 			...generatorOptions,
