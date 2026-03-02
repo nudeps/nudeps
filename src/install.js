@@ -2,7 +2,7 @@ import { readJSONSync, writeJSONSync } from "./util.js";
 import nudeps from "./index.js";
 
 export default async function () {
-	let pkg = readJSONSync("package.json");
+	let pkg = readJSONSync("package.json", { optional: true });
 
 	if (!pkg) {
 		console.info("package.json not found, creating stub...");

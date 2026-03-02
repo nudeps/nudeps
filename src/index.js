@@ -238,7 +238,7 @@ export default async function (options) {
 		createGitignoredDir(depNudepsDir);
 
 		let dependentsFile = path.join(depNudepsDir, "local-dependents.json");
-		let dependents = readJSONSync(dependentsFile) ?? [];
+		let dependents = readJSONSync(dependentsFile, { optional: true }) ?? [];
 		let relPath = path.relative(resolvedPath, ".");
 
 		if (!dependents.includes(relPath)) {
@@ -251,7 +251,7 @@ export default async function (options) {
 	// this one locally. --if-present silently skips if no hook is configured.
 	// Content-based comparison naturally breaks cycles (map converges → no change → stops).
 	if (mapChanged) {
-		let dependents = readJSONSync(".nudeps/local-dependents.json");
+		let dependents = readJSONSync(".nudeps/local-dependents.json", { optional: true });
 
 		for (let entry of dependents ?? []) {
 			nudeps.info(`Propagating to dependent: ${entry}`);

@@ -27,7 +27,7 @@ export default class Nudeps {
 
 	constructor ({ config }) {
 		this.config = config;
-		this.oldConfig = readJSONSync(".nudeps/config.json");
+		this.oldConfig = readJSONSync(".nudeps/config.json", { optional: true });
 
 		let { dirs, symlinks } = config.init ? { dirs: [], symlinks: [] } : getTopLevelModules(config.dir);
 		this.existingDirs = new Set(dirs.map(d => config.dir + "/" + d));
@@ -39,18 +39,12 @@ export default class Nudeps {
 
 	get pkg () {
 		let value = readJSONSync("./package.json");
-		if (!value) {
-			throw new Error("package.json not found or invalid");
-		}
 		Object.defineProperty(this, "pkg", { value, configurable: true });
 		return value;
 	}
 
 	get pkgLock () {
 		let data = readJSONSync("package-lock.json");
-		if (!data) {
-			throw new Error("package-lock.json not found or invalid");
-		}
 		let value = new PackageLock(data);
 		Object.defineProperty(this, "pkgLock", { value, configurable: true });
 		return value;
@@ -85,7 +79,7 @@ export default class Nudeps {
 	 */
 	childLock (resolvedPath) {
 		if (!(resolvedPath in this.#childLocks)) {
-			let data = readJSONSync(`${resolvedPath}/package-lock.json`);
+			let data = readJSONSync(`${resolvedPath}/package-lock.json`, { optional: true });
 			if (data) {
 				this.#childLocks[resolvedPath] = new PackageLock(data);
 			}

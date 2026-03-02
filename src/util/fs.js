@@ -12,12 +12,41 @@ import {
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 
-export function readJSONSync (path) {
-	if (!existsSync(path)) {
-		return undefined;
+/**
+ * Read and parse a JSON file synchronously.
+ * By default, throws on missing or invalid files with detectable error codes.
+ * @param {string} filePath
+ * @param {{ optional?: boolean }} [options]
+ * @returns {any} Parsed JSON, or `undefined` if `optional` is set and file is missing/invalid
+ * @throws {Error} With `code: "ENOENT"` if file not found
+ * @throws {Error} With `code: "ERR_INVALID_JSON"` if file contains invalid JSON (wraps the original SyntaxError as `cause`)
+ */
+export function readJSONSync (filePath, { optional } = {}) {
+	let resolved = path.resolve(filePath);
+
+	if (!existsSync(resolved)) {
+		if (optional) {
+			return undefined;
+		}
+
+		let err = new Error(`File not found: ${resolved}`);
+		err.code = "ENOENT";
+		throw err;
 	}
 
-	return JSON.parse(readFileSync(path, "utf8"));
+	try {
+		return JSON.parse(readFileSync(resolved, "utf8"));
+	}
+	catch (e) {
+		if (optional) {
+			return undefined;
+		}
+
+		let err = new Error(`Invalid JSON in ${resolved}: ${e.message}`);
+		err.code = "ERR_INVALID_JSON";
+		err.cause = e;
+		throw err;
+	}
 }
 
 export function writeJSONSync (path, data, indent = "\t") {
