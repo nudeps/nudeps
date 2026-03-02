@@ -48,9 +48,10 @@ export default async function (options) {
 
 	if (!config.prune && nudeps.pkg.dependencies) {
 		let exclude = new Set(config.exclude ?? []);
+		let external = nudeps.externalPackages;
 
 		for (const dep in nudeps.pkg.dependencies) {
-			if (exclude.has(dep)) {
+			if (exclude.has(dep) || external.has(dep)) {
 				continue;
 			}
 
@@ -117,6 +118,9 @@ export default async function (options) {
 		}
 	}
 
+	// Install external packages from CDN providers
+	let cdnMap = await nudeps.installExternalPackages();
+
 	let dirExists = existsSync(config.dir);
 	if (config.init && dirExists) {
 		rmSync(config.dir, { recursive: true });
@@ -134,6 +138,12 @@ export default async function (options) {
 	let { toCopy } = nudeps;
 
 	const { map, stats } = nudeps;
+
+	// Merge CDN entries into the local map (CDN URLs don't contain node_modules/,
+	// so the rewrite loop below naturally skips them)
+	if (cdnMap.imports || cdnMap.scopes) {
+		map.applyOverrides(cdnMap);
+	}
 
 	for (let { specifier, url, map: subMap } of map) {
 		stats.entries++;

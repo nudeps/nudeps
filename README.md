@@ -39,9 +39,10 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 6. [Config options](#config-options)
 	1. [Restricting which files are deployed from dependencies](#restricting-which-files-are-deployed-from-dependencies)
 	2. [Aliases](#aliases)
-	3. [Modes](#modes)
-	4. [Pruning (`nudeps --prune`)](#pruning-nudeps---prune)
-	5. [Force initialization (`nudeps --init`)](#force-initialization-nudeps---init)
+	3. [External packages](#external-packages)
+	4. [Modes](#modes)
+	5. [Pruning (`nudeps --prune`)](#pruning-nudeps---prune)
+	6. [Force initialization (`nudeps --init`)](#force-initialization-nudeps---init)
 7. [Local dependencies](#local-dependencies)
 	1. [Registration](#registration)
 	2. [Propagation](#propagation)
@@ -207,6 +208,7 @@ Some command line options also allow for a shorthand one letter syntax (e.g. `-d
 | Module               | `module`        | `--module`  | -              | `false`            | Set to `true` if the import map script will be loaded as `<script type="module">`. Please note that **this will reduce browser support**, as certain browsers do not support injecting import maps after any module has started loading.                                     |
 | CommonJS             | `cjs`           | `--cjs`     | -              | `true`             | Whether to add a CommonJS shim to the import if any CJS packages are detected. Setting to `false` will omit both the shim and these packages from the import map.                                                                                                            |
 | Alias                | `alias`         | `--alias`   | -              | -                  | Create unversioned symlinks in `client_modules` pointing to versioned directories. Useful for stable URLs to package assets (CSS, images, etc.). See [Aliases](#aliases) below.                                                                                              |
+| External             | `external`      | -           | -              | `{}`               | Serve specific packages from a CDN instead of locally. Useful for packages that can't run in the browser from local files (CJS-only, Node built-in deps, etc.). See [External packages](#external-packages) below.                                                           |
 
 ### Restricting which files are deployed from dependencies
 
@@ -293,6 +295,63 @@ When an alias is removed from the config (or its package is uninstalled), the sy
 
 > **npm aliases:** When using npm aliases (e.g. `npm install my-props@npm:open-props`), string and object forms match against both the install name (`my-props`) and the real package name (`open-props`), with install name taking priority in object lookups.
 > Function forms receive both as `{ packageName, version, installName }`, letting you distinguish multiple installs of the same package.
+
+### External packages
+
+Some npm packages can't run locally in the browser — they may be CJS-only, depend on Node built-ins, or have other incompatibilities.
+The `external` option lets you serve these packages from a CDN instead.
+External packages are excluded from `client_modules/` and resolved via CDN URLs in the import map.
+
+Under the hood, nudeps uses [JSPM's CDN provider system](https://jspm.org/docs/generator/interfaces/GeneratorOptions.html) to trace subpaths and build proper scopes for external packages.
+The default provider is `esm.sh`, which handles CJS→ESM conversion automatically.
+
+Supported providers: `"esm.sh"`, `"jspm.io"`, `"jspm.io#system"`, `"jsdelivr"`, `"unpkg"`, `"skypack"`.
+
+The `external` option supports several forms:
+
+**String** — one package, default provider:
+
+```js
+external: "pg"
+```
+
+**Array** — multiple packages, default provider:
+
+```js
+external: ["pg", "better-sqlite3"]
+```
+
+**Object** — per-package provider:
+
+```js
+external: {
+	"pg": true,          // default provider (esm.sh)
+	"lodash": "jsdelivr" // specific provider
+}
+```
+
+Functions can also be used as object values for per-package logic:
+
+```js
+external: {
+	"pg": ({ version }) => "esm.sh"
+}
+```
+
+**Function** — dynamic for all packages:
+
+```js
+// Mark all packages starting with "pg" as external
+external: (ctx) => ctx.packageName.startsWith("pg")
+```
+
+Function forms receive `{ packageName, installName, version }` and should return `true` (default provider), a provider name string, or a falsy value.
+
+> **npm aliases:** When using npm aliases (e.g. `npm install my-pg@npm:pg`), string and object forms match against both the install name (`my-pg`) and the real package name (`pg`), with install name taking priority in object lookups.
+
+> **Transitive dependencies:** The CDN provider resolves all transitive dependencies of external packages through the CDN itself, using scoped import map entries.
+> This means if an external package and a local package share a transitive dependency (e.g. both use `lodash`), it will be loaded twice — once locally and once from the CDN.
+> This is an inherent tradeoff of the external escape hatch and is generally negligible in practice.
 
 ### Modes
 

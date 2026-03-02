@@ -9,13 +9,17 @@ import * as path from "node:path";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export class ImportMapGenerator extends Generator {
-	constructor ({ mode, ...generatorOptions } = {}) {
+	constructor ({ mode, ignore, ...generatorOptions } = {}) {
 		if (mode) {
 			this.mode = mode;
 			generatorOptions.env ??= [mode, "browser", "module"];
 		}
 
 		let commonJS = generatorOptions.commonJS ?? true;
+		let allIgnore = getNodeBuiltins();
+		if (ignore) {
+			allIgnore = allIgnore.concat(ignore);
+		}
 
 		super({
 			defaultProvider: "nodemodules",
@@ -23,7 +27,7 @@ export class ImportMapGenerator extends Generator {
 			flattenScopes: false,
 			combineSubpaths: "both",
 			commonJS: true,
-			ignore: getNodeBuiltins(),
+			ignore: allIgnore,
 			...generatorOptions,
 		});
 
@@ -196,6 +200,21 @@ ${injectMap}
 })();
 `;
 	}
+}
+
+/**
+ * Deep-merge multiple `{ imports, scopes }` import map objects into one.
+ * @param {...object} maps - Import map objects to merge (later ones take precedence)
+ * @returns {object} Merged import map
+ */
+export function mergeImportMaps (...maps) {
+	let result = {};
+	for (let map of maps) {
+		if (map) {
+			deepAssign(result, map);
+		}
+	}
+	return result;
 }
 
 function deepAssign (target, source) {

@@ -80,4 +80,5 @@ export default {
 		default: false,
 	},
 	alias: {},
+	external: {},
 };

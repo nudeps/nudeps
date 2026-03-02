@@ -3,7 +3,7 @@
  */
 
 import { readJSONSync } from "./util.js";
-import { ImportMapGenerator, ImportMap } from "./map.js";
+import { ImportMapGenerator, ImportMap, mergeImportMaps } from "./map.js";
 import ModulePath from "./util/path.js";
 import { matchesGlob, ensureSymlink } from "./util/fs.js";
 
@@ -11,6 +11,8 @@ import { getTopLevelModules } from "./util.js";
 import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
 import PackageLock from "./util/package-lock.js";
+
+const DEFAULT_PROVIDER = "esm.sh";
 
 export default class Nudeps {
 	stats = {
@@ -53,6 +55,13 @@ export default class Nudeps {
 	get generator () {
 		let generatorOptions = { commonJS: this.config.cjs };
 
+		// Tell JSPM to ignore external packages so it doesn't resolve them locally;
+		// other packages that depend on them fall back to top-level import map entries
+		let externalNames = [...this.externalPackages.keys()];
+		if (externalNames.length > 0) {
+			generatorOptions.ignore = externalNames;
+		}
+
 		let value = new ImportMapGenerator(generatorOptions);
 		Object.defineProperty(this, "generator", { value, configurable: true });
 		return value;
@@ -68,6 +77,132 @@ export default class Nudeps {
 
 		Object.defineProperty(this, "map", { value, configurable: true });
 		return value;
+	}
+
+	/**
+	 * Resolve the external provider for a dependency.
+	 * Returns a provider name string (e.g. "esm.sh") or null if the dep is not external.
+	 * @param {string} dep - The install name (key under pkg.dependencies)
+	 * @param {*} [external] - External config value; defaults to this.config.external
+	 * @returns {string|null}
+	 */
+	resolveExternal (dep, external = this.config.external) {
+		let lockKey = `node_modules/${dep}`;
+		let info = this.pkgLock.packages[lockKey];
+		let installName = dep;
+		let packageName = info?.name ?? dep;
+		let version = info?.version;
+
+		return this.#resolveExternalValue(external, { installName, packageName, version });
+	}
+
+	/**
+	 * Recursively resolve an external config value for a given package context.
+	 * Supports true, string (package name match), array, object (key lookup), and function forms.
+	 * After object/function fall-through: true → default provider, string → provider name.
+	 */
+	#resolveExternalValue (value, ctx) {
+		if (value == null || value === false) return null;
+		if (value === true) return DEFAULT_PROVIDER;
+
+		if (Array.isArray(value)) {
+			for (let item of value) {
+				let result = this.#resolveExternalValue(item, ctx);
+				if (result) return result;
+			}
+			return null;
+		}
+
+		// Top-level string = match by package name
+		if (typeof value === "string") {
+			return ctx.installName === value || ctx.packageName === value ? DEFAULT_PROVIDER : null;
+		}
+
+		// Object form: key lookup, then fall through
+		if (typeof value === "object") {
+			value = value[ctx.installName] ?? value[ctx.packageName];
+		}
+
+		// Function form (top-level or object value)
+		if (typeof value === "function") {
+			value = value(ctx);
+		}
+
+		// Fall-through resolution: true → default, string → provider name
+		if (value === true) return DEFAULT_PROVIDER;
+		if (typeof value === "string") return value;
+		return null;
+	}
+
+	/**
+	 * Map of external packages: installName → { provider, packageName, version }.
+	 * Iterates pkg.dependencies and resolves each against the external config.
+	 */
+	get externalPackages () {
+		let result = new Map();
+		let deps = this.pkg.dependencies;
+
+		if (deps) {
+			for (let dep in deps) {
+				let provider = this.resolveExternal(dep);
+				if (provider) {
+					let info = this.pkgLock.packages[`node_modules/${dep}`];
+					result.set(dep, {
+						provider,
+						packageName: info?.name ?? dep,
+						version: info?.version,
+					});
+				}
+			}
+		}
+
+		Object.defineProperty(this, "externalPackages", { value: result, configurable: true });
+		return result;
+	}
+
+	/**
+	 * Install external packages from CDN providers.
+	 * Groups packages by provider, creates a separate ImportMapGenerator per provider,
+	 * installs each package, and returns the merged import map.
+	 * @returns {Promise<object>} Merged { imports, scopes } from all CDN generators
+	 */
+	async installExternalPackages () {
+		if (this.externalPackages.size === 0) return {};
+
+		// Group by provider
+		let groups = {};
+		for (let [installName, { provider, packageName, version }] of this.externalPackages) {
+			groups[provider] ??= [];
+			groups[provider].push({ installName, packageName, version });
+		}
+
+		let maps = [];
+
+		for (let [providerName, packages] of Object.entries(groups)) {
+			let generator = new ImportMapGenerator({
+				defaultProvider: providerName,
+				commonJS: this.config.cjs,
+			});
+
+			for (let { installName, packageName, version } of packages) {
+				let target = version ? `${packageName}@${version}` : packageName;
+
+				if (!version) {
+					this.info(`Warning: No version found for external package ${installName}, using latest`);
+				}
+
+				try {
+					await generator.install(installName, target);
+				}
+				catch (e) {
+					this.error(`Error installing external package ${installName} from ${providerName}: ${e.message}`);
+				}
+			}
+
+			maps.push(generator.getMap());
+		}
+
+		return mergeImportMaps(...maps);
 	}
 
 	#childLocks = {};
