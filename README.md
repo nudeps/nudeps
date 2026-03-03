@@ -1,4 +1,11 @@
+<div align="center">
+  <a href="https://github.com/nudeps/nudeps">
+    <img width="200" height="200" src="logo.svg">
+  </a>
+
 # Nudeps
+
+</div>
 
 Your dependencies, naked.
 
