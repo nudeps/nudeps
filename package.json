@@ -11,6 +11,12 @@
 		"type": "git",
 		"url": "git+https://github.com/nudeps/nudeps.git"
 	},
+ "funding": [
+    {
+      "type": "individual",
+      "url": "https://github.com/sponsors/LeaVerou"
+    }
+  ],
 	"license": "MIT",
 	"author": "Lea Verou",
 	"type": "module",
