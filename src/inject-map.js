@@ -3,7 +3,7 @@ if (!mapUrl) {
 		throw new Error("nudeps: Import map script appears to be loaded as a module. Set module: true in nudeps config, or remove type=\"module\" from the script tag.");
 	}
 	else if (document.querySelector("script[type=module]")) {
-		throw new Error(`nudeps: ${document.currentScript.getAttribute("src")} is included after module scripts, which is not supported in all browsers.`);
+		console.warn(`nudeps: ${document.currentScript.getAttribute("src")} is included after module scripts, which is not supported in all browsers.`);
 	}
 }
 
