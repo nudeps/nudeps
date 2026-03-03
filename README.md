@@ -27,83 +27,78 @@ For background, see [Web dependencies are broken. Can we fix them?](https://lea.
 
 ## Contents
 
-1. [How does it work?](#how-does-it-work)
-2. [Nudeps vs JSPM](#nudeps-vs-jspm)
+1. [Installation \& Usage](#installation--usage)
+2. [How does it work?](#how-does-it-work)
 	1. [Do I need nudeps or JSPM?](#do-i-need-nudeps-or-jspm)
-3. [Current limitations](#current-limitations)
-4. [Installation](#installation)
-	1. [Local installation](#local-installation)
-	2. [Global installation](#global-installation)
-	3. [Automatically run nudeps when dependencies change](#automatically-run-nudeps-when-dependencies-change)
-5. [Usage](#usage)
-6. [Config options](#config-options)
+3. [Limitations](#limitations)
+4. [Config options](#config-options)
 	1. [Restricting which files are deployed from dependencies](#restricting-which-files-are-deployed-from-dependencies)
-	2. [Aliases](#aliases)
+	2. [Importing non-JS resources: Unversioned aliases](#importing-non-js-resources-unversioned-aliases)
 	3. [Modes](#modes)
 	4. [Pruning (`nudeps --prune`)](#pruning-nudeps---prune)
 	5. [Force initialization (`nudeps --init`)](#force-initialization-nudeps---init)
-7. [Local dependencies](#local-dependencies)
+5. [Local dependencies (via `npm install ../other-repo`)](#local-dependencies-via-npm-install-other-repo)
 	1. [Registration](#registration)
 	2. [Propagation](#propagation)
-8. [FAQ](#faq)
+6. [FAQ](#faq)
 	1. [Which browsers are supported?](#which-browsers-are-supported)
 	2. [Does this support pnpm/bun/yarn/etc.?](#does-this-support-pnpmbunyarnetc)
 	3. [Why does it add the version number to the directory name?](#why-does-it-add-the-version-number-to-the-directory-name)
 	4. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
 	5. [Why doesn't Nudeps have an option to add integrity hashes to the import map?](#why-doesnt-nudeps-have-an-option-to-add-integrity-hashes-to-the-import-map)
 	6. [How are CJS (CommonJS) packages handled?](#how-are-cjs-commonjs-packages-handled)
-9. [Troubleshooting](#troubleshooting)
+7. [Troubleshooting](#troubleshooting)
 	1. [Getting an error about a specifier failing to resolve](#getting-an-error-about-a-specifier-failing-to-resolve)
 	2. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
 	3. [Packages that use extension-less paths](#packages-that-use-extension-less-paths)
 
-## How does it work?
+## Installation & Usage
 
-You run `nudeps install` once to initialize the project.
-That’s it.
-You can then forget about it, it will run automatically whenever you install or uninstall packages.
-Unless you need to transpile your JS for other reasons, you can write JS that just runs, no transpilation needed.
+To install Nudeps on a project and initialize it, run:
 
-Instead of forcing you to use a CDN, Nudeps copies your dependencies to a **local directory** you specify (`./client_modules` by default), adds versions to directory names for **cache busting**, and generates an **import map** that maps specifiers to these local paths.
-For example, `lit` may be mapped to `"./client_modules/lit@3.3.2/index.js"`.
-
-All it takes to use these definitions is to include the `importmap.js` file in your HTML before any modules are loaded:
-
-```html
-<script src="importmap.js"></script>
+```bash
+npm install nudeps -D
+npx nudeps install
 ```
 
-You can include that one line of HTML either manually or via your templating system of choice.
+This will add a `dependencies` (or `predependencies`, `postdependencies` if `dependencies` is taken) script to your `package.json` that will run `nudeps` automatically whenever you install or uninstall packages.
+It will also run Nudeps for you, which will copy your dependencies (and their transitive dependencies) to the client modules directory (as `./client_modules` by default) and generate an import map (as `importmap.js` by default).
+
 You can see an example of what such a file looks like at https://github.com/nudeps/nudeps-demos/blob/main/floating-ui/importmap.js
+(you can also browse the other demos in the [nudeps-demos repository](https://github.com/nudeps/nudeps-demos))
 
-You then install and uninstall dependencies as needed and use them straight away, and both the import map and copied dependencies will be automatically updated.
-No, without you having to remember to run anything before or after.
+> [!NOTE]
+> Normally you should avoid committing your import map to version control as it's a build artifact, but it is included there for demonstration purposes.
 
-If you want, you can periodically run `nudeps --prune` to subset the copied dependencies and import map to only those used by your own package entry points.
+To use the import map in your app, include it in a classic (non-module) `<script>` element, before any modules are loaded, either manually or via your templating system of choice:
 
-## Nudeps vs JSPM
+```html
+<script src="/importmap.js"></script>
+```
 
-Nudeps is actually implemented as an opinionated wrapper over the excellent [JSPM Generator](https://jspm.org/), which handles a lot of the heavy lifting around import map generation.
-Unlike JSPM, Nudeps does not aim to cover all possible use cases.
-Instead, it aims to cover a subset of use cases with the best DX possible.
+> [!IMPORTANT]
+> To maximize compatibility, this script needs to be included **before any module scripts are loaded, and must be included as a regular script, not a module script.**
+> If you want to include it as `<script type="module" src="importmap.js">` instead, set the `module` option to `true` in your nudeps config.
+> Please note that as of March 2026, this will _dramatically_ reduce browser support and is not recommended.
+
+Once you do that, you can just **forget about Nudeps and go about your business**, using `npm install` and `npm uninstall` for dependencies as you normally would.
+If something seems off, you can run `npx nudeps` explicitly, but most of the time things should Just Work™.
+
+## How does it work?
+
+Nudeps copies your dependencies to a **local directory** you specify (`./client_modules` by default), adds versions to directory names for **cache busting** just like a CDN, and generates an **import map** that maps specifiers to these local paths.
+For example, `lit` may be mapped to `"./client_modules/lit@3.3.2/index.js"`.
+
+It then optimistically adds your direct dependencies to your import map, so that you can use them straight away.
+In production (or if you use the `prune` option), it will subset the import map to only include the dependencies you actually use.
 
 ### Do I need nudeps or JSPM?
 
-JSPM has paved the way in managing import maps that let you use specifiers in the browser and its Generator module doing a lot of the heavy lifting here.
+[JSPM](https://jspm.org/) paved the way in managing import maps that let you use specifiers in the browser.
+Nudeps is actually implemented as an opinionated wrapper over the excellent [JSPM Generator](https://jspm.org/docs/generator/), which handles a lot of the heavy lifting around tracing and import map generation.
 
-However:
-
-- It basically forces you into using a CDN. While there is a `nodemodules` provider, it is only meant for local development and does not do any cache busting.
-  However, CDNs are generally considered insecure, and introduce an additional point of failure in terms of reliability.
-  Nudeps copies only the dependencies you use in a directory you specify and adds version numbers to directory names so that you get the same cache busting behavior as you would with a CDN, but in your own domain.
-- While subsetting modules to only those you actually use is a good idea, it forces you to run a build process before working on code, which is a hassle and error-prone, especially when working with beginners.
-  Nudeps separates this subsetting into a separate step ("pruning") that you can run separately, as an optimization. This allows it to only run when dependencies change, rather than continuously during development.
-
-With nudeps, your workflow is basically:
-
-- `npm install` or `npm uninstall` as needed
-- Just use specifiers in your code
-- Nothing more to do, no build process to run, everything just works.
+Its main value-add is letting you host your own dependencies locally instead of relying on a CDN (or — worse — having to deploy your entire `node_modules` directory!), and not requiring a watcher.
+If you’re ok with using a CDN for your dependencies and don’t mind running a build process whenever you work on code, JSPM is a great choice.
 
 Here is a handy table to compare the two:
 
@@ -117,81 +112,17 @@ Here is a handy table to compare the two:
 | `npm link` still works                                                  | ✅     | ✅        |
 | No build process to remember to run before working on code              | ✅     | ❌        |
 | Granular cache busting, only for modules that change version            | ✅     | CDNs only |
-| Import map automatically updated as you install packages                | ✅     | ❌        |
+| Import map automatically updated as you (un)install packages            | ✅     | ❌        |
 | Supports CDNs like unpkg, jsdelivr, etc.                                | ❌     | ✅        |
 | Self-host dependencies                                                  | ✅     | ❌        |
 
-## Current limitations
+## Limitations
 
-- Specifiers will not work in web workers ([#19](https://github.com/nudeps/nudeps/issues/19))
-- Local (`file:`) dependencies have some issues ([#39](https://github.com/nudeps/nudeps/issues/39))
-
-## Installation
-
-You can install nudeps as a devDependency, locally in each project or globally to have it available on every project.
-
-### Local installation
-
-This can be useful for signaling to collaborators that nudeps is required to work on the project or if you’d rather avoid global installs.
-
-```bash
-npm install nudeps -D
-```
-
-### Global installation
-
-You can also install Nudeps globally:
-
-```bash
-npm install nudeps -gD
-```
-
-Then, whenever you want to initialize for a given project, just run `nudeps` in its root directory.
-It will automatically detect that it has not run before and initialize.
-
-### Automatically run nudeps when dependencies change
-
-This is essential, otherwise you’d need to manually run `nudeps` whenever you install or uninstall a dependency.
-
-Either run `nudeps install` which will do this automatically, or add a `dependencies` script manually to your `package.json`:
-
-```json
-{
-	"name": "my-project",
-	"scripts": {
-		"dependencies": "npx nudeps"
-	}
-}
-```
-
-> [!TIP]
-> If you have another `dependencies` script, you can use `predependencies` to run `nudeps` before it or `postdependencies` to run `nudeps` after it.
-
-Then, to use the import map in your app, include this script in your HTML before any modules are loaded, either manually or via your templating system of choice:
-
-```html
-<script src="/importmap.js"></script>
-```
-
-> [!IMPORTANT]
-> By default, this script needs to be included **before any module scripts are loaded, and must be included as a regular script, not a module script.**
-> If you want to include it as `<script type="module" src="importmap.js">` instead, set the `module` option to `true` in your nudeps config.
-> Please note this may make your import map not work in all browsers (as of February 2026, only Safari seems to support this).
-
-## Usage
-
-Run `npx nudeps` to initialize or update as needed.
-
-This takes care of:
-
-- Copying dependencies to the target directory
-- Generating a new import map
-
-Several options are available to customize the behavior, which are documented below.
+- Specifiers will not work in web workers ([#19](https://github.com/nudeps/nudeps/issues/19)). This is a platform limitation.
 
 ## Config options
 
-Each of the following options is available either as a config file key, or a command line option (e.g. `foo` would be `--foo`).
+Most options are available either as a config file key, or a command line option (e.g. `foo` would be `--foo`), though their CLI version may support a more limited syntax.
 Some command line options also allow for a shorthand one letter syntax (e.g. `-d foo` instead of `--dir=foo`) which is listed under "CLI short flag".
 
 | Option               | Config file key | CLI option  | CLI short flag | Default            | Description                                                                                                                                                                                                                                                                  |
@@ -238,7 +169,7 @@ For example:
 
 To restrict rules to specific packages, you can provide the rule as an object and add one or more (as an array) package names via the `packageName` property.
 
-### Aliases
+### Importing non-JS resources: Unversioned aliases
 
 While the import map handles JavaScript specifier resolution, you may need to reference package files directly by URL — for example, CSS files, images, or other assets.
 Because package directories include version numbers (e.g., `client_modules/open-props@2.0.4/`), these URLs break every time a dependency is updated.
@@ -380,7 +311,7 @@ You can set `prune: true` in your config file to always prune dependencies but t
 Force initialization, even if nudeps has already run.
 Note that this also clears the list of local dependents (see below). They will re-register the next time they run nudeps.
 
-## Local dependencies
+## Local dependencies (via `npm install ../other-repo`)
 
 When you have local dependencies (installed via `npm install ../other-repo`), nudeps automatically handles propagation between them, but there are a few things you need to know about it.
 
@@ -413,13 +344,11 @@ When the import map injection script is included as a non-module script before a
 ### Does this support pnpm/bun/yarn/etc.?
 
 At the moment, we’re focusing on nailing the best DX possible, and to let us focus on that, we're cutting scope by only supporting npm for now.
-However, Nudeps should however work with any other package managers that follow similar conventions in terms of:
+Please open an issue if lack of support for your package manager is a blocker for you and add it below:
 
-- `node_modules` directory structure
-- `package-lock.json` file format
-- `package.json` file format
+- [pnpm](https://github.com/nudeps/nudeps/issues/13)
 
-You're welcome to contribute support for other package managers, but please let me know first so we can discuss the best approach.
+If there is an existing issue for your package manager, please upvote it.
 
 ### Why does it add the version number to the directory name?
 
