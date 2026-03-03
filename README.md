@@ -10,7 +10,7 @@
 Your dependencies, naked.
 
 This package introduces lightweight tooling as an alternative to bundlers.
-It lets you use `npm install` as you normally would, and import dependencies via specifiers in the browser without a bundler or build step.
+It lets you use `npm install` as you normally would, and import dependencies via plain specifiers (e.g. `import { createApp } from "vue"`) in the browser without a bundler or build step.
 Yes, you read that right.
 
 - ✅ **No transpilation or bundling needed** for either your code or your dependencies (but if you already transpile, it works fine!)
@@ -19,6 +19,7 @@ Yes, you read that right.
 - ✅ **No watchers!** No per-change bottleneck, nothing to remember to run before working on code
 - ✅ **No additional client-side code** you need to run [^1]
   ental)
+- ✅ **Nice URLs for non-JS resources** (CSS, images, icons, etc.) — because the Web is not just JS
 
 Even edge cases work:
 
