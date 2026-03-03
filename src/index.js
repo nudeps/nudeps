@@ -88,7 +88,13 @@ export default async function (options) {
 	}
 
 	if (config.cjs !== false) {
-		let cjsEntries = generator.getEntries(entry => entry?.format === "commonjs");
+		// Only flag packages as CJS if they have no ESM exports at all
+		let esmPackages = new Set(
+			generator.getEntries(entry => entry?.format === "esm")
+				.map(([url]) => nudeps.path(url).packageName),
+		);
+		let cjsEntries = generator.getEntries(entry => entry?.format === "commonjs")
+			.filter(([url]) => !esmPackages.has(nudeps.path(url).packageName));
 
 		if (cjsEntries.length > 0) {
 			try {
