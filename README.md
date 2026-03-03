@@ -13,14 +13,17 @@ This package introduces lightweight tooling as an alternative to bundlers.
 It lets you use `npm install` as you normally would, and import dependencies via specifiers in the browser without a bundler or build step.
 Yes, you read that right.
 
-- ✅ **No watchers!** Nothing to remember to run before working on code
-- ✅ **No transpilation or bundling** needed for either your code or your dependencies
-- ✅ **Granular cache busting**, only for modules that change version
+- ✅ **No transpilation or bundling needed** for either your code or your dependencies (but if you already transpile, it works fine!)
+- ✅ **Granular cache busting**, only when modules change version
+- ✅ **Local-first workflow**, no external requests, no CDN required
+- ✅ **No watchers!** No per-change bottleneck, nothing to remember to run before working on code
 - ✅ **No additional client-side code** you need to run [^1]
   ental)
 
 Even edge cases work:
 
+- ✅ Dynamic `import()`
+- ✅ `import.meta.resolve()`
 - ✅ CJS packages(experimental)
 - ✅ Local packages (`npm install ../foo`)
 - ✅ Git dependencies (`npm install git+https://github.com/foo/bar.git`)
@@ -30,7 +33,11 @@ Even edge cases work:
 
 Try it out in the [demos repository](https://github.com/nudeps/nudeps-demos).
 
-For background, see [Web dependencies are broken. Can we fix them?](https://lea.verou.me/blog/2026/web-deps/).
+For background, see these blog posts:
+
+- [Web dependencies are broken. Can we fix them?](https://lea.verou.me/blog/2026/web-deps/).
+- [External import maps, today!](https://lea.verou.me/blog/2026/external-import-maps-today/)
+- [Introducing Nudeps: Let your dependencies go nude!](https://lea.verou.me/blog/2026/nudeps/)
 
 ## Contents
 
