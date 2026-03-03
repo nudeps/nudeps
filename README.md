@@ -10,7 +10,7 @@
 Your dependencies, naked.
 
 This package introduces lightweight tooling as an alternative to bundlers.
-It lets you use `npm install` as you normally would, and import dependencies via plain specifiers (e.g. `import { createApp } from "vue"`) in the browser without a bundler or build step.
+It lets you use `npm install` as you normally would, and import dependencies via plain specifiers (e.g. `import foo from "foo"`) in the browser without a bundler or build step.
 Yes, you read that right.
 
 - ✅ **No transpilation or bundling needed** for either your code or your dependencies (but if you already transpile, it works fine!)
