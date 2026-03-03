@@ -18,7 +18,6 @@ Yes, you read that right.
 - ✅ **Local-first workflow**, no external requests, no CDN required
 - ✅ **No watchers!** No per-change bottleneck, nothing to remember to run before working on code
 - ✅ **No additional client-side code** you need to run [^1]
-  ental)
 - ✅ **Nice URLs for non-JS resources** (CSS, images, icons, etc.) — because the Web is not just JS
 
 Even edge cases work:
