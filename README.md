@@ -76,7 +76,7 @@ npx nudeps install
 ```
 
 This will add a `dependencies` (or `predependencies`, `postdependencies` if `dependencies` is taken) script to your `package.json` that will run `nudeps` automatically whenever you install or uninstall packages.
-It will also run Nudeps for you, which will copy your dependencies (and their transitive dependencies) to the client modules directory (as `./client_modules` by default) and generate an import map (as `importmap.js` by default).
+It will also run Nudeps for you, which will copy your dependencies (and their transitive dependencies) to the client modules directory (as `./client_modules` by default) and generate an [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script/type/importmap) (as `importmap.js` by default).
 
 You can see an example of what such a file looks like at https://github.com/nudeps/nudeps-demos/blob/main/floating-ui/importmap.js
 (you can also browse the other demos in the [nudeps-demos repository](https://github.com/nudeps/nudeps-demos))
@@ -100,7 +100,7 @@ If something seems off, you can run `npx nudeps` explicitly, but most of the tim
 
 ## How does it work?
 
-Nudeps copies your dependencies to a **local directory** you specify (`./client_modules` by default), adds versions to directory names for **cache busting** just like a CDN, and generates an **import map** that maps specifiers to these local paths.
+Nudeps copies your dependencies to a **local directory** you specify (`./client_modules` by default), adds versions to directory names for **cache busting** just like a CDN, generates an [**import map**](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script/type/importmap) that maps specifiers to these local paths, and an injection script that injects the import map into any HTML page.
 For example, `lit` may be mapped to `"./client_modules/lit@3.3.2/index.js"`.
 
 It then optimistically adds your direct dependencies to your import map, so that you can use them straight away.
@@ -151,6 +151,7 @@ Some command line options also allow for a shorthand one letter syntax (e.g. `-d
 | Overrides            | `overrides`     | -           | -              | `{}`               | Overrides for the import map, using `./node_modules/` paths. Set a key to `undefined` to remove it from the map.                                                                                                                                                             |
 | Module               | `module`        | `--module`  | -              | `false`            | Set to `true` if the import map script will be loaded as `<script type="module">`. Please note that **this will reduce browser support**, as certain browsers do not support injecting import maps after any module has started loading.                                     |
 | CommonJS             | `cjs`           | `--cjs`     | -              | `true`             | Whether to add a CommonJS shim to the import if any CJS packages are detected. Setting to `false` will omit both the shim and these packages from the import map.                                                                                                            |
+| Terse import map     | `terse`         | `--terse`   | -              | `false`            | Terser import map injection script (compact JSON, no error checks, reduced whitespace). Enabled by default in `prod` mode.                                                                                                                                                   |
 | Alias                | `alias`         | `--alias`   | -              | -                  | Create unversioned symlinks in `client_modules` pointing to versioned directories. Useful for stable URLs to package assets (CSS, images, etc.). See [Aliases](#aliases) below.                                                                                              |
 
 ### Restricting which files are deployed from dependencies
@@ -243,10 +244,10 @@ When an alias is removed from the config (or its package is uninstalled), the sy
 
 Modes let you switch between sets of option defaults with a single flag. Two modes are built in:
 
-| Mode   | Defaults                        |
-| ------ | ------------------------------- |
-| `dev`  | `symlink: true`                 |
-| `prod` | `symlink: false`, `prune: true` |
+| Mode   | Defaults                                       |
+| ------ | ---------------------------------------------- |
+| `dev`  | `symlink: true`                                |
+| `prod` | `symlink: false`, `prune: true`, `terse: true` |
 
 Use a mode from the CLI:
 

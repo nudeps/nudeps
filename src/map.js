@@ -183,18 +183,48 @@ export class ImportMap {
 	 * When false (default), uses `document.currentScript`.
 	 * @param {object} options
 	 * @param {boolean} [options.module=false] - Whether the script will be loaded as a module.
+	 * @param {boolean} [options.terse=false] - Whether to lightly minify the output.
 	 */
-	toJS ({ module = false } = {}) {
-		let injectMap = readFileSync(path.join(__dirname, "inject-map.js"), "utf8");
+	toJS ({ module = false, terse = false } = {}) {
+		let indent = terse ? "" : "\t";
+		let lf = terse ? "" : "\n";
+		let vars = {};
+		vars.cS = "document.currentScript";
+		vars.mapUrl = module ? "import.meta.url" : "cS?.src";
+		vars.map = JSON.stringify(this.map, null, indent);
 
-		let mapUrl = module ? "import.meta.url" : "document.currentScript?.src";
+		let errors = "";
 
-		return `(()=>{
-let map = ${JSON.stringify(this.map, null, "\t")};
-let mapUrl = ${mapUrl};
-${injectMap}
-})();
-`;
+		if (!terse) {
+			errors = /* js */ `
+		if (!mapUrl && !cS) {
+			throw new Error('nudeps: Import map script appears to be loaded as a module. Set module: true in nudeps config, or remove type="module" from the script tag.');
+		}`;
+			if (!module) {
+				errors += /* js */ `
+		if (document.querySelector("script[type=module]")) {
+			console.warn("nudeps: " + cS.getAttribute("src") + " is included after module scripts, which is not supported in all browsers.");
+		}`;
+			}
+		}
+
+		let declarations = Object.entries(vars)
+			.map(([key, value]) => `let ${key} = ${value};`)
+			.join(lf);
+
+		let ret = /* js */ `
+		${errors}
+		const rebase = m => { for (let k in m) m[k] = new URL(m[k], mapUrl).href; return m; };
+		rebase(map.imports);
+		for (let scope in map.scopes) rebase(map.scopes[scope]);
+		let script = Object.assign(document.createElement("script"), { type: "importmap", textContent: JSON.stringify(map) });
+		if (cS) cS.after(script);
+		else (document.head ?? document.documentElement).append(script);`;
+
+		ret = ret.replace(terse ? /^\t+/gm : /^\t{2}/gm, "").trim();
+		ret = declarations + lf + ret;
+		ret = ["(()=>{", ret, "})();"].join(lf);
+		return ret;
 	}
 }
 

@@ -4,5 +4,5 @@
  */
 export default {
 	dev: { symlink: true },
-	prod: { symlink: false, prune: true },
+	prod: { symlink: false, prune: true, terse: true },
 };

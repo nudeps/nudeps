@@ -13,6 +13,9 @@ export default {
 		flag: "o",
 		default: "importmap.js",
 	},
+	terse: {
+		default: false,
+	},
 	exclude: {
 		flag: "e",
 		parse: v => v.split(","),

@@ -182,7 +182,7 @@ export default async function (options) {
 
 	// Detect whether the map actually changed (used to skip propagation on no-ops,
 	// which also naturally breaks cycles between mutually-local deps).
-	let mapContent = map.toJS({ module: config.module });
+	let mapContent = map.toJS({ module: config.module, terse: config.terse });
 	let existingMap = existsSync(config.map) ? readFileSync(config.map, "utf8") : null;
 	let mapChanged = mapContent !== existingMap;
 
@@ -190,7 +190,6 @@ export default async function (options) {
 		mkdirSync(path.dirname(config.map), { recursive: true });
 		writeFileSync(config.map, mapContent);
 	}
-
 
 	writeJSONSync(".nudeps/config.json", config);
 
