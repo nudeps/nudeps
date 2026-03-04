@@ -34,7 +34,7 @@
 		"test": "npx htest ./test/index.js"
 	},
 	"devDependencies": {
-		"htest.dev": "^0.0.21",
+		"htest.dev": "^0.0.22",
 		"prettier": "~3.5.3",
 		"prettier-plugin-brace-style": "latest",
 		"prettier-plugin-merge": "latest",
