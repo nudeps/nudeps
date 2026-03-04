@@ -45,11 +45,14 @@ export default class Nudeps {
 	}
 
 	get pkgLock () {
-		if (!existsSync("node_modules") && existsSync("package.json")) {
-			throw new Error("node_modules not found. Run `npm install` first.");
+		let data =
+			readJSONSync("package-lock.json", { optional: true }) ??
+			readJSONSync("node_modules/.package-lock.json", { optional: true });
+
+		if (!data) {
+			throw new Error("No lockfile found. Run `npm install` first.");
 		}
 
-		let data = readJSONSync("node_modules/.package-lock.json");
 		let value = new PackageLock(data);
 		Object.defineProperty(this, "pkgLock", { value, configurable: true });
 		return value;
@@ -85,28 +88,25 @@ export default class Nudeps {
 	 */
 	childLock (resolvedPath) {
 		if (!(resolvedPath in this.#childLocks)) {
-			let nmDir = `${resolvedPath}/node_modules`;
+			let data =
+				readJSONSync(`${resolvedPath}/package-lock.json`, { optional: true }) ??
+				readJSONSync(`${resolvedPath}/node_modules/.package-lock.json`, { optional: true });
 
-			if (!existsSync(nmDir) && existsSync(`${resolvedPath}/package.json`)) {
-				this.info(`Warning: node_modules not found at ${resolvedPath}. Run \`npm install\` there first.`);
+			if (!data) {
+				this.info(
+					`Warning: No lockfile found at ${resolvedPath}. Run \`npm install\` there first.`,
+				);
 				this.#childLocks[resolvedPath] = null;
 			}
 			else {
-				let data = readJSONSync(`${nmDir}/.package-lock.json`, { optional: true });
-				if (data) {
-					this.#childLocks[resolvedPath] = new PackageLock(data);
-				}
-				else {
-					this.info(`Warning: No lockfile found at ${resolvedPath}`);
-					this.#childLocks[resolvedPath] = null;
-				}
+				this.#childLocks[resolvedPath] = new PackageLock(data);
 			}
 		}
 		return this.#childLocks[resolvedPath];
 	}
 
 	get packages () {
-		return this.pkgLock?.packages ?? {};
+		return this.pkgLock.packages;
 	}
 
 	get dir () {
