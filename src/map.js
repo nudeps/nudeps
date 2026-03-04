@@ -6,6 +6,7 @@ import { readFileSync, globSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
+import { deepAssign } from "./util.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export class ImportMapGenerator extends Generator {
@@ -226,30 +227,6 @@ export class ImportMap {
 		ret = ["(()=>{", ret, "})();"].join(lf);
 		return ret;
 	}
-}
-
-function deepAssign (target, source) {
-	if (!target) {
-		target = {};
-	}
-	for (let key in source) {
-		if (!target[key]) {
-			target[key] = {};
-		}
-
-		if (typeof source[key] === "object" && source[key] !== null) {
-			target[key] = deepAssign(target[key], source[key]);
-		}
-		else {
-			target[key] = source[key];
-		}
-
-		if (target[key] === undefined) {
-			delete target[key];
-		}
-	}
-
-	return target;
 }
 
 let nodeBuiltins = null;
