@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/nudeps/nudeps">
-    <img width="200" height="200" src="logo.svg">
+    <img width="200" height="200" src="https://nudeps.dev/logo.svg">
   </a>
 
 # Nudeps
