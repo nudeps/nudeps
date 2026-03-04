@@ -1,0 +1,85 @@
+/**
+ * Applies JSPM community overrides to package configs.
+ * These fix broken/incomplete package.json metadata (exports, main, etc.)
+ * that the jspm.io CDN normally applies server-side.
+ *
+ * @see https://github.com/jspm/overrides
+ */
+
+/** The raw overrides data, keyed by package name then version key. */
+import overrides from "@jspm/overrides" with { type: "json" };
+export { overrides };
+
+/**
+ * Find the best matching override for a given package name and version.
+ * Override keys like "3" or "16.8.0" mean "same major, >= this version".
+ * Among multiple matches, the most specific (most segments) wins.
+ * @param {string} name - Package name (e.g. "vue")
+ * @param {string} version - Installed version (e.g. "3.5.26")
+ * @returns {object|null} The override object to merge, or null
+ */
+export function findOverride (name, version) {
+	let pkgOverrides = overrides[name];
+	if (!pkgOverrides) {
+		return null;
+	}
+
+	let installed = parseVersion(version);
+	if (!installed) {
+		return null;
+	}
+
+	// Find all matching keys, pick the most specific (most segments)
+	let bestKey = Object.keys(pkgOverrides)
+		.map(key => ({ key, segments: parseVersion(key) }))
+		.filter(
+			({ segments: s }) => s && s[0] === installed[0] && s.every((v, i) => installed[i] >= v),
+		)
+		.sort((a, b) => b.segments.length - a.segments.length)[0]?.key;
+
+	return bestKey ? pkgOverrides[bestKey] : null;
+}
+
+/**
+ * Parse a version string into an array of numeric segments.
+ * @param {string} version - e.g. "3", "3.5", "3.5.26"
+ * @returns {number[] | null}
+ */
+function parseVersion (version) {
+	if (!version) {
+		return null;
+	}
+
+	let parts = version.split(".").map(s => parseInt(s));
+
+	let end = parts.findIndex(isNaN);
+	if (end !== -1) {
+		parts = parts.slice(0, end);
+	}
+
+	return parts.length ? parts : null;
+}
+
+/**
+ * Monkey-patch the generator's provider manager to apply JSPM overrides
+ * after reading package config from disk, but before caching.
+ * This is the client-side equivalent of what jspm.io CDN does server-side.
+ * @param {import("@jspm/generator").Generator} generator
+ */
+export function patchGenerator (generator) {
+	let pm = generator.traceMap.resolver.pm;
+	let original = pm.getPackageConfig.bind(pm);
+
+	pm.getPackageConfig = async function (pkgUrl) {
+		let pcfg = await original(pkgUrl);
+
+		if (pcfg?.name) {
+			let override = findOverride(pcfg.name, pcfg.version);
+			if (override) {
+				Object.assign(pcfg, override);
+			}
+		}
+
+		return pcfg;
+	};
+}
