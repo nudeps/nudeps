@@ -17,7 +17,7 @@ export default {
 				},
 				{
 					arg: "prod",
-					expect: { symlink: false, prune: true },
+					expect: { symlink: false, prune: true, terse: true },
 				},
 			],
 		},
@@ -32,7 +32,7 @@ export default {
 			tests: [
 				{
 					arg: "staging",
-					expect: { symlink: false, prune: false },
+					expect: { symlink: false, prune: false, terse: true },
 				},
 			],
 		},
@@ -47,7 +47,7 @@ export default {
 			tests: [
 				{
 					arg: "prod",
-					expect: { symlink: false, prune: false },
+					expect: { symlink: false, prune: false, terse: true },
 				},
 			],
 		},
