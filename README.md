@@ -415,12 +415,10 @@ Before investigating further:
 ### Package assumes a bundler is being used
 
 Some packages don't just use specifiers — they actively assume that if they can use specifiers, it _must_ mean that a bundler is being used and that the environment is NodeJS or similar.
-For example, as of this writing, using `vue` out of the box will fail with an error about `process` not being available.
+For popular packages, we use [JSPM’s override registry](https://github.com/jspm/overrides) but for less well-known packages, you may need to use a custom override through the `overrides` option.
 
-There are two ways to fix this:
-
-- Use the package's browser bundle through the `overrides` option. This is usually not advisable because it inlines dependencies that other packages may be using too, but sometimes it's the best way forwards. You can see an example of this in the [Vue demo](https://github.com/nudeps/nudeps-demos/tree/main/vue).
-- Stub NodeJS objects like `process`. This can work if the surface area is limited, but it can quickly turn into a game of whack-a-mole. Additionally, it can cause bugs in other packages that depend on the presence of these objects to _detect_ NodeJS.
+Another option is to stub NodeJS objects like `process`.
+This can work if the surface area is limited, but it can quickly turn into a game of whack-a-mole. Additionally, it can cause bugs in other packages that depend on the presence of these objects to _detect_ NodeJS.
 
 ### Packages that use extension-less paths
 
