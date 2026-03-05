@@ -43,7 +43,7 @@
 	},
 	"dependencies": {
 		"@jspm/generator": "^2.11.0",
-		"@jspm/overrides": "github:nudeps/jspm-overrides",
+		"@jspm/overrides": "github:nudeps/overrides",
 		"cjs-browser-shim": "latest",
 		"minimist": "^1.2.8"
 	}
