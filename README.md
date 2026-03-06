@@ -69,7 +69,7 @@ Features:
 
 - ✅ **No transpilation or bundling needed** for either your code or your dependencies (already transpiling? No problem!)
 - ✅ **Granular cache busting**: When a module is updated, it is automatically updated in the browser cache, and that does not affect any other modules
-- ✅ **Local-first workflow**, no external requests, no CDN required
+- ✅ **Local-first workflow**, no external requests, no CDN required, no additional points of failure
 - ✅ **Automatically updated when dependencies change** No need to start anything before you can edit files — everything just works.
 - ✅ **No additional client-side code** to run (unless you have CJS packages [^1])
 - ✅ **Nice URLs for non-JS resources** (CSS, images, icons, etc.) — because the Web is not just JS
