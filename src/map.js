@@ -2,13 +2,9 @@
  * Utils for generating and manipulating import maps
  */
 import { Generator } from "@jspm/generator";
-import { readFileSync, globSync } from "node:fs";
 import { builtinModules } from "node:module";
-import { fileURLToPath } from "node:url";
-import * as path from "node:path";
 import { deepAssign } from "./util.js";
 import { findOverride } from "./util/jspm-overrides.js";
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export class ImportMapGenerator extends Generator {
 	constructor ({ mode, ...generatorOptions } = {}) {
