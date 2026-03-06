@@ -7,6 +7,7 @@ import nudeps from "./index.js";
 function addHook (pkg, hook, command) {
 	for (let name of [hook, "pre" + hook, "post" + hook]) {
 		if (pkg.scripts[name]?.includes(command)) {
+			// Already there
 			return;
 		}
 		if (!pkg.scripts[name]) {
