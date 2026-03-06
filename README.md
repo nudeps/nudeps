@@ -156,7 +156,7 @@ Some command line options also allow for a shorthand one letter syntax (e.g. `-d
 | Module               | `module`        | `--module`  | -              | `false`            | Set to `true` if the import map script will be loaded as `<script type="module">`. Please note that **this will reduce browser support**, as certain browsers do not support injecting import maps after any module has started loading.                                     |
 | CommonJS             | `cjs`           | `--cjs`     | -              | `true`             | Whether to add a CommonJS shim to the import if any CJS packages are detected. Setting to `false` will omit both the shim and these packages from the import map.                                                                                                            |
 | Terse import map     | `terse`         | `--terse`   | -              | `false`            | Terser import map injection script (compact JSON, no error checks, reduced whitespace). Enabled by default in `prod` mode.                                                                                                                                                   |
-| Alias                | `alias`         | `--alias`   | -              | -                  | Create unversioned symlinks in `client_modules` pointing to versioned directories. Useful for stable URLs to package assets (CSS, images, etc.). See [Aliases](#aliases) below.                                                                                              |
+| Alias                | `alias`         | `--alias`   | -              | `true`             | Create unversioned symlinks in `client_modules` pointing to versioned directories. Useful for stable URLs to package assets (CSS, images, etc.). See [Aliases](#aliases) below.                                                                                              |
 
 ### Restricting which files are deployed from dependencies
 
@@ -201,7 +201,22 @@ client_modules/open-props → client_modules/open-props@2.0.4
 
 This lets you use stable paths like `client_modules/open-props/open-props.min.css` in your HTML and CSS.
 
+By default, `alias` is `true`, which creates an unversioned symlink for every package using its install name.
+Set `alias: false` to opt out entirely.
+
 The `alias` option supports several forms:
+
+**`true`** (default) — alias every package to its install name:
+
+```js
+alias: true;
+```
+
+**`false`** — disable aliases:
+
+```js
+alias: false;
+```
 
 **String** — alias a single package by name:
 

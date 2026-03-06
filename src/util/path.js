@@ -165,6 +165,10 @@ export default class ModulePath {
 			return [];
 		}
 
+		if (alias === true) {
+			return this.isNested ? [] : [this.installName];
+		}
+
 		if (Array.isArray(alias)) {
 			return alias.flatMap(item => this.#getAliases(item));
 		}

@@ -82,5 +82,7 @@ export default {
 	preserveSymlinks: {
 		default: false,
 	},
-	alias: {},
+	alias: {
+		default: true,
+	},
 };
