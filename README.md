@@ -54,14 +54,15 @@ For background, see these blog posts:
 6. [Local dependencies (via `npm install ../other-repo`)](#local-dependencies-via-npm-install-other-repo)
 	1. [Registration](#registration)
 	2. [Propagation](#propagation)
-7. [FAQ](#faq)
+7. [Programmatic API](#programmatic-api)
+8. [FAQ](#faq)
 	1. [Which browsers are supported?](#which-browsers-are-supported)
 	2. [Does this support pnpm/bun/yarn/etc.?](#does-this-support-pnpmbunyarnetc)
 	3. [Why does it add the version number to the directory name?](#why-does-it-add-the-version-number-to-the-directory-name)
 	4. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
 	5. [Why doesn't Nudeps have an option to add integrity hashes to the import map?](#why-doesnt-nudeps-have-an-option-to-add-integrity-hashes-to-the-import-map)
 	6. [How are CJS (CommonJS) packages handled?](#how-are-cjs-commonjs-packages-handled)
-8. [Troubleshooting](#troubleshooting)
+9. [Troubleshooting](#troubleshooting)
 	1. [Getting an error about a specifier failing to resolve](#getting-an-error-about-a-specifier-failing-to-resolve)
 	2. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
 	3. [Packages that use extension-less paths](#packages-that-use-extension-less-paths)
@@ -351,6 +352,15 @@ When nudeps detects that the generated import map has actually changed (content 
 This ensures that when package B's dependencies change, any repo A that depends on B locally gets its import map updated automatically.
 
 Circular local dependencies (A depends on B and B depends on A) are handled naturally: propagation only triggers when the map content changes, so cycles terminate once the maps converge.
+
+## Programmatic API
+
+You can use the programmatic API to call nudeps from another script:
+
+```js
+import nudeps from "nudeps";
+await nudeps({ prune: true });
+```
 
 ## FAQ
 
