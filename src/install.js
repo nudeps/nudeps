@@ -30,6 +30,7 @@ export default async function () {
 
 		// Re-read package.json
 		pkg = readJSONSync("package.json");
+		pkg.type ??= "module";
 	}
 
 	let command = "npx nudeps";
