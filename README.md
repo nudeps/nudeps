@@ -37,31 +37,31 @@ For background, see these blog posts:
 
 - [Web dependencies are broken. Can we fix them?](https://lea.verou.me/blog/2026/web-deps/).
 - [External import maps, today!](https://lea.verou.me/blog/2026/external-import-maps-today/)
-- [Introducing Nudeps: Let your dependencies go nude!](https://lea.verou.me/blog/2026/nudeps/)
+- [Introducing Nudeps: Web dependencies, naked!](https://lea.verou.me/blog/2026/nudeps/) (TBD)
 
 ## Contents
 
 1. [Installation \& Usage](#installation--usage)
 2. [How does it work?](#how-does-it-work)
-	1. [Do I need nudeps or JSPM?](#do-i-need-nudeps-or-jspm)
-3. [Limitations](#limitations)
-4. [Config options](#config-options)
+3. [Do I need nudeps or JSPM?](#do-i-need-nudeps-or-jspm)
+4. [Limitations](#limitations)
+5. [Config options](#config-options)
 	1. [Restricting which files are deployed from dependencies](#restricting-which-files-are-deployed-from-dependencies)
 	2. [Importing non-JS resources: Unversioned aliases](#importing-non-js-resources-unversioned-aliases)
 	3. [Modes](#modes)
 	4. [Pruning (`nudeps --prune`)](#pruning-nudeps---prune)
 	5. [Force initialization (`nudeps --init`)](#force-initialization-nudeps---init)
-5. [Local dependencies (via `npm install ../other-repo`)](#local-dependencies-via-npm-install-other-repo)
+6. [Local dependencies (via `npm install ../other-repo`)](#local-dependencies-via-npm-install-other-repo)
 	1. [Registration](#registration)
 	2. [Propagation](#propagation)
-6. [FAQ](#faq)
+7. [FAQ](#faq)
 	1. [Which browsers are supported?](#which-browsers-are-supported)
 	2. [Does this support pnpm/bun/yarn/etc.?](#does-this-support-pnpmbunyarnetc)
 	3. [Why does it add the version number to the directory name?](#why-does-it-add-the-version-number-to-the-directory-name)
 	4. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
 	5. [Why doesn't Nudeps have an option to add integrity hashes to the import map?](#why-doesnt-nudeps-have-an-option-to-add-integrity-hashes-to-the-import-map)
 	6. [How are CJS (CommonJS) packages handled?](#how-are-cjs-commonjs-packages-handled)
-7. [Troubleshooting](#troubleshooting)
+8. [Troubleshooting](#troubleshooting)
 	1. [Getting an error about a specifier failing to resolve](#getting-an-error-about-a-specifier-failing-to-resolve)
 	2. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
 	3. [Packages that use extension-less paths](#packages-that-use-extension-less-paths)
@@ -106,12 +106,16 @@ For example, `lit` may be mapped to `"./client_modules/lit@3.3.2/index.js"`.
 It then optimistically adds your direct dependencies to your import map, so that you can use them straight away.
 In production (or if you use the `prune` option), it will subset the import map to only include the dependencies you actually use.
 
-### Do I need nudeps or JSPM?
+## Do I need nudeps or JSPM?
 
 [JSPM](https://jspm.org/) paved the way in managing import maps that let you use specifiers in the browser.
-Nudeps is actually implemented as an opinionated wrapper over the excellent [JSPM Generator](https://jspm.org/docs/generator/), which handles a lot of the heavy lifting around tracing and import map generation.
+Nudeps actually uses the excellent [JSPM Generator](https://jspm.org/docs/generator/) under the hood, which handles a lot of the heavy lifting around tracing and import map generation.
 
-Its main value-add is letting you host your own dependencies locally instead of relying on a CDN (or — worse — having to deploy your entire `node_modules` directory!), and not requiring a watcher.
+The main value-add of nudeps over JSPM is:
+
+- Letting you **host your own dependencies** instead of relying on a CDN, selectively and with the same cache busting behavior as a CDN.
+- Because it takes a different approach to handling which dependencies are installed, which makes it **not require a watcher** — it just runs during a certain npm hook and that's it.
+
 If you’re ok with using a CDN for your dependencies and don’t mind running a build process whenever you work on code, JSPM is a great choice.
 
 Here is a handy table to compare the two:
@@ -132,7 +136,7 @@ Here is a handy table to compare the two:
 
 ## Limitations
 
-- Specifiers will not work in web workers ([#19](https://github.com/nudeps/nudeps/issues/19)). This is a platform limitation.
+- Specifiers will not work in web workers ([#19](https://github.com/nudeps/nudeps/issues/19)). This is a platform limitation, and is not specific to nudeps.
 
 ## Config options
 
