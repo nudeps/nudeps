@@ -197,6 +197,14 @@ export default async function (options) {
 		writeFileSync(config.map, mapContent);
 	}
 
+	// Persist external alias paths so they can be cleaned up on next run
+	if (nudeps.externalAliases?.size > 0) {
+		writeJSONSync(".nudeps/external-aliases.json", [...nudeps.externalAliases]);
+	}
+	else if (existsSync(".nudeps/external-aliases.json")) {
+		rmSync(".nudeps/external-aliases.json");
+	}
+
 	writeJSONSync(".nudeps/config.json", config);
 
 	let info = [];

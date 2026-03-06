@@ -32,6 +32,16 @@ export default class Nudeps {
 		let { dirs, symlinks } = config.init ? { dirs: [], symlinks: [] } : getTopLevelModules(config.dir);
 		this.existingDirs = new Set(dirs.map(d => config.dir + "/" + d));
 		this.existingSymlinks = new Set(symlinks.map(d => config.dir + "/" + d));
+
+		// Load previously-written external aliases so they enter the deletion queue.
+		// They go in both sets because aliases are always symlinks,
+		// and existingDirs tracks all entries while existingSymlinks marks which are symlinks.
+		let savedExternal = config.init ? [] : (readJSONSync(".nudeps/external-aliases.json", { optional: true }) ?? []);
+		for (let p of savedExternal) {
+			this.existingDirs.add(p);
+			this.existingSymlinks.add(p);
+		}
+
 		this.toDelete = new Set(this.existingDirs);
 		this.hasIgnoreExceptions = this.config.ignore.some(p => p.include);
 		this.hasDeepGlobs = this.config.ignore.some(p => (p.include ?? p.exclude)?.includes("/"));
@@ -184,6 +194,8 @@ export default class Nudeps {
 
 	copyPackages () {
 		let { config, existingDirs, existingSymlinks, toCopy, toDelete, toDeleteIfEmpty, stats } = this;
+		this.externalAliases = new Set();
+		let resolvedDir = path.resolve(config.dir);
 
 		// Copy (or symlink) package directories
 		for (let from in toCopy) {
@@ -237,12 +249,17 @@ export default class Nudeps {
 			// Create alias symlinks (unversioned paths pointing to versioned directories)
 			if (config.alias) {
 				for (let alias of mp.aliases) {
-					let aliasPath = config.dir + "/" + alias;
+					let aliasPath = path.normalize(config.dir + "/" + alias);
 					let relTarget = path.relative(path.dirname(aliasPath), to);
 					let exists = existingDirs.has(aliasPath);
 
 					if (exists) {
 						toDelete.delete(aliasPath);
+					}
+
+					// Track aliases that resolve outside config.dir
+					if (!path.resolve(aliasPath).startsWith(resolvedDir + path.sep)) {
+						this.externalAliases.add(aliasPath);
 					}
 
 					if (ensureSymlink(relTarget, aliasPath, "dir", { force: exists, skipIfCorrect: exists })) {
