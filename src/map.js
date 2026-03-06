@@ -7,6 +7,7 @@ import { builtinModules } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
 import { deepAssign } from "./util.js";
+import { findOverride } from "./util/jspm-overrides.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export class ImportMapGenerator extends Generator {
@@ -29,6 +30,20 @@ export class ImportMapGenerator extends Generator {
 		});
 
 		this.commonJS = commonJS;
+
+		// Apply JSPM community overrides (client-side equivalent of what jspm.io CDN does server-side)
+		let pm = this.provider;
+		let originalGetPackageConfig = pm.getPackageConfig.bind(pm);
+		pm.getPackageConfig = async function (pkgUrl) {
+			let pcfg = await originalGetPackageConfig(pkgUrl);
+			if (pcfg?.name) {
+				let override = findOverride(pcfg.name, pcfg.version);
+				if (override) {
+					Object.assign(pcfg, override);
+				}
+			}
+			return pcfg;
+		};
 	}
 
 	get provider () {

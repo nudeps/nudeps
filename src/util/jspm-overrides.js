@@ -59,27 +59,3 @@ function parseVersion (version) {
 
 	return parts.length ? parts : null;
 }
-
-/**
- * Monkey-patch the generator's provider manager to apply JSPM overrides
- * after reading package config from disk, but before caching.
- * This is the client-side equivalent of what jspm.io CDN does server-side.
- * @param {import("@jspm/generator").Generator} generator
- */
-export function patchGenerator (generator) {
-	let pm = generator.traceMap.resolver.pm;
-	let original = pm.getPackageConfig.bind(pm);
-
-	pm.getPackageConfig = async function (pkgUrl) {
-		let pcfg = await original(pkgUrl);
-
-		if (pcfg?.name) {
-			let override = findOverride(pcfg.name, pcfg.version);
-			if (override) {
-				Object.assign(pcfg, override);
-			}
-		}
-
-		return pcfg;
-	};
-}

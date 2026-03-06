@@ -6,7 +6,6 @@ import { readJSONSync } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import ModulePath from "./util/path.js";
 import { matchesGlob, ensureSymlink } from "./util/fs.js";
-import { patchGenerator } from "./util/jspm-overrides.js";
 
 import { getTopLevelModules } from "./util.js";
 import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
@@ -59,7 +58,6 @@ export default class Nudeps {
 		let generatorOptions = { commonJS: this.config.cjs };
 
 		let value = new ImportMapGenerator(generatorOptions);
-		patchGenerator(value);
 		Object.defineProperty(this, "generator", { value, configurable: true });
 		return value;
 	}
