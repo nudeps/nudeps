@@ -1,13 +1,13 @@
-<div align="center">
+<header align="center">
   <a href="https://github.com/nudeps/nudeps">
     <img width="200" height="200" src="https://nudeps.dev/logo.svg">
   </a>
 
-# Nudeps
-
-</div>
+<h1><img src="https://nudeps.dev/wordmark.svg" alt="nudeps" width="250"></h1>
 
 Your dependencies, naked.
+
+</header>
 
 This package introduces lightweight tooling as an alternative to bundlers.
 It lets you use `npm install` as you normally would, and import dependencies via plain specifiers (e.g. `import foo from "foo"`) in the browser without a bundler or build step.
