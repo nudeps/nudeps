@@ -29,9 +29,9 @@ export class ImportMapGenerator extends Generator {
 
 		// Apply JSPM community overrides (client-side equivalent of what jspm.io CDN does server-side)
 		let pm = this.provider;
-		let originalGetPackageConfig = pm.getPackageConfig.bind(pm);
+		pm._getPackageConfig = pm.getPackageConfig;
 		pm.getPackageConfig = async function (pkgUrl) {
-			let pcfg = await originalGetPackageConfig(pkgUrl);
+			let pcfg = await pm._getPackageConfig(pkgUrl);
 			if (pcfg?.name) {
 				let override = findOverride(pcfg.name, pcfg.version);
 				if (override) {
