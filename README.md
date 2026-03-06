@@ -47,10 +47,10 @@ my-app/
 </html>
 ```
 
-Install Nudeps:
+Install Nudeps and add the necessary NPM hooks to your `package.json` by running:
 
 ```bash
-npm install nudeps -D && npx nudeps install
+npx nudeps install
 ```
 
 Then you can install dependencies and they would Just Work™, starting with VueJS:
@@ -126,7 +126,6 @@ For background, see these blog posts:
 To install Nudeps on a project and initialize it, run:
 
 ```bash
-npm install nudeps -D
 npx nudeps install
 ```
 

@@ -1,10 +1,12 @@
 import { readJSONSync, writeJSONSync } from "./util.js";
-import nudeps from "./index.js";
+import { execSync } from "node:child_process";
 
 /**
  * Add a command to an npm lifecycle hook, falling back to pre/post variants if the hook is already taken.
  */
 function addHook (pkg, hook, command) {
+	pkg.scripts ??= {};
+
 	for (let name of [hook, "pre" + hook, "post" + hook]) {
 		if (pkg.scripts[name]?.includes(command)) {
 			// Already there
@@ -20,12 +22,15 @@ function addHook (pkg, hook, command) {
 export default async function () {
 	let pkg = readJSONSync("package.json", { optional: true });
 
-	if (!pkg) {
-		console.info("package.json not found, creating stub...");
-		pkg = { name: process.cwd().split("/").pop() };
-	}
+	// Install nudeps as a devDependency if not already present
+	if (!pkg?.devDependencies?.nudeps && !pkg?.dependencies?.nudeps) {
+		let command = "npm install nudeps -D";
+		console.info("Nudeps not found, installing via", command, "...");
+		execSync(command, { stdio: "inherit" });
 
-	pkg.scripts ??= {};
+		// Re-read package.json
+		pkg = readJSONSync("package.json");
+	}
 
 	let command = "npx nudeps";
 	addHook(pkg, "dependencies", command);
