@@ -224,7 +224,13 @@ export default async function (options) {
 	nudeps.info(...info);
 
 	// Register this repo as a dependent of each local dep, so they can propagate changes back.
+	// Only process production dependencies — devDependencies are not installed by nudeps.
+	let prodDeps = new Set(Object.keys(nudeps.pkg.dependencies ?? {}));
 	for (let [lockKey, resolvedPath] of Object.entries(nudeps.pkgLock.external)) {
+		let depName = lockKey.replace(/^node_modules\//, "");
+		if (!prodDeps.has(depName)) {
+			continue;
+		}
 		if (!existsSync(resolvedPath)) {
 			continue;
 		}
