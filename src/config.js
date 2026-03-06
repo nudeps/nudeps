@@ -4,47 +4,8 @@
 
 import { importCwdRelative } from "./util.js";
 import { existsSync } from "node:fs";
-import minimist from "minimist";
 import availableOptions from "./options.js";
 import builtInModes from "./modes.js";
-
-function readArgs (argv = process.argv.slice(2)) {
-	let args = minimist(argv);
-	let ret = {};
-
-	for (let key in availableOptions) {
-		let option = availableOptions[key];
-		if (option.cli === false) {
-			continue;
-		}
-
-		if (key in args) {
-			ret[key] = args[key];
-		}
-		else if (option.flag in args) {
-			ret[key] = args[option.flag];
-		}
-		else {
-			continue;
-		}
-
-		if (typeof ret[key] === "string" && option.parse) {
-			ret[key] = option.parse(ret[key]);
-		}
-		else if (
-			typeof option.default === "boolean" &&
-			(ret[key] === "true" || ret[key] === "false")
-		) {
-			ret[key] = ret[key] === "true";
-		}
-
-		if (option.validate && !option.validate(ret[key])) {
-			delete ret[key];
-		}
-	}
-
-	return ret;
-}
 
 function readExternalConfig (args) {
 	let configPath = args.config || "nudeps.js";
@@ -106,8 +67,8 @@ export function resolveDefaults (name, allModes, { baseModes = builtInModes, see
  * Get the resolved config regardless of where settings come from
  * @returns
  */
-export async function getConfig () {
-	let args = readArgs();
+export async function getConfig (overrides = {}) {
+	let args = overrides;
 
 	let config = readExternalConfig(args) ?? {};
 

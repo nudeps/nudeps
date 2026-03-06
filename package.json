@@ -24,7 +24,7 @@
 		".": "./src/index.js"
 	},
 	"bin": {
-		"nudeps": "src/cli.js"
+		"nudeps": "src/cli/index.js"
 	},
 	"files": [
 		"src"

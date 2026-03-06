@@ -10,7 +10,7 @@ import { execSync } from "node:child_process";
 import Nudeps from "./nudeps.js";
 
 export default async function (options) {
-	let config = Object.assign(await getConfig(), options);
+	let config = await getConfig(options);
 	let nudeps = new Nudeps({ config });
 	let oldConfig = nudeps.oldConfig;
 
