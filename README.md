@@ -5,26 +5,80 @@
 
 <h1><img src="https://nudeps.dev/wordmark.svg" alt="nudeps" width="250"></h1>
 
-Your dependencies, naked.
+**Web dependencies, _naked_.**
 
 </div>
 
-This package introduces lightweight tooling as an alternative to bundlers.
-It lets you use `npm install` as you normally would, and import dependencies via plain specifiers (e.g. `import foo from "foo"`) in the browser without a bundler or build step.
-Yes, you read that right.
+Nudeps is a new, **ultra-lightweight end-to-end dependency management system**, intended to make **bundler-free, local-first** workflows not just _possible_, but actually _pleasant_.
 
-- ✅ **No transpilation or bundling needed** for either your code or your dependencies (but if you already transpile, it works fine!)
-- ✅ **Granular cache busting**, only when modules change version
+It lets you use `npm install`/`npm uninstall` to manage client-side dependencies, and then use them via plain specifiers in your code (e.g. `import foo from "foo"`) without a bundler or build step.
+
+It works by copying a subset of your dependencies to a local directory and generating an [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script/type/importmap) that maps specifiers to these local paths.
+Then, the import map is automatically updated whenever dependencies change, through NPM hooks.
+
+<details>
+<summary><strong>Example usage scenario: VueJS app</strong></summary>
+
+Suppose you want to use e.g. [VueJS](https://vuejs.org/) for a simple web app.
+
+You could start by creating a new directory for your app with the following files:
+
+```
+my-app/
+├── index.html
+└── index.js
+```
+
+`index.html` might be something like this:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>My App</title>
+	<script src="importmap.js"></script>
+	<script type="module" src="index.js"></script>
+</head>
+<body>
+	<h1>My App</h1>
+</body>
+</html>
+```
+
+Install Nudeps:
+
+```bash
+npm install nudeps -D && npx nudeps install
+```
+
+Then you can install dependencies and they would Just Work™, starting with VueJS:
+
+```bash
+npm install vue
+```
+
+Now you can write `import { createApp } from "vue"` in your `index.js` file and it just works!
+
+You can keep installing and uninstalling dependencies as needed, and use them immediately in your code — the import map will be updated automatically and you don’t have to lift a finger!
+
+</details>
+
+Features:
+
+- ✅ **No transpilation or bundling needed** for either your code or your dependencies (already transpiling? No problem!)
+- ✅ **Granular cache busting**: When a module is updated, it is automatically updated in the browser cache, and that does not affect any other modules
 - ✅ **Local-first workflow**, no external requests, no CDN required
-- ✅ **No watchers!** No per-change bottleneck, nothing to remember to run before working on code
-- ✅ **No additional client-side code** you need to run [^1]
+- ✅ **Automatically updated when dependencies change** No need to start anything before you can edit files — everything just works.
+- ✅ **No additional client-side code** to run (unless you have CJS packages [^1])
 - ✅ **Nice URLs for non-JS resources** (CSS, images, icons, etc.) — because the Web is not just JS
 
 Even edge cases work:
 
 - ✅ Dynamic `import()`
 - ✅ `import.meta.resolve()`
-- ✅ CJS packages(experimental)
+- ✅ CJS packages (experimental)
 - ✅ Local packages (`npm install ../foo`)
 - ✅ Git dependencies (`npm install git+https://github.com/foo/bar.git`)
 - ✅ npm aliases (`npm install vue2@npm:vue@2`)
@@ -37,7 +91,7 @@ For background, see these blog posts:
 
 - [Web dependencies are broken. Can we fix them?](https://lea.verou.me/blog/2026/web-deps/).
 - [External import maps, today!](https://lea.verou.me/blog/2026/external-import-maps-today/)
-- [Introducing Nudeps: Web dependencies, naked!](https://lea.verou.me/blog/2026/nudeps/) (TBD)
+- [Introducing Nudeps: Web dependencies, naked!](https://lea.verou.me/blog/2026/nudeps/) (upcoming)
 
 ## Contents
 
