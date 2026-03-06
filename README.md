@@ -169,25 +169,24 @@ Nudeps actually uses the excellent [JSPM Generator](https://jspm.org/docs/genera
 The main value-add of nudeps over JSPM is:
 
 - Letting you **host your own dependencies** instead of relying on a CDN, selectively and with the same cache busting behavior as a CDN.
-- Because it takes a different approach to handling which dependencies are installed, which makes it **not require a watcher** — it just runs during a certain npm hook and that's it.
+- Because it takes a different approach to handling which dependencies are installed, it does **not require a watcher** — it just runs during certain npm hooks and that's enough.
+- It also takes care of making non-JS imports more palatable, through [aliases](#importing-non-js-resources-unversioned-aliases)
 
-If you’re ok with using a CDN for your dependencies and don’t mind running a build process whenever you work on code, JSPM is a great choice.
+If you’re ok with using a CDN for your dependencies and don't need any of these features, JSPM is a great choice.
 
 Here is a handy table to compare the two:
 
-| Feature                                                                 | nudeps | JSPM      |
-| ----------------------------------------------------------------------- | ------ | --------- |
-| Use specifiers both in your own code, and in code you distribute.       | ✅     | ✅        |
-| Manages copying the right dependencies out of `node_modules`            | ✅     | ❌        |
-| Use dependencies without having to transpile your _own_ code.           | ✅     | ✅        |
-| No "browser bundle" nonsense: common transitive dependencies are shared | ✅     | ✅        |
-| Separate files are kept separate and cached separately.                 | ✅     | ✅        |
-| `npm link` still works                                                  | ✅     | ✅        |
-| No build process to remember to run before working on code              | ✅     | ❌        |
-| Granular cache busting, only for modules that change version            | ✅     | CDNs only |
-| Import map automatically updated as you (un)install packages            | ✅     | ❌        |
-| Supports CDNs like unpkg, jsdelivr, etc.                                | ❌     | ✅        |
-| Self-host dependencies                                                  | ✅     | ❌        |
+| Feature                                                               | nudeps | JSPM      |
+| --------------------------------------------------------------------- | ------ | --------- |
+| Use specifiers both in your own code, and in code you distribute.     | ✅     | ✅        |
+| Self-host dependencies                                                | ✅     | ❌        |
+| Use dependencies without having to transpile your _own_ code.         | ✅     | ✅        |
+| Shared transitive dependencies                                        | ✅     | ✅        |
+| `npm link` still works                                                | ✅     | ✅        |
+| No build process to remember to run before working on code            | ✅     | ❌        |
+| Supports CDNs like unpkg, jsdelivr, etc.                              | ❌     | ✅        |
+| Granular cache busting                                                | ✅     | CDNs only |
+| Nice URLs for resources that can't use specifiers (CSS, images, etc.) | ✅     | ❌        |
 
 ## Limitations
 
