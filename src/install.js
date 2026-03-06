@@ -1,6 +1,21 @@
 import { readJSONSync, writeJSONSync } from "./util.js";
 import nudeps from "./index.js";
 
+/**
+ * Add a command to an npm lifecycle hook, falling back to pre/post variants if the hook is already taken.
+ */
+function addHook (pkg, hook, command) {
+	for (let name of [hook, "pre" + hook, "post" + hook]) {
+		if (pkg.scripts[name]?.includes(command)) {
+			return;
+		}
+		if (!pkg.scripts[name]) {
+			pkg.scripts[name] = command;
+			return;
+		}
+	}
+}
+
 export default async function () {
 	let pkg = readJSONSync("package.json", { optional: true });
 
@@ -11,18 +26,9 @@ export default async function () {
 
 	pkg.scripts ??= {};
 
-	let hooks = ["dependencies", "predependencies", "postdependencies"];
 	let command = "npx nudeps";
-	for (const hook of hooks) {
-		if (pkg.scripts[hook]?.includes(command)) {
-			// Already installed
-			break;
-		}
-		if (!pkg.scripts[hook]) {
-			pkg.scripts[hook] = command;
-			break;
-		}
-	}
+	addHook(pkg, "dependencies", command);
+	addHook(pkg, "prepare", command);
 
 	writeJSONSync("package.json", pkg, 2);
 }
