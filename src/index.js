@@ -37,6 +37,7 @@ export default async function (options) {
 	}
 
 	const generator = nudeps.generator;
+	let resolveStart = performance.now();
 	try {
 		await generator.install(nudeps.pkg.name, ".");
 	}
@@ -62,6 +63,7 @@ export default async function (options) {
 			}
 		}
 	}
+	nudeps.stats.resolveTime = performance.now() - resolveStart;
 
 	// If root package installation failed due to missing dependencies in the entry point,
 	// add it manually after all dependencies are installed using JSPM's resolver.
@@ -228,12 +230,12 @@ export default async function (options) {
 	}
 	if (mapChanged) {
 		info.push(
-			`Import map with ${stats.entries} entries generated successfully at ${config.map}. Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms.`,
+			`Import map with ${stats.entries} entries generated successfully at ${config.map}. Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms (resolve: ${+stats.resolveTime.toFixed(2)} ms).`,
 		);
 	}
 	else {
 		info.push(
-			`Import map unchanged (${stats.entries} entries). Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms.`,
+			`Import map unchanged (${stats.entries} entries). Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms (resolve: ${+stats.resolveTime.toFixed(2)} ms).`,
 		);
 	}
 	nudeps.info(...info);
