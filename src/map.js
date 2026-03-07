@@ -239,5 +239,3 @@ export class ImportMap {
 		return ret;
 	}
 }
-
-}
