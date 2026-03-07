@@ -293,6 +293,124 @@ export default {
 				},
 			],
 		},
+		{
+			name: "./node_modules/@floating-ui/",
+			description: "Scope-only directory with trailing slash",
+			tests: [
+				{
+					arg: "packages",
+					expect: [],
+				},
+				{
+					arg: "filePath",
+					expect: "@floating-ui/",
+				},
+				{
+					arg: "localDir",
+					expect: "./client_modules",
+				},
+				{
+					arg: "localPath",
+					expect: "./client_modules/@floating-ui/",
+				},
+			],
+		},
+		{
+			name: "./node_modules/@foo",
+			description: "Scope-only directory without trailing slash",
+			tests: [
+				{
+					arg: "packages",
+					expect: [],
+				},
+				{
+					arg: "filePath",
+					expect: "@foo",
+				},
+				{
+					arg: "localDir",
+					expect: "./client_modules",
+				},
+				{
+					arg: "localPath",
+					expect: "./client_modules/@foo",
+				},
+			],
+		},
+		{
+			name: "./node_modules/@foo/bar/",
+			description: "Scoped package with trailing slash (directory mapping)",
+			tests: [
+				{
+					arg: "packages",
+					expect: ["@foo/bar"],
+				},
+				{
+					arg: "filePath",
+					expect: "",
+				},
+				{
+					arg: "packageName",
+					expect: "@foo/bar",
+				},
+				{
+					arg: "localDir",
+					expect: "./client_modules/@foo/bar@1.2.3",
+				},
+				{
+					arg: "localPath",
+					expect: "./client_modules/@foo/bar@1.2.3/",
+				},
+			],
+		},
+		{
+			name: "./node_modules/foo/",
+			description: "Unscoped package with trailing slash (directory mapping)",
+			tests: [
+				{
+					arg: "packages",
+					expect: ["foo"],
+				},
+				{
+					arg: "filePath",
+					expect: "",
+				},
+				{
+					arg: "packageName",
+					expect: "foo",
+				},
+				{
+					arg: "localDir",
+					expect: "./client_modules/foo@1.2.3",
+				},
+				{
+					arg: "localPath",
+					expect: "./client_modules/foo@1.2.3/",
+				},
+			],
+		},
+		{
+			name: "./node_modules/foo/node_modules/@bar/",
+			description: "Nested scope-only directory",
+			tests: [
+				{
+					arg: "packages",
+					expect: ["foo"],
+				},
+				{
+					arg: "filePath",
+					expect: "@bar/",
+				},
+				{
+					arg: "packageName",
+					expect: "foo",
+				},
+				{
+					arg: "localPath",
+					expect: "./client_modules/foo@1.2.3/@bar/",
+				},
+			],
+		},
 		// Case A: transitive dep via local dep's resolved path
 		{
 			name: "../vue/node_modules/vue/dist/vue.esm-bundler.js",

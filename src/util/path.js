@@ -201,6 +201,12 @@ export default class ModulePath {
 	 * For transitive deps of local deps, nests under the local dep's client_modules.
 	 */
 	get localDir () {
+		if (!this.packageName) {
+			// Non-package path (e.g. scope-only directory like @floating-ui/)
+			// filePath already contains the remaining path segments
+			return this.nudeps.dir;
+		}
+
 		let versionSuffix = this.version ? "@" + this.version : "";
 		let versionedName = this.packageName + versionSuffix;
 

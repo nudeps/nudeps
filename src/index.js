@@ -155,11 +155,6 @@ export default async function (options) {
 
 		let modulePath = nudeps.path(url);
 
-		// Scope-only directories (e.g. ./node_modules/@floating-ui/) are not packages
-		if (modulePath.packages.length === 0) {
-			continue;
-		}
-
 		let urlFromMap = path.relative(path.dirname(config.map), modulePath.localPath); // Note: path.relative() might normalize away the trailing slash for directories
 		urlFromMap = urlFromMap.startsWith(".") ? urlFromMap : "./" + urlFromMap;
 		if (specifier.endsWith("/") && !urlFromMap.endsWith("/")) {
@@ -167,7 +162,7 @@ export default async function (options) {
 			urlFromMap += "/";
 		}
 		subMap[specifier] = urlFromMap;
-		if (!modulePath.externalBase) {
+		if (modulePath.packages.length > 0 && !modulePath.externalBase) {
 			toCopy[modulePath.nodeDir] ??= modulePath.localDir;
 		}
 	}
