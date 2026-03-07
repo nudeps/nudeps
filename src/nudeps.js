@@ -199,7 +199,8 @@ export default class Nudeps {
 	}
 
 	copyPackages () {
-		let { config, existingDirs, existingSymlinks, toCopy, toDelete, toDeleteIfEmpty, stats } = this;
+		let { config, existingDirs, existingSymlinks, toCopy, toDelete, toDeleteIfEmpty, stats } =
+			this;
 		this.externalAliases = new Set();
 		let resolvedDir = path.resolve(config.dir);
 
