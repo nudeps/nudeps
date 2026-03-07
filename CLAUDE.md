@@ -1,1 +1,2 @@
 - Demos you can use to test stuff in ../nudeps-demos/
+- When running tests via `npx htest`, pass `--verbose` to see output for passing tests (htest suppresses output in non-TTY/piped contexts unless there are failures or `--verbose` is set).
