@@ -29,14 +29,18 @@ export default class Nudeps {
 		this.config = config;
 		this.oldConfig = readJSONSync(".nudeps/config.json", { optional: true });
 
-		let { dirs, symlinks } = config.init ? { dirs: [], symlinks: [] } : getTopLevelModules(config.dir);
+		let { dirs, symlinks } = config.init
+			? { dirs: [], symlinks: [] }
+			: getTopLevelModules(config.dir);
 		this.existingDirs = new Set(dirs.map(d => config.dir + "/" + d));
 		this.existingSymlinks = new Set(symlinks.map(d => config.dir + "/" + d));
 
 		// Load previously-written external aliases so they enter the deletion queue.
 		// They go in both sets because aliases are always symlinks,
 		// and existingDirs tracks all entries while existingSymlinks marks which are symlinks.
-		let savedExternal = config.init ? [] : (readJSONSync(".nudeps/external-aliases.json", { optional: true }) ?? []);
+		let savedExternal = config.init
+			? []
+			: (readJSONSync(".nudeps/external-aliases.json", { optional: true }) ?? []);
 		for (let p of savedExternal) {
 			this.existingDirs.add(p);
 			this.existingSymlinks.add(p);
@@ -96,7 +100,9 @@ export default class Nudeps {
 			let nmDir = `${resolvedPath}/node_modules`;
 
 			if (!existsSync(nmDir) && existsSync(`${resolvedPath}/package.json`)) {
-				this.info(`Warning: node_modules not found at ${resolvedPath}. Run \`npm install\` there first.`);
+				this.info(
+					`Warning: node_modules not found at ${resolvedPath}. Run \`npm install\` there first.`,
+				);
 				this.#childLocks[resolvedPath] = null;
 			}
 			else {
@@ -203,7 +209,7 @@ export default class Nudeps {
 			let mp = this.path(from);
 
 			let exists = existingDirs.has(to);
-			let needsRecreate = exists && (existingSymlinks.has(to) !== this.shouldSymlink(mp));
+			let needsRecreate = exists && existingSymlinks.has(to) !== this.shouldSymlink(mp);
 
 			if (needsRecreate) {
 				rmSync(to, { recursive: true });
@@ -262,7 +268,12 @@ export default class Nudeps {
 						this.externalAliases.add(aliasPath);
 					}
 
-					if (ensureSymlink(relTarget, aliasPath, "dir", { force: exists, skipIfCorrect: exists })) {
+					if (
+						ensureSymlink(relTarget, aliasPath, "dir", {
+							force: exists,
+							skipIfCorrect: exists,
+						})
+					) {
 						stats.aliased++;
 					}
 				}
