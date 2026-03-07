@@ -1,5 +1,6 @@
 export * from "./util/fs.js";
 export * from "./util/path.js";
+import { builtinModules } from "node:module";
 
 /**
  * Deep-merge `source` into `target`, recursing into nested objects.
@@ -30,4 +31,15 @@ export function deepAssign (target, source) {
 	}
 
 	return target;
+}
+
+let nodeBuiltins = null;
+export function getNodeBuiltins () {
+	nodeBuiltins ??= Array.from(
+		new Set(
+			builtinModules.flatMap(mod =>
+				mod.startsWith("node:") ? [mod, mod.slice(5)] : [mod, `node:${mod}`]),
+		),
+	);
+	return nodeBuiltins;
 }

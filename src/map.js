@@ -2,8 +2,8 @@
  * Utils for generating and manipulating import maps
  */
 import { Generator } from "@jspm/generator";
-import { builtinModules } from "node:module";
-import { deepAssign } from "./util.js";
+
+import { deepAssign, getNodeBuiltins } from "./util.js";
 import { findOverride } from "./util/jspm-overrides.js";
 
 export class ImportMapGenerator extends Generator {
@@ -240,13 +240,4 @@ export class ImportMap {
 	}
 }
 
-let nodeBuiltins = null;
-function getNodeBuiltins () {
-	nodeBuiltins ??= Array.from(
-		new Set(
-			builtinModules.flatMap(mod =>
-				mod.startsWith("node:") ? [mod, mod.slice(5)] : [mod, `node:${mod}`]),
-		),
-	);
-	return nodeBuiltins;
 }
