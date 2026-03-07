@@ -269,12 +269,7 @@ export default class Nudeps {
 						this.externalAliases.add(aliasPath);
 					}
 
-					if (
-						ensureSymlink(relTarget, aliasPath, "dir", {
-							force: exists,
-							skipIfCorrect: exists,
-						})
-					) {
+					if (ensureSymlink(relTarget, aliasPath, "dir", { force: exists })) {
 						stats.aliased++;
 					}
 				}

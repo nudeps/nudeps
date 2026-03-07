@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs";
+import * as path from "node:path";
 
 export default {
 	dir: {
 		flag: "d",
 		default: "./client_modules",
+		normalize: (v, defaultValue) => path.normalize(v ?? defaultValue),
 	},
 	mode: {
 		flag: "m",

@@ -34,7 +34,13 @@ export default class ModulePath {
 
 			while (this.parts[0] === "node_modules") {
 				this.parts.shift();
-				let isScoped = this.parts[0].startsWith("@");
+
+				// Scope-only directory (e.g. @floating-ui/) — not a package
+				if (this.parts[0]?.startsWith("@") && !this.parts[1]) {
+					break;
+				}
+
+				let isScoped = this.parts[0]?.startsWith("@");
 				let packageName = this.parts.splice(0, isScoped ? 2 : 1).join("/");
 				this.packages.push(packageName);
 			}

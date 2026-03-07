@@ -129,25 +129,23 @@ export function createGitignoredDir (dir) {
 /**
  * Create a symlink, optionally replacing an existing one.
  * With `force`, removes any existing entry at `linkPath` before creating.
- * With `skipIfCorrect`, skips creation if the symlink already points to `target`.
  * @param {string} target - The symlink target (what it points to)
  * @param {string} linkPath - Where to create the symlink
  * @param {"dir"|"file"|"junction"} [type] - Symlink type (passed to symlinkSync)
- * @param {{ force?: boolean, skipIfCorrect?: boolean }} [options]
+ * @param {{ force?: boolean }} [options]
  * @returns {boolean} Whether a new symlink was created
  */
-export function ensureSymlink (target, linkPath, type, { force, skipIfCorrect } = {}) {
-	if (force || skipIfCorrect) {
-		try {
-			if (skipIfCorrect && readlinkSync(linkPath) === target) {
-				return false;
-			}
+export function ensureSymlink (target, linkPath, type, { force } = {}) {
+	try {
+		if (readlinkSync(linkPath) === target) {
+			// Symlink already points to the correct target
+			return false;
 		}
-		catch {}
+	}
+	catch {}
 
-		if (force) {
-			rmSync(linkPath, { recursive: true, force: true });
-		}
+	if (force) {
+		rmSync(linkPath, { recursive: true, force: true });
 	}
 
 	mkdirSync(path.dirname(linkPath), { recursive: true });
