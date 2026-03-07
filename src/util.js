@@ -33,6 +33,10 @@ export function deepAssign (target, source) {
 	return target;
 }
 
+export function deepMerge (...objects) {
+	return objects.reduce((acc, obj) => deepAssign(acc, obj));
+}
+
 let nodeBuiltins = null;
 export function getNodeBuiltins () {
 	nodeBuiltins ??= Array.from(
