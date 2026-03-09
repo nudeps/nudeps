@@ -89,43 +89,7 @@ export default async function (options) {
 		}
 	}
 
-	if (config.cjs !== false) {
-		// Only flag packages as CJS if they have no ESM exports at all
-		let esmPackages = new Set(
-			generator
-				.getEntries(entry => entry?.format === "esm")
-				.map(([url]) => nudeps.path(url).packageName),
-		);
-		let cjsEntries = generator
-			.getEntries(entry => entry?.format === "commonjs")
-			.filter(([url]) => !esmPackages.has(nudeps.path(url).packageName));
-
-		if (cjsEntries.length > 0) {
-			try {
-				await generator.install("cjs-browser-shim", undefined, { noRetry: true });
-			}
-			catch (e) {
-				await generator.install(
-					"cjs-browser-shim",
-					"./node_modules/nudeps/node_modules/cjs-browser-shim",
-					{ noRetry: true },
-				);
-			}
-
-			let cjsPackages = [...new Set(cjsEntries.map(([url]) => nudeps.path(url).packageName))];
-			let directCjsDeps = cjsPackages.filter(
-				packageName => packageName in (nudeps.pkg.dependencies ?? {}),
-			);
-
-			let requireMsg = "";
-			if (directCjsDeps.length > 0) {
-				requireMsg = `Use require() to import these packages: ${directCjsDeps.join(", ")}.`;
-			}
-			nudeps.info(
-				`${cjsPackages.length} CommonJS packages detected, adding cjs-browser-shim. ${requireMsg} Disable with --cjs=false`,
-			);
-		}
-	}
+	await nudeps.finalize();
 
 	let dirExists = existsSync(config.dir);
 	if (config.init && dirExists) {
@@ -223,14 +187,18 @@ export default async function (options) {
 				: parts.join(" and ");
 		info.push(msg + ` in ${config.dir}.`);
 	}
+	let { cacheHits, cacheMisses } = generator.stats;
+	let cacheInfo = cacheHits > 0
+		? `, ${cacheHits}/${cacheHits + cacheMisses} cached`
+		: "";
 	if (mapChanged) {
 		info.push(
-			`Import map with ${stats.entries} entries generated successfully at ${config.map}. Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms (resolve: ${+stats.resolveTime.toFixed(2)} ms).`,
+			`Import map with ${stats.entries} entries generated successfully at ${config.map}. Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms (resolve: ${+stats.resolveTime.toFixed(2)} ms${cacheInfo}).`,
 		);
 	}
 	else {
 		info.push(
-			`Import map unchanged (${stats.entries} entries). Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms (resolve: ${+stats.resolveTime.toFixed(2)} ms).`,
+			`Import map unchanged (${stats.entries} entries). Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms (resolve: ${+stats.resolveTime.toFixed(2)} ms${cacheInfo}).`,
 		);
 	}
 	nudeps.info(...info);

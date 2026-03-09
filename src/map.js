@@ -7,7 +7,12 @@ import { deepAssign, getNodeBuiltins } from "./util.js";
 import { findOverride } from "./util/jspm-overrides.js";
 
 export class ImportMapGenerator extends Generator {
-	constructor ({ mode, ...generatorOptions } = {}) {
+	/**
+	 * @param {object} [options]
+	 * @param {object} [options.installCache] - Per-package cache map (mutated on miss), or null
+	 * @param {import("../nudeps.js").default} [options.nudeps] - Nudeps instance for lock data access
+	 */
+	constructor ({ mode, installCache, nudeps, ...generatorOptions } = {}) {
 		if (mode) {
 			this.mode = mode;
 			generatorOptions.env ??= [mode, "browser", "module"];
@@ -26,6 +31,13 @@ export class ImportMapGenerator extends Generator {
 		});
 
 		this.commonJS = commonJS;
+		this.installCache = installCache ?? null;
+		this.nudeps = nudeps ?? null;
+		this.mapsToMerge = [];
+		this.staleCacheKeys = new Set(Object.keys(installCache ?? {}));
+		this.stats = { cacheHits: 0, cacheMisses: 0 };
+		// Save options for creating temp generators on cache miss
+		this._options = { mode, ...generatorOptions };
 
 		// Apply JSPM community overrides (client-side equivalent of what jspm.io CDN does server-side)
 		let pm = this.provider;
@@ -47,6 +59,33 @@ export class ImportMapGenerator extends Generator {
 	}
 
 	async install (alias, target = `./node_modules/${alias}`, { noRetry, ...installOptions } = {}) {
+		// Check if this install is cacheable:
+		// must have a cache, not be the root package ("."), and not be a symlink (local dep)
+		let mp = this.nudeps && target !== "." ? this.nudeps.path(target) : null;
+		let shouldCache = this.installCache && mp?.version && !mp.isExternal;
+		let cacheKey = shouldCache ? mp.localDir : null;
+
+		// Cache hit — skip JSPM entirely
+		if (shouldCache && cacheKey in this.installCache) {
+			this.stats.cacheHits++;
+			this.staleCacheKeys.delete(cacheKey);
+			this.mapsToMerge.push(this.installCache[cacheKey]);
+			return;
+		}
+
+		// Cache miss — resolve on a temporary generator and capture the result
+		if (shouldCache) {
+			this.stats.cacheMisses++;
+			let tempGen = new ImportMapGenerator(this._options);
+			await tempGen.install(alias, target, { noRetry, ...installOptions });
+
+			let depMap = tempGen.getMap();
+			this.installCache[cacheKey] = depMap;
+			this.mapsToMerge.push(depMap);
+			return;
+		}
+
+		// Not cacheable (root package, symlink, etc.): install on this generator
 		try {
 			return await super.install({
 				alias,
@@ -77,6 +116,17 @@ export class ImportMapGenerator extends Generator {
 		}
 	}
 
+	/**
+	 * Merge per-package cached maps with the generator's own map (root + non-cached installs).
+	 */
+	getMap () {
+		let map = super.getMap();
+		for (let cached of this.mapsToMerge) {
+			deepAssign(map, cached);
+		}
+		return map;
+	}
+
 	getEntries (fn) {
 		const resolver = this.traceMap?.resolver;
 
@@ -85,6 +135,69 @@ export class ImportMapGenerator extends Generator {
 		}
 
 		return [];
+	}
+
+	/**
+	 * Finalize after all installs: install CJS shim if needed, prune stale cache entries.
+	 */
+	async finalize () {
+		await this.#installCjsShim();
+
+		// Prune stale cache entries (packages no longer encountered)
+		for (let key of this.staleCacheKeys) {
+			delete this.installCache[key];
+		}
+	}
+
+	/**
+	 * Install cjs-browser-shim if any CJS-only packages were newly resolved.
+	 * Skips if the shim is already present from cached maps.
+	 */
+	async #installCjsShim () {
+		if (this.commonJS === false) {
+			return;
+		}
+
+		// Shim already present from cached maps — nothing to do
+		if (this.mapsToMerge.some(m => m.imports?.["cjs-browser-shim"])) {
+			return;
+		}
+
+		// Only flag packages as CJS if they have no ESM exports at all
+		let esmPackages = new Set(
+			this.getEntries(e => e?.format === "esm")
+				.map(([url]) => this.nudeps.path(url).packageName),
+		);
+		let cjsEntries = this.getEntries(e => e?.format === "commonjs")
+			.filter(([url]) => !esmPackages.has(this.nudeps.path(url).packageName));
+
+		if (cjsEntries.length === 0) {
+			return;
+		}
+
+		try {
+			await this.install("cjs-browser-shim", undefined, { noRetry: true });
+		}
+		catch {
+			await this.install(
+				"cjs-browser-shim",
+				"./node_modules/nudeps/node_modules/cjs-browser-shim",
+				{ noRetry: true },
+			);
+		}
+
+		let cjsPackages = [...new Set(cjsEntries.map(([url]) => this.nudeps.path(url).packageName))];
+		let directCjsDeps = cjsPackages.filter(
+			name => name in (this.nudeps.pkg.dependencies ?? {}),
+		);
+
+		let requireMsg = "";
+		if (directCjsDeps.length > 0) {
+			requireMsg = `Use require() to import these packages: ${directCjsDeps.join(", ")}.`;
+		}
+		this.nudeps.info(
+			`${cjsPackages.length} CommonJS packages detected, adding cjs-browser-shim. ${requireMsg} Disable with --cjs=false`,
+		);
 	}
 }
 
