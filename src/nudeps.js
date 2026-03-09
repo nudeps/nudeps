@@ -2,7 +2,7 @@
  * Main entry point
  */
 
-import { readJSONSync } from "./util.js";
+import { readJSONSync, writeJSONSync } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import ModulePath from "./util/path.js";
 import { matchesGlob, ensureSymlink } from "./util/fs.js";
@@ -11,6 +11,7 @@ import { getTopLevelModules } from "./util.js";
 import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
 import PackageLock from "./util/package-lock.js";
+import nudepsPkg from "../package.json" with { type: "json" };
 
 export default class Nudeps {
 	stats = {
@@ -51,6 +52,41 @@ export default class Nudeps {
 		this.hasDeepGlobs = this.config.ignore.some(p => (p.include ?? p.exclude)?.includes("/"));
 	}
 
+	get installCache () {
+		let configChanged = JSON.stringify(this.oldConfig) !== JSON.stringify(this.config);
+		let cacheData = readJSONSync(".nudeps/cache.json", { optional: true });
+
+		if (cacheData?.version !== nudepsPkg.version || configChanged) {
+			cacheData = null;
+		}
+
+		let value = cacheData?.packages ?? {};
+		Object.defineProperty(this, "installCache", { value, writable: true, configurable: true });
+		return value;
+	}
+
+	/**
+	 * Persist the install cache to disk. Skips writing if cache is empty.
+	 */
+	saveCache () {
+		if (!this.installCache || Object.keys(this.installCache).length === 0) {
+			return;
+		}
+
+		writeJSONSync(".nudeps/cache.json", {
+			version: nudepsPkg.version,
+			packages: this.installCache,
+		});
+	}
+
+	/**
+	 * Finalize after all installs: CJS shim, cache pruning, and cache persistence.
+	 */
+	async finalize () {
+		await this.generator.finalize();
+		this.saveCache();
+	}
+
 	get pkg () {
 		let value = readJSONSync("./package.json");
 		Object.defineProperty(this, "pkg", { value, configurable: true });
@@ -69,7 +105,11 @@ export default class Nudeps {
 	}
 
 	get generator () {
-		let generatorOptions = { commonJS: this.config.cjs };
+		let generatorOptions = {
+			commonJS: this.config.cjs,
+			installCache: this.installCache ?? null,
+			nudeps: this,
+		};
 
 		let value = new ImportMapGenerator(generatorOptions);
 		Object.defineProperty(this, "generator", { value, configurable: true });
