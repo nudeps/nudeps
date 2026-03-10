@@ -37,7 +37,7 @@ export class ImportMapGenerator extends Generator {
 		this.staleCacheKeys = new Set(Object.keys(installCache ?? {}));
 		this.stats = { cacheHits: 0, cacheMisses: 0 };
 		// Save options for creating temp generators on cache miss
-		this._options = { mode, ...generatorOptions };
+		this._options = { mode, nudeps, ...generatorOptions };
 
 		// Apply JSPM community overrides (client-side equivalent of what jspm.io CDN does server-side)
 		let pm = this.provider;
@@ -78,6 +78,7 @@ export class ImportMapGenerator extends Generator {
 			this.stats.cacheMisses++;
 			let tempGen = new ImportMapGenerator(this._options);
 			await tempGen.install(alias, target, { noRetry, ...installOptions });
+			await tempGen.finalize();
 
 			let depMap = tempGen.getMap();
 			this.installCache[cacheKey] = depMap;
