@@ -188,9 +188,7 @@ export default async function (options) {
 		info.push(msg + ` in ${config.dir}.`);
 	}
 	let { cacheHits, cacheMisses } = generator.stats;
-	let cacheInfo = cacheHits > 0
-		? `, ${cacheHits}/${cacheHits + cacheMisses} cached`
-		: "";
+	let cacheInfo = cacheHits > 0 ? `, ${cacheHits}/${cacheHits + cacheMisses} cached` : "";
 	if (mapChanged) {
 		info.push(
 			`Import map with ${stats.entries} entries generated successfully at ${config.map}. Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms (resolve: ${+stats.resolveTime.toFixed(2)} ms${cacheInfo}).`,
