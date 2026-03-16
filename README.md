@@ -152,6 +152,20 @@ To use the import map in your app, include it in a classic (non-module) `<script
 Once you do that, you can just **forget about Nudeps and go about your business**, using `npm install` and `npm uninstall` for dependencies as you normally would.
 If something seems off, you can run `npx nudeps` explicitly, but most of the time things should Just Work™.
 
+### AI coding assistants
+
+If you use AI coding assistants like [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [GitHub Copilot](https://github.com/features/copilot), [Cursor](https://www.cursor.com/), etc., you may want to add the following to your project's `CLAUDE.md` and/or `AGENTS.md` so that the AI understands nudeps' workflow and doesn't try to run it manually:
+
+```markdown
+## nudeps (dependency management)
+
+- **Do NOT run `npx nudeps` after `npm install` or `npm uninstall`** — it runs automatically via an npm lifecycle hook (`dependencies` script in package.json).
+- The `dependencies` script in package.json is an npm hook that fires automatically after install/uninstall — do not modify or call it manually.
+- `client_modules/` and `importmap.js` are generated artifacts managed by nudeps. Do not edit them.
+- Only run `npx nudeps` explicitly if the import map seems out of sync.
+- To add/remove a client-side dependency, just use `npm install <pkg>` / `npm uninstall <pkg>`.
+```
+
 ## How does it work?
 
 Nudeps copies your dependencies to a **local directory** you specify (`./client_modules` by default), adds versions to directory names for **cache busting** just like a CDN, generates an [**import map**](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script/type/importmap) that maps specifiers to these local paths, and an injection script that injects the import map into any HTML page.
