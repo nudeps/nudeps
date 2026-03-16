@@ -25,6 +25,21 @@ export default class PackageLock {
 		return key in this.external;
 	}
 
+	keys () {
+		return Object.keys(this.packages);
+	}
+
+	values () {
+		return Object.values(this.packages);
+	}
+
+	entries () {
+		return Object.entries(this.packages);
+	}
+
+	[Symbol.iterator] () {
+		return this.entries()[Symbol.iterator]();
+	}
 	/**
 	 * Find a lock key by its resolved path (e.g., "../vue" → "node_modules/nudeps-demo-vue")
 	 * @param {string} resolvedPath - The resolved path to look up
