@@ -176,16 +176,17 @@ export class ImportMapGenerator extends Generator {
 			return;
 		}
 
-		try {
-			await this.install("cjs-browser-shim", undefined, { noRetry: true });
+		// Find cjs-browser-shim in the lockfile — prefer the user's own copy (shallowest).
+		// If not found, look for it under nudeps' own node_modules.
+		let { pkgLock } = this.nudeps;
+		let shimKey = pkgLock.getPathsFor("cjs-browser-shim")[0];
+		if (!shimKey) {
+			let nudepsKey = pkgLock.getPathsFor("nudeps")[0];
+			if (nudepsKey) {
+				shimKey = nudepsKey + "/node_modules/cjs-browser-shim";
+			}
 		}
-		catch {
-			await this.install(
-				"cjs-browser-shim",
-				"./node_modules/nudeps/node_modules/cjs-browser-shim",
-				{ noRetry: true },
-			);
-		}
+		await this.install("cjs-browser-shim", "./" + (shimKey ?? "node_modules/cjs-browser-shim"), { noRetry: true });
 
 		let cjsPackages = [...new Set(cjsEntries.map(([url]) => this.nudeps.path(url).packageName))];
 		let directCjsDeps = cjsPackages.filter(

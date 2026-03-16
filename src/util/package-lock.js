@@ -40,6 +40,34 @@ export default class PackageLock {
 	[Symbol.iterator] () {
 		return this.entries()[Symbol.iterator]();
 	}
+
+	/**
+	 * Find all lockfile keys for a package by name, sorted shallowest first.
+	 * Matches against the package's `name` field if present, otherwise the install directory name.
+	 * @param {string} name - Package name (e.g., "cjs-browser-shim")
+	 * @returns {string[]}
+	 */
+	getPathsFor (name) {
+		let suffix = "node_modules/" + name;
+		let ret = [];
+
+		for (let [k, info] of this) {
+			if (info?.name) {
+				if (info.name === name) {
+					ret.push(k);
+				}
+			}
+			else {
+				// No explicit name, match against install directory name.
+				if (k === suffix || k.endsWith("/" + suffix)) {
+					ret.push(k);
+				}
+			}
+		}
+
+		return ret.sort((a, b) => a.length - b.length);
+	}
+
 	/**
 	 * Find a lock key by its resolved path (e.g., "../vue" → "node_modules/nudeps-demo-vue")
 	 * @param {string} resolvedPath - The resolved path to look up
