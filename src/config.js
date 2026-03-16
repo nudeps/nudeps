@@ -4,7 +4,7 @@
 
 import { importCwdRelative } from "./util.js";
 import { existsSync } from "node:fs";
-import availableOptions from "./options.js";
+import * as availableOptions from "./options.js";
 import builtInModes from "./modes.js";
 
 function readExternalConfig (args) {

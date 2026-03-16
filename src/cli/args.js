@@ -3,7 +3,7 @@
  * Reads process.argv by default; accepts a custom argv array for testing.
  */
 import minimist from "minimist";
-import availableOptions from "../options.js";
+import * as availableOptions from "../options.js";
 
 export default function readArgs (argv = process.argv.slice(2)) {
 	let args = minimist(argv);

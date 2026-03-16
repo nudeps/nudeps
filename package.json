@@ -21,7 +21,8 @@
 	"author": "Lea Verou",
 	"type": "module",
 	"exports": {
-		".": "./src/index.js"
+		".": "./src/index.js",
+		"./options": "./src/options.js"
 	},
 	"bin": {
 		"nudeps": "src/cli/index.js"

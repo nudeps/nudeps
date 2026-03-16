@@ -1,90 +1,102 @@
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 
-export default {
-	dir: {
-		flag: "d",
-		default: "./client_modules",
-		normalize: (v, defaultValue) => path.normalize(v ?? defaultValue),
-	},
-	mode: {
-		flag: "m",
-		cli: true,
-	},
-	map: {
-		flag: "o",
-		default: "importmap.js",
-	},
-	terse: {
-		default: false,
-	},
-	exclude: {
-		flag: "e",
-		parse: v => v.split(","),
-		default: [],
-	},
-	prune: {
-		default: false,
-	},
-	config: {
-		flag: "c",
-		default: "nudeps.js",
-		validate: v => existsSync(v),
-		file: false,
-	},
-	init: {
-		default: false,
-	},
-	overrides: {
-		cli: false,
-	},
-	module: {
-		default: false,
-	},
-	cjs: {
-		default: true,
-	},
-	ignore: {
-		default: [
-			// Readme files with any extension
-			"{readme,README}.*",
+export const dir = {
+	flag: "d",
+	default: "./client_modules",
+	normalize: (v, defaultValue) => path.normalize(v ?? defaultValue),
+};
 
-			// Dotfiles
-			".*",
+export const mode = {
+	flag: "m",
+	cli: true,
+};
 
-			// Package files
-			"package.json",
-			"{package,pnpm}-lock.json",
-		],
-		normalize: (value, defaultValue) => {
-			if (value) {
-				value = Array.isArray(value) ? value : [value];
-				value.unshift(...defaultValue);
+export const map = {
+	flag: "o",
+	default: "importmap.js",
+};
+
+export const terse = {
+	default: false,
+};
+
+export const exclude = {
+	flag: "e",
+	parse: v => v.split(","),
+	default: [],
+};
+
+export const prune = {
+	default: false,
+};
+
+export const config = {
+	flag: "c",
+	default: "nudeps.js",
+	validate: v => existsSync(v),
+	file: false,
+};
+
+export const init = {
+	default: false,
+};
+
+export const overrides = {
+	cli: false,
+};
+
+export const module = {
+	default: false,
+};
+
+export const cjs = {
+	default: true,
+};
+
+export const ignore = {
+	default: [
+		// Readme files with any extension
+		"{readme,README}.*",
+
+		// Dotfiles
+		".*",
+
+		// Package files
+		"package.json",
+		"{package,pnpm}-lock.json",
+	],
+	normalize: (value, defaultValue) => {
+		if (value) {
+			value = Array.isArray(value) ? value : [value];
+			value.unshift(...defaultValue);
+		}
+		else {
+			value = defaultValue;
+		}
+
+		value = value.map(p => {
+			p = typeof p === "string" ? { exclude: p } : p;
+
+			if (p.packageName && !Array.isArray(p.packageName)) {
+				p.packageName = [p.packageName];
 			}
-			else {
-				value = defaultValue;
-			}
 
-			value = value.map(p => {
-				p = typeof p === "string" ? { exclude: p } : p;
+			return p;
+		});
 
-				if (p.packageName && !Array.isArray(p.packageName)) {
-					p.packageName = [p.packageName];
-				}
+		return value;
+	},
+};
 
-				return p;
-			});
+export const symlink = {
+	default: ({ isExternal }) => isExternal,
+};
 
-			return value;
-		},
-	},
-	symlink: {
-		default: ({ isExternal }) => isExternal,
-	},
-	preserveSymlinks: {
-		default: false,
-	},
-	alias: {
-		default: true,
-	},
+export const preserveSymlinks = {
+	default: false,
+};
+
+export const alias = {
+	default: true,
 };
