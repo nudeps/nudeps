@@ -126,7 +126,9 @@ export default async function (options) {
 			urlFromMap += "/";
 		}
 		subMap[specifier] = urlFromMap;
-		if (modulePath.packages.length > 0 && !modulePath.externalBase) {
+		let parentManaged =
+			modulePath.externalBase && modulePath.externalParent?.hasDependency("nudeps");
+		if (modulePath.packages.length > 0 && !parentManaged) {
 			toCopy[modulePath.nodeDir] ??= modulePath.localDir;
 		}
 	}
@@ -213,13 +215,15 @@ export default async function (options) {
 			continue;
 		}
 
-		// Warn if nudeps isn't installed in the dep (propagation won't work without it)
-		let depInfo = nudeps.packages[lockKey];
-		if (!depInfo?.dependencies?.nudeps && !depInfo?.devDependencies?.nudeps) {
+		let depMP = nudeps.path("./" + lockKey);
+		if (!depMP.hasDependency("nudeps")) {
+			// Nudeps not installed on the local dep — it was copied as a regular dependency.
+			// Propagation requires nudeps on both ends.
 			nudeps.info(
-				`Local dependency at ${resolvedPath} doesn't have nudeps installed. ` +
-					`Run "npx nudeps install" there to enable propagation.`,
+				`Local dependency at ${resolvedPath} doesn't have nudeps installed; copied as regular dependency. ` +
+					`Install nudeps there to enable symlinking and change propagation.`,
 			);
+			continue;
 		}
 
 		// Ensure .nudeps/ exists in the dep, then add ourselves to its dependents list

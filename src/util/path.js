@@ -100,6 +100,16 @@ export default class ModulePath {
 		return this.constructor.from("./" + parentKey, this.nudeps);
 	}
 
+	/**
+	 * Check if the package at this path has a given dependency (in dependencies or devDependencies)
+	 * @param {string} name - Dependency name to check for
+	 * @returns {boolean}
+	 */
+	hasDependency (name) {
+		let info = this.packageInfo;
+		return !!(info?.dependencies?.[name] || info?.devDependencies?.[name]);
+	}
+
 	get packageInfo () {
 		let info = this.nudeps.pkgLock.packages[this.rawLockKey] ?? null;
 
@@ -210,7 +220,10 @@ export default class ModulePath {
 		let versionSuffix = this.version ? "@" + this.version : "";
 		let versionedName = this.packageName + versionSuffix;
 
-		if (this.externalBase) {
+		// Nest transitive deps under the local dep's client_modules,
+		// but only if the local dep is managed by nudeps (has its own nudeps installation)
+		let parent = this.externalBase && this.externalParent;
+		if (parent?.hasDependency("nudeps")) {
 			// Check if the main lockfile already has the same package@version
 			let mainInfo = this.nudeps.pkgLock.packages["node_modules/" + this.packageName];
 			if (mainInfo?.version === this.version) {
@@ -218,11 +231,7 @@ export default class ModulePath {
 				return [this.nudeps.dir, versionedName].join("/");
 			}
 
-			// Nest under the local dep's client_modules
-			let parent = this.externalParent;
-			if (parent) {
-				return parent.localDir + "/client_modules/" + versionedName;
-			}
+			return parent.localDir + "/client_modules/" + versionedName;
 		}
 
 		return [this.nudeps.dir, versionedName].join("/");
