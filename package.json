@@ -32,7 +32,9 @@
 	],
 	"scripts": {
 		"release": "npm login && release-it",
-		"test": "npx htest ./test/index.js"
+		"test": "npx htest ./test/index.js",
+		"demos": "cd ../nudeps-demos/ && ./each.sh 'npm link nudeps && npx nudeps'",
+		"init-demos": "cd ../nudeps-demos/ && ./each.sh 'npm link nudeps && npx nudeps --init'"
 	},
 	"devDependencies": {
 		"htest.dev": "^0.0.22",
