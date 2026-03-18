@@ -50,7 +50,7 @@ export default class Packages {
 					let installName = childKey.split("node_modules/").at(-1).replace(/\/$/, "");
 					this.#byKey[fullKey] = new Package({
 						installName,
-						name: childInfo?.name ?? installName,
+						name: childInfo?.name,
 						version: childInfo?.version,
 						path: fullKey.startsWith(".") ? fullKey : "./" + fullKey,
 						parent: pkg,
