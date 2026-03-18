@@ -1,7 +1,12 @@
 export default class PackageLock {
 	external = {};
 
-	constructor (data) {
+	/**
+	 * @param {object} data - Lockfile data (npm's .package-lock.json format)
+	 * @param {object} [options]
+	 * @param {object} [options.children] - Child lockfile data keyed by resolved path, for merging transitive deps of local deps
+	 */
+	constructor (data, { children = {} } = {}) {
 		let raw = data.packages ?? {};
 		this.packages = {};
 
@@ -13,6 +18,20 @@ export default class PackageLock {
 			}
 			else {
 				this.packages[key] = info;
+			}
+		}
+
+		// Merge child lockfile entries for external deps, keyed by full path
+		// (e.g., "../vue/node_modules/vue") so parse/packageInfo can find them directly
+		for (let resolvedPath of Object.values(this.external)) {
+			let childRaw = children[resolvedPath]?.packages ?? {};
+			for (let [childKey, childInfo] of Object.entries(childRaw)) {
+				if (!childKey) {
+					continue;
+				}
+
+				let fullKey = resolvedPath + "/" + childKey;
+				this.packages[fullKey] ??= childInfo;
 			}
 		}
 	}

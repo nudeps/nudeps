@@ -90,7 +90,7 @@ export const ignore = {
 };
 
 export const symlink = {
-	default: mp => mp.isExternal && mp.hasDependency("nudeps"),
+	default: mp => mp.isExternal,
 };
 
 export const preserveSymlinks = {

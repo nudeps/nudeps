@@ -126,9 +126,7 @@ export default async function (options) {
 			urlFromMap += "/";
 		}
 		subMap[specifier] = urlFromMap;
-		let parentManaged =
-			modulePath.externalBase && modulePath.externalParent?.hasDependency("nudeps");
-		if (modulePath.packages.length > 0 && !parentManaged) {
+		if (modulePath.packages.length > 0) {
 			toCopy[modulePath.nodeDir] ??= modulePath.localDir;
 		}
 	}

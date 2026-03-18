@@ -99,7 +99,30 @@ export default class Nudeps {
 		}
 
 		let data = readJSONSync("node_modules/.package-lock.json");
-		let value = new PackageLock(data);
+		let raw = data?.packages ?? {};
+
+		// Pre-load child lockfiles for external (linked) deps
+		let children = {};
+		for (let [key, info] of Object.entries(raw)) {
+			if (info.link) {
+				let childData = readJSONSync(`${info.resolved}/node_modules/.package-lock.json`, {
+					optional: true,
+				});
+				if (childData) {
+					children[info.resolved] = childData;
+				}
+				else if (!existsSync(`${info.resolved}/node_modules`)) {
+					this.info(
+						`Warning: node_modules not found at ${info.resolved}. Run \`npm install\` there first.`,
+					);
+				}
+				else {
+					this.info(`Warning: No lockfile found at ${info.resolved}`);
+				}
+			}
+		}
+
+		let value = new PackageLock(data, { children });
 		Object.defineProperty(this, "pkgLock", { value, configurable: true });
 		return value;
 	}
@@ -126,37 +149,6 @@ export default class Nudeps {
 
 		Object.defineProperty(this, "map", { value, configurable: true });
 		return value;
-	}
-
-	#childLocks = {};
-
-	/**
-	 * Load and cache a child package's lockfile for resolving transitive deps of local deps
-	 * @param {string} resolvedPath - Resolved path to the local dep (e.g., "../vue")
-	 * @returns {PackageLock|null}
-	 */
-	childLock (resolvedPath) {
-		if (!(resolvedPath in this.#childLocks)) {
-			let nmDir = `${resolvedPath}/node_modules`;
-
-			if (!existsSync(nmDir) && existsSync(`${resolvedPath}/package.json`)) {
-				this.info(
-					`Warning: node_modules not found at ${resolvedPath}. Run \`npm install\` there first.`,
-				);
-				this.#childLocks[resolvedPath] = null;
-			}
-			else {
-				let data = readJSONSync(`${nmDir}/.package-lock.json`, { optional: true });
-				if (data) {
-					this.#childLocks[resolvedPath] = new PackageLock(data);
-				}
-				else {
-					this.info(`Warning: No lockfile found at ${resolvedPath}`);
-					this.#childLocks[resolvedPath] = null;
-				}
-			}
-		}
-		return this.#childLocks[resolvedPath];
 	}
 
 	get packages () {
@@ -261,9 +253,8 @@ export default class Nudeps {
 				toDelete.delete(to);
 			}
 			else if (this.shouldSymlink(mp)) {
-				// Create a symlink to the resolved local path
-				let resolvedPath = this.pkgLock.resolveKey(mp.rawLockKey);
-				let target = path.relative(path.dirname(to), resolvedPath);
+				// Create a symlink to the source path (resolves through links for external deps)
+				let target = path.relative(path.dirname(to), from);
 				mkdirSync(path.dirname(to), { recursive: true });
 				symlinkSync(target, to, "dir");
 				stats.linked++;
