@@ -57,26 +57,33 @@ export default class ModulePath {
 		return this.packages.length > 1;
 	}
 
+	/**
+	 * Whether this package is associated with a local/linked dep — either it IS one,
+	 * or it's a transitive dep of one. Derived from externalBase.
+	 */
 	get isExternal () {
-		return this.nudeps.pkgLock.isExternal(this.rawLockKey);
+		return !!this.externalBase;
 	}
 
 	/**
-	 * If this module is a transitive dep of a local/linked dep, returns the resolved path
-	 * of that local dep (e.g., "../vue"). Returns undefined otherwise.
-	 *
-	 * Case A: base matches a resolved path of a linked dep (e.g., base="../vue")
-	 * Case B: nested under an external package (e.g., packages=["ext-pkg", "dep"])
+	 * The resolved path of the local/linked dep this package is associated with.
+	 * Returns the dep's own resolved path if it IS external, or the parent external's
+	 * resolved path for transitive deps. Returns undefined for regular packages.
 	 */
 	get externalBase () {
 		let pkgLock = this.nudeps.pkgLock;
 
-		// Case A: base is a non-trivial path pointing to a local dep
+		// This package itself is a local/linked dep
+		if (pkgLock.isExternal(this.rawLockKey)) {
+			return pkgLock.resolveKey(this.rawLockKey);
+		}
+
+		// Base path matches an external dep's resolved path (e.g., ../vue/node_modules/vue)
 		if (this.base && this.base !== "." && pkgLock.findKeyByResolvedPath(this.base)) {
 			return this.base;
 		}
 
-		// Case B: nested under an external (linked) package
+		// Nested under an external package (e.g., node_modules/ext-pkg/node_modules/dep)
 		if (this.isNested && pkgLock.isExternal(this.topLockKey)) {
 			return pkgLock.resolveKey(this.topLockKey);
 		}
@@ -111,29 +118,27 @@ export default class ModulePath {
 	}
 
 	get packageInfo () {
-		let info = this.nudeps.pkgLock.packages[this.rawLockKey] ?? null;
-
-		if (!info && this.externalBase) {
-			// Fall back to child lockfile for transitive deps of local deps
-			let childLock = this.nudeps.childLock(this.externalBase);
-			if (childLock) {
-				let childKey;
-				if (this.base && this.base !== "." && this.base === this.externalBase) {
-					// Case A: use rawLockKey as-is
-					childKey = this.rawLockKey;
-				}
-				else {
-					// Case B: strip the parent package
-					childKey = this.packages
+		// For transitive deps of external packages, try the merged child key first.
+		// Child entries are keyed by resolvedPath + childKey (e.g., "../vue/node_modules/vue").
+		let eb = this.externalBase;
+		if (eb) {
+			// Case A (base = "../vue"): childKey = rawLockKey (e.g., "node_modules/vue")
+			// Case B (nested under ext-pkg): childKey = just the transitive dep part
+			let isBaseExternal = this.base === eb;
+			let childKey = isBaseExternal
+				? this.rawLockKey
+				: this.packages
 						.slice(1)
 						.map(p => "node_modules/" + p)
 						.join("/");
-				}
-				info = childLock.packages[childKey] ?? null;
+
+			let info = this.nudeps.pkgLock.packages[eb + "/" + childKey];
+			if (info) {
+				return info;
 			}
 		}
 
-		return info;
+		return this.nudeps.pkgLock.packages[this.rawLockKey] ?? null;
 	}
 
 	get rawLockKey () {
@@ -208,33 +213,15 @@ export default class ModulePath {
 
 	/**
 	 * Get client_modules directory for the package (including version etc).
-	 * For transitive deps of local deps, nests under the local dep's client_modules.
+	 * All packages go to top-level client_modules, including transitive deps of local deps.
 	 */
 	get localDir () {
 		if (!this.packageName) {
-			// Non-package path (e.g. scope-only directory like @floating-ui/)
-			// filePath already contains the remaining path segments
 			return this.nudeps.dir;
 		}
 
 		let versionSuffix = this.version ? "@" + this.version : "";
-		let versionedName = this.packageName + versionSuffix;
-
-		// Nest transitive deps under the local dep's client_modules,
-		// but only if the local dep is managed by nudeps (has its own nudeps installation)
-		let parent = this.externalBase && this.externalParent;
-		if (parent?.hasDependency("nudeps")) {
-			// Check if the main lockfile already has the same package@version
-			let mainInfo = this.nudeps.pkgLock.packages["node_modules/" + this.packageName];
-			if (mainInfo?.version === this.version) {
-				// Reuse the standard path
-				return [this.nudeps.dir, versionedName].join("/");
-			}
-
-			return parent.localDir + "/client_modules/" + versionedName;
-		}
-
-		return [this.nudeps.dir, versionedName].join("/");
+		return [this.nudeps.dir, this.packageName + versionSuffix].join("/");
 	}
 
 	/**
