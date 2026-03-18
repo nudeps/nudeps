@@ -182,6 +182,7 @@ export default {
 				{ arg: "isExternal", expect: true },
 				{ arg: "parentName", expect: "nudeps-demo-vue" },
 				{ arg: "localDir", expect: "./client_modules/vue@3.5.26" },
+				{ arg: "sourcePath", expect: "../vue/node_modules/vue" },
 			],
 		},
 		// Case A with reuse: same flat path
@@ -201,6 +202,7 @@ export default {
 				{ arg: "name", expect: "dep" },
 				{ arg: "isExternal", expect: true },
 				{ arg: "localDir", expect: "./client_modules/dep@2.0.0" },
+				{ arg: "sourcePath", expect: "../ext/node_modules/dep" },
 			],
 		},
 	],

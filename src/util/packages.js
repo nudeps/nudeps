@@ -153,6 +153,7 @@ export default class Packages {
 		// If not found directly, check if the path goes through an external dep.
 		// Case A: base is the external's resolved path (e.g., ../vue/node_modules/vue)
 		// Case B: first package is external (e.g., node_modules/ext-pkg/node_modules/dep)
+		let effectiveBase = base;
 		if (!pkg) {
 			let resolvedBase = base && base !== "." ? base : null;
 
@@ -169,10 +170,11 @@ export default class Packages {
 
 			if (resolvedBase) {
 				pkg = this.#byKey[resolvedBase + "/" + key] ?? null;
+				if (pkg) effectiveBase = resolvedBase;
 			}
 		}
 
-		let sourcePath = (base === "." ? "" : base + "/") + key;
+		let sourcePath = (effectiveBase === "." ? "" : effectiveBase + "/") + key;
 		if (!sourcePath.startsWith(".")) sourcePath = "./" + sourcePath;
 
 		return (this.#parseCache[url] = { pkg, filePath, sourcePath });
