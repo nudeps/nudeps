@@ -107,7 +107,7 @@ export default async function (options) {
 
 	let { toCopy } = nudeps;
 
-	const { map, stats } = nudeps;
+	const { map, stats, packages } = nudeps;
 
 	for (let { specifier, url, map: subMap } of map) {
 		stats.entries++;
@@ -117,17 +117,18 @@ export default async function (options) {
 			continue;
 		}
 
-		let modulePath = nudeps.path(url);
+		let { pkg, filePath, sourcePath } = packages.parse(url);
 
-		let urlFromMap = path.relative(path.dirname(config.map), modulePath.localPath); // Note: path.relative() might normalize away the trailing slash for directories
+		let localPath = pkg ? nudeps.localPath(pkg, filePath) : config.dir + "/" + filePath;
+		let urlFromMap = path.relative(path.dirname(config.map), localPath); // Note: path.relative() might normalize away the trailing slash for directories
 		urlFromMap = urlFromMap.startsWith(".") ? urlFromMap : "./" + urlFromMap;
 		if (specifier.endsWith("/") && !urlFromMap.endsWith("/")) {
 			// Preserve directory specifiers that require a trailing slash in import maps
 			urlFromMap += "/";
 		}
 		subMap[specifier] = urlFromMap;
-		if (modulePath.packages.length > 0) {
-			toCopy[modulePath.nodeDir] ??= modulePath.localDir;
+		if (pkg) {
+			toCopy[sourcePath] ??= nudeps.localDir(pkg);
 		}
 	}
 
@@ -138,10 +139,11 @@ export default async function (options) {
 			}
 
 			// Rewrite scope itself
-			let scopeFromMap = path.relative(path.dirname(config.map), nudeps.path(scope).localDir);
+			let { pkg: scopePkg } = packages.parse(scope);
+			let scopeLocalDir = scopePkg ? nudeps.localDir(scopePkg) : config.dir;
+			let scopeFromMap = path.relative(path.dirname(config.map), scopeLocalDir);
 			scopeFromMap = scopeFromMap.startsWith(".") ? scopeFromMap : "./" + scopeFromMap;
-			let localDir = scopeFromMap;
-			map.scopes[localDir] = map.scopes[scope];
+			map.scopes[scopeFromMap] = map.scopes[scope];
 			delete map.scopes[scope];
 		}
 	}
@@ -204,33 +206,30 @@ export default async function (options) {
 	// Register this repo as a dependent of each local dep, so they can propagate changes back.
 	// Only process production dependencies — devDependencies are not installed by nudeps.
 	let prodDeps = new Set(Object.keys(nudeps.pkg.dependencies ?? {}));
-	for (let [lockKey, resolvedPath] of Object.entries(nudeps.pkgLock.external)) {
-		let depName = lockKey.replace(/^node_modules\//, "");
-		if (!prodDeps.has(depName)) {
+	for (let pkg of packages.externals) {
+		if (!prodDeps.has(pkg.installName)) {
 			continue;
 		}
-		if (!existsSync(resolvedPath)) {
+		if (!existsSync(pkg.resolvedPath)) {
 			continue;
 		}
 
-		let depMP = nudeps.path("./" + lockKey);
-		if (!depMP.hasDependency("nudeps")) {
-			// Nudeps not installed on the local dep — it was copied as a regular dependency.
-			// Propagation requires nudeps on both ends.
+		if (!pkg.hasDependency("nudeps")) {
+			// Nudeps not installed on the local dep — propagation requires nudeps on both ends.
 			nudeps.info(
-				`Local dependency at ${resolvedPath} doesn't have nudeps installed; copied as regular dependency. ` +
-					`Install nudeps there to enable symlinking and change propagation.`,
+				`Local dependency at ${pkg.resolvedPath} doesn't have nudeps installed. ` +
+					`Install nudeps there to enable change propagation.`,
 			);
 			continue;
 		}
 
 		// Ensure .nudeps/ exists in the dep, then add ourselves to its dependents list
-		let depNudepsDir = path.join(resolvedPath, ".nudeps");
+		let depNudepsDir = path.join(pkg.resolvedPath, ".nudeps");
 		createGitignoredDir(depNudepsDir);
 
 		let dependentsFile = path.join(depNudepsDir, "local-dependents.json");
 		let dependents = readJSONSync(dependentsFile, { optional: true }) ?? [];
-		let relPath = path.relative(resolvedPath, ".");
+		let relPath = path.relative(pkg.resolvedPath, ".");
 
 		if (!dependents.includes(relPath)) {
 			dependents.push(relPath);

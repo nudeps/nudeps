@@ -1,7 +1,7 @@
-import pathsTests from "./paths.js";
+import packagesTests from "./packages.js";
 import readJSONTests from "./read-json.js";
 
 export default {
 	name: "util tests",
-	tests: [pathsTests, readJSONTests],
+	tests: [packagesTests, readJSONTests],
 };

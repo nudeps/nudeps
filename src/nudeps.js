@@ -4,13 +4,12 @@
 
 import { readJSONSync, writeJSONSync } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
-import ModulePath from "./util/path.js";
 import { matchesGlob, ensureSymlink } from "./util/fs.js";
 
 import { getTopLevelModules } from "./util.js";
 import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
-import PackageLock from "./util/package-lock.js";
+import Packages from "./util/packages.js";
 import nudepsPkg from "../package.json" with { type: "json" };
 
 export default class Nudeps {
@@ -93,7 +92,7 @@ export default class Nudeps {
 		return value;
 	}
 
-	get pkgLock () {
+	get packages () {
 		if (!existsSync("node_modules") && existsSync("package.json")) {
 			throw new Error("node_modules not found. Run `npm install` first.");
 		}
@@ -122,8 +121,8 @@ export default class Nudeps {
 			}
 		}
 
-		let value = new PackageLock(data, { children });
-		Object.defineProperty(this, "pkgLock", { value, configurable: true });
+		let value = new Packages(data, { children });
+		Object.defineProperty(this, "packages", { value, configurable: true });
 		return value;
 	}
 
@@ -151,20 +150,12 @@ export default class Nudeps {
 		return value;
 	}
 
-	get packages () {
-		return this.pkgLock?.packages ?? {};
-	}
-
 	get dir () {
 		return this.config.dir;
 	}
 
 	get elapsedTime () {
 		return performance.now() - this.stats.startTime;
-	}
-
-	path (url) {
-		return ModulePath.from(url, this);
 	}
 
 	info (...messages) {
@@ -176,9 +167,70 @@ export default class Nudeps {
 	}
 
 	/**
-	 * Check if a path is ignored by the ignore configuration
-	 * @param {*} path
-	 * @returns
+	 * Compute the client_modules output directory for a package.
+	 * All packages go to top-level client_modules.
+	 * @param {import("./util/package.js").default} pkg
+	 * @returns {string}
+	 */
+	localDir (pkg) {
+		if (!pkg?.name) {
+			return this.dir;
+		}
+
+		return [this.dir, pkg.dirName].join("/");
+	}
+
+	/**
+	 * Compute the client_modules output path for a file within a package.
+	 * @param {import("./util/package.js").default} pkg
+	 * @param {string} filePath
+	 * @returns {string}
+	 */
+	localPath (pkg, filePath) {
+		return [this.localDir(pkg), filePath].join("/");
+	}
+
+	/**
+	 * Resolve alias config into alias paths for a package.
+	 * @param {import("./util/package.js").default} pkg
+	 * @param {*} [alias] - Alias config; defaults to this.config.alias
+	 * @returns {string[]}
+	 */
+	aliases (pkg, alias = this.config.alias) {
+		if (!alias) {
+			return [];
+		}
+
+		if (alias === true) {
+			return pkg.parent ? [] : [pkg.installName];
+		}
+
+		if (Array.isArray(alias)) {
+			return alias.flatMap(item => this.aliases(pkg, item));
+		}
+
+		if (typeof alias === "string") {
+			return pkg.name === alias || pkg.installName === alias ? [alias] : [];
+		}
+
+		// Object form: resolve to value via key lookup, then fall through
+		if (typeof alias === "object") {
+			alias = alias[pkg.installName] ?? alias[pkg.name];
+		}
+
+		// Function form (top-level or object value)
+		if (typeof alias === "function") {
+			alias = alias(pkg);
+		}
+
+		return alias == null ? [] : [alias].flat();
+	}
+
+	/**
+	 * Whether symlinks should be dereferenced (resolved to real paths) when copying a package.
+	 * @param {string} packageName
+	 * @param {string} version
+	 * @returns {boolean}
 	 */
 	dereference (packageName, version) {
 		switch (typeof this.config.preserveSymlinks) {
@@ -196,14 +248,14 @@ export default class Nudeps {
 		return true;
 	}
 
-	shouldSymlink (mp) {
+	shouldSymlink (pkg) {
 		let { symlink } = this.config;
 
 		if (typeof symlink === "boolean") {
 			return symlink;
 		}
 
-		return symlink(mp);
+		return symlink(pkg);
 	}
 
 	isPathIgnored (path, packageName) {
@@ -239,10 +291,10 @@ export default class Nudeps {
 		// Copy (or symlink) package directories
 		for (let from in toCopy) {
 			let to = toCopy[from];
-			let mp = this.path(from);
+			let { pkg } = this.packages.parse(from);
 
 			let exists = existingDirs.has(to);
-			let needsRecreate = exists && existingSymlinks.has(to) !== this.shouldSymlink(mp);
+			let needsRecreate = exists && existingSymlinks.has(to) !== this.shouldSymlink(pkg);
 
 			if (needsRecreate) {
 				rmSync(to, { recursive: true });
@@ -252,7 +304,7 @@ export default class Nudeps {
 			if (exists && !needsRecreate) {
 				toDelete.delete(to);
 			}
-			else if (this.shouldSymlink(mp)) {
+			else if (this.shouldSymlink(pkg)) {
 				// Create a symlink to the source path (resolves through links for external deps)
 				let target = path.relative(path.dirname(to), from);
 				mkdirSync(path.dirname(to), { recursive: true });
@@ -261,9 +313,8 @@ export default class Nudeps {
 			}
 			else {
 				stats.copied++;
-				let { packageName, version } = mp;
 				cpSync(from, to, {
-					dereference: this.dereference(packageName, version),
+					dereference: this.dereference(pkg.name, pkg.version),
 					preserveTimestamps: true,
 					recursive: true,
 					filter: src => {
@@ -278,15 +329,15 @@ export default class Nudeps {
 							return false;
 						}
 
-						let { packageName } = this.path(src);
-						return !this.isPathIgnored(relativePath, packageName);
+						let { pkg: srcPkg } = this.packages.parse(src);
+						return !this.isPathIgnored(relativePath, srcPkg?.name);
 					},
 				});
 			}
 
 			// Create alias symlinks (unversioned paths pointing to versioned directories)
 			if (config.alias) {
-				for (let alias of mp.aliases) {
+				for (let alias of this.aliases(pkg)) {
 					let aliasPath = path.normalize(config.dir + "/" + alias);
 					let relTarget = path.relative(path.dirname(aliasPath), to);
 					let exists = existingDirs.has(aliasPath);
