@@ -28,7 +28,7 @@ export default class Packages {
 
 			this.#byKey[key] = new Package({
 				installName,
-				name: resolved?.name ?? installName,
+				name: resolved?.name,
 				version: resolved?.version,
 				path: "./" + key,
 				resolvedPath: info.link ? info.resolved : undefined,
