@@ -55,6 +55,7 @@ export const cjs = {
 };
 
 export const combineSubpaths = {
+	flag: "combine-subpaths",
 	default: false,
 };
 
