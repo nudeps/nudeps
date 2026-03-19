@@ -38,9 +38,11 @@ export default class Packages {
 			});
 		}
 
+		this.#values = Object.values(this.#byKey);
+
 		// Merge child lockfile entries for external deps, keyed by full path
 		// (e.g., "../vue/node_modules/vue") so parse() can find them directly
-		for (let pkg of Object.values(this.#byKey)) {
+		for (let pkg of this.#values) {
 			if (!pkg.isExternal) continue;
 			let childRaw = children[pkg.resolvedPath]?.packages ?? {};
 			for (let [childKey, childInfo] of Object.entries(childRaw)) {
@@ -48,7 +50,7 @@ export default class Packages {
 				let fullKey = pkg.resolvedPath + "/" + childKey;
 				if (!(fullKey in this.#byKey)) {
 					let installName = childKey.split("node_modules/").at(-1).replace(/\/$/, "");
-					this.#byKey[fullKey] = new Package({
+					let childPkg = new Package({
 						installName,
 						name: childInfo?.name,
 						version: childInfo?.version,
@@ -56,6 +58,8 @@ export default class Packages {
 						parent: pkg,
 						info: childInfo,
 					});
+					this.#byKey[fullKey] = childPkg;
+					this.#values.push(childPkg);
 				}
 			}
 		}
@@ -69,8 +73,7 @@ export default class Packages {
 			}
 		}
 
-		// Build indexes
-		this.#values = Object.values(this.#byKey);
+		// Build #byName index
 		for (let pkg of this.#values) {
 			this.#byName[pkg.name] ??= pkg;
 		}
