@@ -61,9 +61,9 @@ export class ImportMapGenerator extends Generator {
 	async install (alias, target = `./node_modules/${alias}`, { noRetry, ...installOptions } = {}) {
 		// Check if this install is cacheable:
 		// must have a cache, not be the root package ("."), and not be a symlink (local dep)
-		let mp = this.nudeps && target !== "." ? this.nudeps.path(target) : null;
-		let shouldCache = this.installCache && mp?.version && !mp.isExternal;
-		let cacheKey = shouldCache ? mp.localDir : null;
+		let pkg = this.nudeps && target !== "." ? this.nudeps.packages.parse(target).pkg : null;
+		let shouldCache = this.installCache && pkg?.version && !pkg.isExternal;
+		let cacheKey = shouldCache ? this.nudeps.localDir(pkg) : null;
 
 		// Cache hit — skip JSPM entirely
 		if (shouldCache && cacheKey in this.installCache) {
@@ -167,10 +167,10 @@ export class ImportMapGenerator extends Generator {
 		// Only flag packages as CJS if they have no ESM exports at all
 		let esmPackages = new Set(
 			this.getEntries(e => e?.format === "esm")
-				.map(([url]) => this.nudeps.path(url).packageName),
+				.map(([url]) => this.nudeps.packages.parse(url).pkg?.name),
 		);
 		let cjsEntries = this.getEntries(e => e?.format === "commonjs")
-			.filter(([url]) => !esmPackages.has(this.nudeps.path(url).packageName));
+			.filter(([url]) => !esmPackages.has(this.nudeps.packages.parse(url).pkg?.name));
 
 		if (cjsEntries.length === 0) {
 			return;
@@ -178,17 +178,18 @@ export class ImportMapGenerator extends Generator {
 
 		// Find cjs-browser-shim in the lockfile — prefer the user's own copy (shallowest).
 		// If not found, look for it under nudeps' own node_modules.
-		let { pkgLock } = this.nudeps;
-		let shimKey = pkgLock.getPathsFor("cjs-browser-shim")[0];
-		if (!shimKey) {
-			let nudepsKey = pkgLock.getPathsFor("nudeps")[0];
-			if (nudepsKey) {
-				shimKey = nudepsKey + "/node_modules/cjs-browser-shim";
-			}
+		let { packages } = this.nudeps;
+		let shimPkg = packages.getAll("cjs-browser-shim")[0];
+		let shimPath = shimPkg?.path;
+		if (!shimPath) {
+			let nudepsPkg = packages.getAll("nudeps")[0];
+			shimPath = nudepsPkg
+				? nudepsPkg.path + "/node_modules/cjs-browser-shim"
+				: "./node_modules/cjs-browser-shim";
 		}
-		await this.install("cjs-browser-shim", "./" + (shimKey ?? "node_modules/cjs-browser-shim"), { noRetry: true });
+		await this.install("cjs-browser-shim", shimPath, { noRetry: true });
 
-		let cjsPackages = [...new Set(cjsEntries.map(([url]) => this.nudeps.path(url).packageName))];
+		let cjsPackages = [...new Set(cjsEntries.map(([url]) => packages.parse(url).pkg?.name))];
 		let directCjsDeps = cjsPackages.filter(
 			name => name in (this.nudeps.pkg.dependencies ?? {}),
 		);

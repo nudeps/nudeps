@@ -1,5 +1,4 @@
 export * from "./util/fs.js";
-export * from "./util/path.js";
 import { builtinModules } from "node:module";
 
 /**
