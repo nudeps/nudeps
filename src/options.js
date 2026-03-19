@@ -90,7 +90,7 @@ export const ignore = {
 };
 
 export const symlink = {
-	default: mp => mp.isExternal,
+	default: pkg => pkg.isExternal,
 };
 
 export const preserveSymlinks = {
