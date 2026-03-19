@@ -54,6 +54,11 @@ export const cjs = {
 	default: true,
 };
 
+export const combineSubpaths = {
+	flag: "combine-subpaths",
+	default: false,
+};
+
 export const ignore = {
 	default: [
 		// Readme files with any extension

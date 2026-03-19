@@ -129,6 +129,7 @@ export default class Nudeps {
 	get generator () {
 		let generatorOptions = {
 			commonJS: this.config.cjs,
+			combineSubpaths: this.config.combineSubpaths,
 			installCache: this.installCache ?? null,
 			nudeps: this,
 		};
