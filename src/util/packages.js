@@ -43,24 +43,34 @@ export default class Packages {
 		// Merge child lockfile entries for external deps, keyed by full path
 		// (e.g., "../vue/node_modules/vue") so parse() can find them directly
 		for (let pkg of this.#values) {
-			if (!pkg.isExternal) continue;
+			if (!pkg.isExternal) {
+				continue;
+			}
+
 			let childRaw = children[pkg.resolvedPath]?.packages ?? {};
+
 			for (let [childKey, childInfo] of Object.entries(childRaw)) {
-				if (!childKey) continue;
-				let fullKey = pkg.resolvedPath + "/" + childKey;
-				if (!(fullKey in this.#byKey)) {
-					let installName = childKey.split("node_modules/").at(-1).replace(/\/$/, "");
-					let childPkg = new Package({
-						installName,
-						name: childInfo?.name,
-						version: childInfo?.version,
-						path: fullKey.startsWith(".") ? fullKey : "./" + fullKey,
-						parent: pkg,
-						info: childInfo,
-					});
-					this.#byKey[fullKey] = childPkg;
-					this.#values.push(childPkg);
+				if (!childKey) {
+					continue;
 				}
+
+				let fullKey = pkg.resolvedPath + "/" + childKey;
+				if (fullKey in this.#byKey) {
+					continue;
+				}
+
+				let installName = childKey.split("node_modules/").at(-1).replace(/\/$/, "");
+				let childPkg = new Package({
+					installName,
+					name: childInfo?.name,
+					version: childInfo?.version,
+					path: fullKey.startsWith(".") ? fullKey : "./" + fullKey,
+					parent: pkg,
+					info: childInfo,
+				});
+
+				this.#byKey[fullKey] = childPkg;
+				this.#values.push(childPkg);
 			}
 		}
 
