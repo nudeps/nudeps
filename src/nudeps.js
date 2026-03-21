@@ -259,10 +259,12 @@ export default class Nudeps {
 		return symlink(pkg);
 	}
 
-	isPathIgnored (path, packageName) {
-		if (!path) {
+	isPathIgnored (filePath, pkg) {
+		if (!filePath) {
 			return false;
 		}
+
+		let packageName = pkg?.name;
 
 		// If we traverse backwards we can stop once we find a pattern that would change the inclusion status
 		for (let i = this.config.ignore.length - 1; i >= 0; i--) {
@@ -273,10 +275,26 @@ export default class Nudeps {
 			}
 
 			let glob = p.exclude ?? p.include;
-			let matches = matchesGlob(path, glob);
+			let matches = matchesGlob(filePath, glob);
 
 			if (matches) {
-				return Boolean(p.exclude);
+				if (!p.exclude) {
+					return false;
+				}
+
+				// Don't ignore files that are explicitly exported in the import map
+				if (pkg) {
+					let rel = path.relative(
+						path.dirname(this.config.map),
+						this.localPath(pkg, filePath),
+					);
+					let fullUrl = rel.startsWith(".") ? rel : "./" + rel;
+					if (this.map.exportedUrls.has(fullUrl)) {
+						return false;
+					}
+				}
+
+				return true;
 			}
 		}
 
@@ -331,7 +349,7 @@ export default class Nudeps {
 						}
 
 						let { pkg: srcPkg } = this.packages.parse(src);
-						return !this.isPathIgnored(relativePath, srcPkg?.name);
+						return !this.isPathIgnored(relativePath, srcPkg);
 					},
 				});
 			}

@@ -225,6 +225,17 @@ export class ImportMap {
 	}
 
 	/**
+	 * Flat set of all URL values in the map, used to exempt explicitly-exported files from
+	 * ignore patterns. Only exact URL matches are checked — directory/prefix exports
+	 * (e.g. "pkg/": "./client_modules/pkg@v/") are not covered and may still be ignored.
+	 */
+	get exportedUrls () {
+		let urls = new Set([...this].map(({ url }) => url));
+		Object.defineProperty(this, "exportedUrls", { value: urls, configurable: true });
+		return urls;
+	}
+
+	/**
 	 * This function processes map.scopes and does the following:
 	 * 1. Removes redundant scopes, i.e. scopes that are identical to their parent
 	 * 2. Hoists specifiers to parent scopes if they would otherwise be undefined
