@@ -34,6 +34,7 @@ export class ImportMapGenerator extends Generator {
 		this.installCache = installCache ?? null;
 		this.nudeps = nudeps ?? null;
 		this.mapsToMerge = [];
+		this.expandedMapsToMerge = [];
 		this.staleCacheKeys = new Set(Object.keys(installCache ?? {}));
 		this.stats = { cacheHits: 0, cacheMisses: 0 };
 		// Save options for creating temp generators on cache miss
@@ -65,24 +66,43 @@ export class ImportMapGenerator extends Generator {
 		let shouldCache = this.installCache && pkg?.version && !pkg.isExternal;
 		let cacheKey = shouldCache ? this.nudeps.localDir(pkg) : null;
 
-		// Cache hit — skip JSPM entirely
-		if (shouldCache && cacheKey in this.installCache) {
-			this.stats.cacheHits++;
-			this.staleCacheKeys.delete(cacheKey);
-			this.mapsToMerge.push(this.installCache[cacheKey]);
-			return;
-		}
-
-		// Cache miss — resolve on a temporary generator and capture the result
 		if (shouldCache) {
-			this.stats.cacheMisses++;
-			let tempGen = new ImportMapGenerator(this._options);
-			await tempGen.install(alias, target, { noRetry, ...installOptions });
-			await tempGen.finalize();
+			let entry = this.installCache[cacheKey];
 
-			let depMap = tempGen.getMap();
-			this.installCache[cacheKey] = depMap;
-			this.mapsToMerge.push(depMap);
+			// Cache hit — skip JSPM entirely
+			if (entry) {
+				this.stats.cacheHits++;
+				this.staleCacheKeys.delete(cacheKey);
+				this.expandedMapsToMerge.push(entry.expanded);
+				this.mapsToMerge.push(entry.output ?? entry.expanded);
+				return;
+			}
+
+			// Cache miss — generate both expanded (for exportedUrls) and output (for the map)
+			this.stats.cacheMisses++;
+
+			let expandedGen = new ImportMapGenerator({
+				...this._options,
+				expandWildcards: true,
+				combineSubpaths: false,
+			});
+			await expandedGen.install(alias, target, { noRetry, ...installOptions });
+			await expandedGen.finalize();
+			let expanded = expandedGen.getMap();
+
+			// Output map only differs from expanded when user hasn't opted into expandWildcards
+			let output;
+			if (this._options.expandWildcards !== true) {
+				let outputGen = new ImportMapGenerator(this._options);
+				await outputGen.install(alias, target, { noRetry, ...installOptions });
+				await outputGen.finalize();
+				output = outputGen.getMap();
+			}
+
+			this.installCache[cacheKey] = output ? { expanded, output } : { expanded };
+			this.staleCacheKeys.delete(cacheKey);
+			this.expandedMapsToMerge.push(expanded);
+			this.mapsToMerge.push(output ?? expanded);
 			return;
 		}
 
@@ -123,6 +143,20 @@ export class ImportMapGenerator extends Generator {
 	getMap () {
 		let map = super.getMap();
 		for (let cached of this.mapsToMerge) {
+			deepAssign(map, cached);
+		}
+		return map;
+	}
+
+	/**
+	 * Returns a merged map of all per-package expanded maps (expandWildcards: true,
+	 * combineSubpaths: false), giving concrete file URLs for every exported subpath.
+	 * Used by ImportMap.exportedUrls. Root and external packages are excluded — their
+	 * files are not individually copied so they don't need to contribute.
+	 */
+	getExpandedMap () {
+		let map = {};
+		for (let cached of this.expandedMapsToMerge) {
 			deepAssign(map, cached);
 		}
 		return map;
@@ -225,12 +259,16 @@ export class ImportMap {
 	}
 
 	/**
-	 * Flat set of all URL values in the map, used to exempt explicitly-exported files from
-	 * ignore patterns. Only exact URL matches are checked — directory/prefix exports
-	 * (e.g. "pkg/": "./client_modules/pkg@v/") are not covered and may still be ignored.
+	 * Flat set of all concrete exported file URLs, used to exempt explicitly-exported files
+	 * from ignore patterns. Built from the expanded map (expandWildcards: true) so that all
+	 * exported subpaths appear as concrete file URLs rather than URL prefixes.
 	 */
 	get exportedUrls () {
-		let urls = new Set([...this].map(({ url }) => url));
+		let map = this.generator.getExpandedMap();
+		let urls = new Set([
+			...Object.values(map.imports ?? {}),
+			...Object.values(map.scopes ?? {}).flatMap(s => Object.values(s)),
+		]);
 		Object.defineProperty(this, "exportedUrls", { value: urls, configurable: true });
 		return urls;
 	}
