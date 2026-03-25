@@ -74,7 +74,7 @@ export class ImportMapGenerator extends Generator {
 				this.stats.cacheHits++;
 				this.staleCacheKeys.delete(cacheKey);
 				this.expandedMapsToMerge.push(entry.expanded);
-				this.mapsToMerge.push(entry.output ?? entry.expanded);
+				this.mapsToMerge.push(entry.output);
 				return;
 			}
 
@@ -90,19 +90,15 @@ export class ImportMapGenerator extends Generator {
 			await expandedGen.finalize();
 			let expanded = expandedGen.getMap();
 
-			// Output map only differs from expanded when user hasn't opted into expandWildcards
-			let output;
-			if (this._options.expandWildcards !== true) {
-				let outputGen = new ImportMapGenerator(this._options);
-				await outputGen.install(alias, target, { noRetry, ...installOptions });
-				await outputGen.finalize();
-				output = outputGen.getMap();
-			}
+			let outputGen = new ImportMapGenerator(this._options);
+			await outputGen.install(alias, target, { noRetry, ...installOptions });
+			await outputGen.finalize();
+			let output = outputGen.getMap();
 
-			this.installCache[cacheKey] = output ? { expanded, output } : { expanded };
+			this.installCache[cacheKey] = { expanded, output };
 			this.staleCacheKeys.delete(cacheKey);
 			this.expandedMapsToMerge.push(expanded);
-			this.mapsToMerge.push(output ?? expanded);
+			this.mapsToMerge.push(output);
 			return;
 		}
 
