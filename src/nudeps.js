@@ -51,30 +51,44 @@ export default class Nudeps {
 		this.hasDeepGlobs = this.config.ignore.some(p => (p.include ?? p.exclude)?.includes("/"));
 	}
 
-	get installCache () {
+	#loadCache (file) {
 		let configChanged = JSON.stringify(this.oldConfig) !== JSON.stringify(this.config);
-		let cacheData = readJSONSync(".nudeps/cache.json", { optional: true });
+		let cacheData = readJSONSync(file, { optional: true });
 
 		if (cacheData?.version !== nudepsPkg.version || configChanged) {
 			cacheData = null;
 		}
 
-		let value = cacheData?.packages ?? {};
+		return cacheData?.packages ?? {};
+	}
+
+	get installCache () {
+		let value = this.#loadCache(".nudeps/cache.json");
 		Object.defineProperty(this, "installCache", { value, writable: true, configurable: true });
 		return value;
 	}
 
+	get exportsCache () {
+		let value = this.#loadCache(".nudeps/exports.json");
+		Object.defineProperty(this, "exportsCache", { value, writable: true, configurable: true });
+		return value;
+	}
+
 	/**
-	 * Persist the install cache to disk. Skips writing if cache is empty.
+	 * Persist the install cache and exports cache to disk.
 	 */
 	saveCache () {
-		if (!this.installCache || Object.keys(this.installCache).length === 0) {
+		if (Object.keys(this.installCache).length === 0) {
 			return;
 		}
 
 		writeJSONSync(".nudeps/cache.json", {
 			version: nudepsPkg.version,
 			packages: this.installCache,
+		});
+		writeJSONSync(".nudeps/exports.json", {
+			version: nudepsPkg.version,
+			packages: this.exportsCache,
 		});
 	}
 
@@ -130,7 +144,8 @@ export default class Nudeps {
 		let generatorOptions = {
 			commonJS: this.config.cjs,
 			combineSubpaths: this.config.combineSubpaths,
-			installCache: this.installCache ?? null,
+			installCache: this.installCache,
+			exportsCache: this.exportsCache,
 			nudeps: this,
 		};
 
