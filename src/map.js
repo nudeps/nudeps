@@ -10,10 +10,9 @@ export class ImportMapGenerator extends Generator {
 	/**
 	 * @param {object} [options]
 	 * @param {object} [options.installCache] - Per-package output map cache (mutated on miss), or null
-	 * @param {object} [options.exportsCache] - Per-package exported URL list cache (mutated on miss), or null
 	 * @param {import("../nudeps.js").default} [options.nudeps] - Nudeps instance for lock data access
 	 */
-	constructor ({ mode, installCache, exportsCache, nudeps, ...generatorOptions } = {}) {
+	constructor ({ mode, installCache, nudeps, ...generatorOptions } = {}) {
 		if (mode) {
 			this.mode = mode;
 			generatorOptions.env ??= [mode, "browser", "module"];
@@ -33,15 +32,13 @@ export class ImportMapGenerator extends Generator {
 
 		this.commonJS = commonJS;
 		this.installCache = installCache ?? null;
-		this.exportsCache = exportsCache ?? null;
 		this.nudeps = nudeps ?? null;
 		this.mapsToMerge = [];
-		this.exportedUrlsList = [];
 		this.staleCacheKeys = new Set(Object.keys(installCache ?? {}));
 		this.stats = { cacheHits: 0, cacheMisses: 0 };
-		// installCache and exportsCache are intentionally excluded from _options so that
-		// temp generators created on cache miss always have null caches and go straight
-		// to super.install(), preventing infinite recursion and shared-cache mutation.
+		// installCache is intentionally excluded from _options so that temp generators
+		// created on cache miss always have null caches and go straight to super.install(),
+		// preventing infinite recursion and shared-cache mutation.
 		this._options = { mode, nudeps, ...generatorOptions };
 
 		// Apply JSPM community overrides (client-side equivalent of what jspm.io CDN does server-side)
@@ -72,49 +69,25 @@ export class ImportMapGenerator extends Generator {
 
 		if (shouldCache) {
 			let outputMap = this.installCache[cacheKey];
-			let urlList = this.exportsCache?.[cacheKey];
 
-			// Full cache hit — skip JSPM entirely
-			if (outputMap && urlList) {
+			// Cache hit — skip JSPM entirely
+			if (outputMap) {
 				this.stats.cacheHits++;
 				this.staleCacheKeys.delete(cacheKey);
-				this.exportedUrlsList.push(urlList);
 				this.mapsToMerge.push(outputMap);
 				return;
 			}
 
 			this.stats.cacheMisses++;
 
-			// Generate expanded map → extract flat URL list for exports.json
-			if (!urlList) {
-				let expandedGen = new ImportMapGenerator({
-					...this._options,
-					expandWildcards: true,
-					combineSubpaths: false,
-				});
-				await expandedGen.install(alias, target, { noRetry, ...installOptions });
-				await expandedGen.finalize();
-				let expandedMap = expandedGen.getMap();
-				urlList = [
-					...Object.values(expandedMap.imports ?? {}),
-					...Object.values(expandedMap.scopes ?? {}).flatMap(s => Object.values(s)),
-				];
-				if (this.exportsCache) {
-					this.exportsCache[cacheKey] = urlList;
-				}
-			}
-
 			// Generate output map with user's settings
-			if (!outputMap) {
-				let outputGen = new ImportMapGenerator(this._options);
-				await outputGen.install(alias, target, { noRetry, ...installOptions });
-				await outputGen.finalize();
-				outputMap = outputGen.getMap();
-				this.installCache[cacheKey] = outputMap;
-			}
+			let outputGen = new ImportMapGenerator(this._options);
+			await outputGen.install(alias, target, { noRetry, ...installOptions });
+			await outputGen.finalize();
+			outputMap = outputGen.getMap();
+			this.installCache[cacheKey] = outputMap;
 
 			this.staleCacheKeys.delete(cacheKey);
-			this.exportedUrlsList.push(urlList);
 			this.mapsToMerge.push(outputMap);
 			return;
 		}
@@ -161,16 +134,6 @@ export class ImportMapGenerator extends Generator {
 		return map;
 	}
 
-	/**
-	 * Returns the flat set of all concrete exported file URLs across all cached packages,
-	 * sourced from exports.json (generated with expandWildcards: true). Used by
-	 * ImportMap.exportedUrls to exempt explicitly-exported files from ignore patterns.
-	 * Root and external packages are excluded — their files are not individually copied.
-	 */
-	getExportedUrls () {
-		return new Set(this.exportedUrlsList.flat());
-	}
-
 	getEntries (fn) {
 		const resolver = this.traceMap?.resolver;
 
@@ -190,7 +153,6 @@ export class ImportMapGenerator extends Generator {
 		// Prune stale cache entries (packages no longer encountered)
 		for (let key of this.staleCacheKeys) {
 			delete this.installCache[key];
-			delete this.exportsCache?.[key];
 		}
 	}
 
@@ -210,11 +172,13 @@ export class ImportMapGenerator extends Generator {
 
 		// Only flag packages as CJS if they have no ESM exports at all
 		let esmPackages = new Set(
-			this.getEntries(e => e?.format === "esm")
-				.map(([url]) => this.nudeps.packages.parse(url).pkg?.name),
+			this.getEntries(e => e?.format === "esm").map(
+				([url]) => this.nudeps.packages.parse(url).pkg?.name,
+			),
 		);
-		let cjsEntries = this.getEntries(e => e?.format === "commonjs")
-			.filter(([url]) => !esmPackages.has(this.nudeps.packages.parse(url).pkg?.name));
+		let cjsEntries = this.getEntries(e => e?.format === "commonjs").filter(
+			([url]) => !esmPackages.has(this.nudeps.packages.parse(url).pkg?.name),
+		);
 
 		if (cjsEntries.length === 0) {
 			return;
@@ -266,17 +230,6 @@ export class ImportMap {
 	}
 	set scopes (scopes) {
 		this.map.scopes = scopes;
-	}
-
-	/**
-	 * Flat set of all concrete exported file URLs, used to exempt explicitly-exported files
-	 * from ignore patterns. Sourced from exports.json (generated with expandWildcards: true)
-	 * so that all exported subpaths appear as concrete file URLs rather than URL prefixes.
-	 */
-	get exportedUrls () {
-		let urls = this.generator.getExportedUrls();
-		Object.defineProperty(this, "exportedUrls", { value: urls, configurable: true });
-		return urls;
 	}
 
 	/**
