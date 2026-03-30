@@ -53,19 +53,13 @@ export default class Nudeps {
 		this.hasDeepGlobs = this.config.ignore.some(p => (p.include ?? p.exclude)?.includes("/"));
 	}
 
-	#loadCache (file) {
+	get installCache () {
 		let configChanged = JSON.stringify(this.oldConfig) !== JSON.stringify(this.config);
-		let cacheData = readJSONSync(file, { optional: true });
-
+		let cacheData = readJSONSync(".nudeps/cache.json", { optional: true });
 		if (cacheData?.version !== nudepsPkg.version || configChanged) {
 			cacheData = null;
 		}
-
-		return cacheData?.packages ?? {};
-	}
-
-	get installCache () {
-		let value = this.#loadCache(".nudeps/cache.json");
+		let value = cacheData?.packages ?? {};
 		Object.defineProperty(this, "installCache", { value, writable: true, configurable: true });
 		return value;
 	}
@@ -223,12 +217,13 @@ export default class Nudeps {
 			return new Set(cached);
 		}
 
-		// Cache miss — generate an expanded trace to enumerate concrete exported URLs
+		// Cache miss — generate an expanded trace to enumerate concrete exported URLs.
+		// silent: true suppresses the CJS shim log from finalize() since this is internal.
 		let expandedGen = new ImportMapGenerator({
 			...this.generator._options,
 			expandWildcards: true,
 			combineSubpaths: false,
-			commonJS: false, // skip CJS shim; we only need exported URL paths
+			silent: true,
 		});
 
 		try {

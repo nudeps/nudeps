@@ -11,8 +11,9 @@ export class ImportMapGenerator extends Generator {
 	 * @param {object} [options]
 	 * @param {object} [options.installCache] - Per-package output map cache (mutated on miss), or null
 	 * @param {import("../nudeps.js").default} [options.nudeps] - Nudeps instance for lock data access
+	 * @param {boolean} [options.silent] - Suppress user-facing log messages (for internal temp generators)
 	 */
-	constructor ({ mode, installCache, nudeps, ...generatorOptions } = {}) {
+	constructor ({ mode, installCache, silent, nudeps, ...generatorOptions } = {}) {
 		if (mode) {
 			this.mode = mode;
 			generatorOptions.env ??= [mode, "browser", "module"];
@@ -33,12 +34,13 @@ export class ImportMapGenerator extends Generator {
 		this.commonJS = commonJS;
 		this.installCache = installCache ?? null;
 		this.nudeps = nudeps ?? null;
+		this.silent = silent ?? false;
 		this.mapsToMerge = [];
 		this.staleCacheKeys = new Set(Object.keys(installCache ?? {}));
 		this.stats = { cacheHits: 0, cacheMisses: 0 };
-		// installCache is intentionally excluded from _options so that temp generators
-		// created on cache miss always have null caches and go straight to super.install(),
-		// preventing infinite recursion and shared-cache mutation.
+		// installCache and silent are intentionally excluded from _options: installCache so that
+		// temp generators always have null caches (preventing recursion); silent so that
+		// sub-generators created on cache miss still produce user-facing log messages.
 		this._options = { mode, nudeps, ...generatorOptions };
 
 		// Apply JSPM community overrides (client-side equivalent of what jspm.io CDN does server-side)
@@ -206,9 +208,11 @@ export class ImportMapGenerator extends Generator {
 		if (directCjsDeps.length > 0) {
 			requireMsg = `Use require() to import these packages: ${directCjsDeps.join(", ")}.`;
 		}
-		this.nudeps.info(
-			`${cjsPackages.length} CommonJS packages detected, adding cjs-browser-shim. ${requireMsg} Disable with --cjs=false`,
-		);
+		if (!this.silent) {
+			this.nudeps.info(
+				`${cjsPackages.length} CommonJS packages detected, adding cjs-browser-shim. ${requireMsg} Disable with --cjs=false`,
+			);
+		}
 	}
 }
 
