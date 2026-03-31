@@ -192,7 +192,7 @@ export default class Nudeps {
 	}
 
 	/**
-	 * Return the set of concrete exported file URLs for a package, loading from
+	 * Return the set of concrete exported file paths (relative to the package root) for a package, loading from
 	 * .nudeps/exports.json on first access and generating an expanded trace
 	 * (expandWildcards: true) on cache miss. The result is stored on pkg.exportedPaths
 	 * so isPathIgnored() can access it synchronously during the subsequent cpSync call.
@@ -236,14 +236,16 @@ export default class Nudeps {
 		}
 
 		let expandedMap = expandedGen.getMap();
-		let urlList = [
+		let filePaths = [
 			...Object.values(expandedMap.imports ?? {}),
 			...Object.values(expandedMap.scopes ?? {}).flatMap(s => Object.values(s)),
-		];
+		]
+			.map(url => this.packages.parse(url).filePath)
+			.filter(Boolean);
 
-		this.#exportsData[key] = urlList;
+		this.#exportsData[key] = filePaths;
 		this.#exportsDirty = true;
-		return new Set(urlList);
+		return new Set(filePaths);
 	}
 
 	/**
@@ -360,15 +362,8 @@ export default class Nudeps {
 				}
 
 				// Don't ignore files that are explicitly exported in the import map
-				if (pkg?.exportedPaths) {
-					let rel = path.relative(
-						path.dirname(this.config.map),
-						this.localPath(pkg, filePath),
-					);
-					let fullUrl = rel.startsWith(".") ? rel : "./" + rel;
-					if (pkg.exportedPaths.has(fullUrl)) {
-						return false;
-					}
+				if (pkg?.exportedPaths?.has(filePath)) {
+					return false;
 				}
 
 				return true;
