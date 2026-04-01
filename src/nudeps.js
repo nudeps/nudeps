@@ -250,16 +250,32 @@ export default class Nudeps {
 
 	/**
 	 * Persist the exports cache to .nudeps/exports.json, but only if new entries were
-	 * generated this run. Prunes entries for packages no longer in the install cache.
+	 * generated this run. Prunes entries for packages no longer in any install cache map
+	 * (direct or transitive).
 	 */
 	saveExports () {
 		if (!this.#exportsDirty) {
 			return;
 		}
 
-		// Prune entries for packages no longer in the install cache (already pruned by finalize)
+		// Build the set of known local dirs from all URLs inside installCache values.
+		// installCache keys are direct deps only, but each value is a full import map
+		// that includes transitive dep URLs in imports and scopes.
+		let knownLocalDirs = new Set(
+			Object.values(this.installCache)
+				.flatMap(map => [
+					...Object.values(map.imports ?? {}),
+					...Object.values(map.scopes ?? {}).flatMap(s => Object.values(s)),
+				])
+				.map(url => {
+					let { pkg } = this.packages.parse(url);
+					return pkg ? this.localDir(pkg) : null;
+				})
+				.filter(Boolean),
+		);
+
 		for (let key of Object.keys(this.#exportsData)) {
-			if (!(key in this.installCache)) {
+			if (!knownLocalDirs.has(key)) {
 				delete this.#exportsData[key];
 			}
 		}
