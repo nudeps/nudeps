@@ -9,10 +9,11 @@ import { findOverride } from "./util/jspm-overrides.js";
 export class ImportMapGenerator extends Generator {
 	/**
 	 * @param {object} [options]
-	 * @param {object} [options.installCache] - Per-package cache map (mutated on miss), or null
+	 * @param {object} [options.installCache] - Per-package output map cache (mutated on miss), or null
 	 * @param {import("../nudeps.js").default} [options.nudeps] - Nudeps instance for lock data access
+	 * @param {boolean} [options.silent] - Suppress user-facing log messages (for internal temp generators)
 	 */
-	constructor ({ mode, installCache, nudeps, ...generatorOptions } = {}) {
+	constructor ({ mode, installCache, silent, nudeps, ...generatorOptions } = {}) {
 		if (mode) {
 			this.mode = mode;
 			generatorOptions.env ??= [mode, "browser", "module"];
@@ -33,10 +34,13 @@ export class ImportMapGenerator extends Generator {
 		this.commonJS = commonJS;
 		this.installCache = installCache ?? null;
 		this.nudeps = nudeps ?? null;
+		this.silent = silent ?? false;
 		this.mapsToMerge = [];
 		this.staleCacheKeys = new Set(Object.keys(installCache ?? {}));
 		this.stats = { cacheHits: 0, cacheMisses: 0 };
-		// Save options for creating temp generators on cache miss
+		// installCache and silent are intentionally excluded from _options: installCache so that
+		// temp generators always have null caches (preventing recursion); silent so that
+		// sub-generators created on cache miss still produce user-facing log messages.
 		this._options = { mode, nudeps, ...generatorOptions };
 
 		// Apply JSPM community overrides (client-side equivalent of what jspm.io CDN does server-side)
@@ -65,24 +69,28 @@ export class ImportMapGenerator extends Generator {
 		let shouldCache = this.installCache && pkg?.version && !pkg.isExternal;
 		let cacheKey = shouldCache ? this.nudeps.localDir(pkg) : null;
 
-		// Cache hit — skip JSPM entirely
-		if (shouldCache && cacheKey in this.installCache) {
-			this.stats.cacheHits++;
-			this.staleCacheKeys.delete(cacheKey);
-			this.mapsToMerge.push(this.installCache[cacheKey]);
-			return;
-		}
-
-		// Cache miss — resolve on a temporary generator and capture the result
 		if (shouldCache) {
-			this.stats.cacheMisses++;
-			let tempGen = new ImportMapGenerator(this._options);
-			await tempGen.install(alias, target, { noRetry, ...installOptions });
-			await tempGen.finalize();
+			let outputMap = this.installCache[cacheKey];
 
-			let depMap = tempGen.getMap();
-			this.installCache[cacheKey] = depMap;
-			this.mapsToMerge.push(depMap);
+			// Cache hit — skip JSPM entirely
+			if (outputMap) {
+				this.stats.cacheHits++;
+				this.staleCacheKeys.delete(cacheKey);
+				this.mapsToMerge.push(outputMap);
+				return;
+			}
+
+			this.stats.cacheMisses++;
+
+			// Generate output map with user's settings
+			let outputGen = new ImportMapGenerator(this._options);
+			await outputGen.install(alias, target, { noRetry, ...installOptions });
+			await outputGen.finalize();
+			outputMap = outputGen.getMap();
+			this.installCache[cacheKey] = outputMap;
+
+			this.staleCacheKeys.delete(cacheKey);
+			this.mapsToMerge.push(outputMap);
 			return;
 		}
 
@@ -166,11 +174,13 @@ export class ImportMapGenerator extends Generator {
 
 		// Only flag packages as CJS if they have no ESM exports at all
 		let esmPackages = new Set(
-			this.getEntries(e => e?.format === "esm")
-				.map(([url]) => this.nudeps.packages.parse(url).pkg?.name),
+			this.getEntries(e => e?.format === "esm").map(
+				([url]) => this.nudeps.packages.parse(url).pkg?.name,
+			),
 		);
-		let cjsEntries = this.getEntries(e => e?.format === "commonjs")
-			.filter(([url]) => !esmPackages.has(this.nudeps.packages.parse(url).pkg?.name));
+		let cjsEntries = this.getEntries(e => e?.format === "commonjs").filter(
+			([url]) => !esmPackages.has(this.nudeps.packages.parse(url).pkg?.name),
+		);
 
 		if (cjsEntries.length === 0) {
 			return;
@@ -198,9 +208,11 @@ export class ImportMapGenerator extends Generator {
 		if (directCjsDeps.length > 0) {
 			requireMsg = `Use require() to import these packages: ${directCjsDeps.join(", ")}.`;
 		}
-		this.nudeps.info(
-			`${cjsPackages.length} CommonJS packages detected, adding cjs-browser-shim. ${requireMsg} Disable with --cjs=false`,
-		);
+		if (!this.silent) {
+			this.nudeps.info(
+				`${cjsPackages.length} CommonJS packages detected, adding cjs-browser-shim. ${requireMsg} Disable with --cjs=false`,
+			);
+		}
 	}
 }
 
@@ -222,17 +234,6 @@ export class ImportMap {
 	}
 	set scopes (scopes) {
 		this.map.scopes = scopes;
-	}
-
-	/**
-	 * Flat set of all URL values in the map, used to exempt explicitly-exported files from
-	 * ignore patterns. Only exact URL matches are checked — directory/prefix exports
-	 * (e.g. "pkg/": "./client_modules/pkg@v/") are not covered and may still be ignored.
-	 */
-	get exportedUrls () {
-		let urls = new Set([...this].map(({ url }) => url));
-		Object.defineProperty(this, "exportedUrls", { value: urls, configurable: true });
-		return urls;
 	}
 
 	/**

@@ -24,6 +24,9 @@ export default class Nudeps {
 	toCopy = {};
 	toDelete = null;
 	toDeleteIfEmpty = new Set();
+	#cachedExports = null;
+	#exportsData = {};
+	#exportsDirty = false;
 
 	constructor ({ config }) {
 		this.config = config;
@@ -54,21 +57,19 @@ export default class Nudeps {
 	get installCache () {
 		let configChanged = JSON.stringify(this.oldConfig) !== JSON.stringify(this.config);
 		let cacheData = readJSONSync(".nudeps/cache.json", { optional: true });
-
 		if (cacheData?.version !== nudepsPkg.version || configChanged) {
 			cacheData = null;
 		}
-
 		let value = cacheData?.packages ?? {};
 		Object.defineProperty(this, "installCache", { value, writable: true, configurable: true });
 		return value;
 	}
 
 	/**
-	 * Persist the install cache to disk. Skips writing if cache is empty.
+	 * Persist the install cache and exports cache to disk.
 	 */
 	saveCache () {
-		if (!this.installCache || Object.keys(this.installCache).length === 0) {
+		if (Object.keys(this.installCache).length === 0) {
 			return;
 		}
 
@@ -130,7 +131,7 @@ export default class Nudeps {
 		let generatorOptions = {
 			commonJS: this.config.cjs,
 			combineSubpaths: this.config.combineSubpaths,
-			installCache: this.installCache ?? null,
+			installCache: this.installCache,
 			nudeps: this,
 		};
 
@@ -189,6 +190,93 @@ export default class Nudeps {
 	 */
 	localPath (pkg, filePath) {
 		return [this.localDir(pkg), filePath].join("/");
+	}
+
+	/**
+	 * Return the set of concrete exported file paths (relative to the package root) for a package, loading from
+	 * .nudeps/exports.json on first access and generating an expanded trace
+	 * (expandWildcards: true) on cache miss. The result is stored on pkg.exportedPaths
+	 * so isPathIgnored() can access it synchronously during the subsequent cpSync call.
+	 * @param {import("./util/package.js").default} pkg
+	 * @returns {Promise<Set<string>>}
+	 */
+	async getExportedPaths (pkg) {
+		if (!pkg?.name || !pkg.version || pkg.isExternal) {
+			return new Set();
+		}
+
+		// Lazily load disk cache for lookups
+		if (this.#cachedExports === null) {
+			let cacheData = readJSONSync(".nudeps/exports.json", { optional: true });
+			this.#cachedExports =
+				cacheData?.version === nudepsPkg.version ? (cacheData.packages ?? {}) : {};
+		}
+
+		let key = pkg.dirName;
+
+		// Already populated this run (e.g. as a transitive dep of another package's trace)
+		if (this.#exportsData[key]) {
+			return new Set(this.#exportsData[key]);
+		}
+
+		// Cache hit from disk — copy to output and return
+		let cached = this.#cachedExports[key];
+		if (cached) {
+			this.#exportsData[key] = cached;
+			return new Set(cached);
+		}
+
+		// Cache miss — generate an expanded trace to enumerate concrete exported file paths.
+		// Group ALL URLs from the expanded map by package so transitive deps are also
+		// populated in one pass, avoiding re-traces on subsequent getExportedPaths calls.
+		// silent: true suppresses the CJS shim log from finalize() since this is internal.
+		let expandedGen = new ImportMapGenerator({
+			...this.generator._options,
+			expandWildcards: true,
+			combineSubpaths: false,
+			silent: true,
+		});
+
+		try {
+			await expandedGen.install(pkg.installName, pkg.path, { noRetry: true });
+			await expandedGen.finalize();
+		}
+		catch (e) {
+			this.info(`Warning: Could not trace exports for ${pkg.name}: ${e.message}`);
+			return new Set();
+		}
+
+		let expandedMap = expandedGen.getMap();
+		let allUrls = [
+			...Object.values(expandedMap.imports ?? {}),
+			...Object.values(expandedMap.scopes ?? {}).flatMap(s => Object.values(s)),
+		];
+
+		for (let url of allUrls) {
+			let { pkg: urlPkg, filePath } = this.packages.parse(url);
+			if (!urlPkg || !filePath) {
+				continue;
+			}
+			(this.#exportsData[urlPkg.dirName] ??= []).push(filePath);
+		}
+
+		this.#exportsDirty = true;
+		return new Set(this.#exportsData[key] ?? []);
+	}
+
+	/**
+	 * Persist the exports cache to .nudeps/exports.json, but only if new entries were
+	 * generated this run. Prunes entries for packages not encountered this run.
+	 */
+	saveExports () {
+		if (!this.#exportsDirty) {
+			return;
+		}
+
+		writeJSONSync(".nudeps/exports.json", {
+			version: nudepsPkg.version,
+			packages: this.#exportsData,
+		});
 	}
 
 	/**
@@ -283,15 +371,8 @@ export default class Nudeps {
 				}
 
 				// Don't ignore files that are explicitly exported in the import map
-				if (pkg) {
-					let rel = path.relative(
-						path.dirname(this.config.map),
-						this.localPath(pkg, filePath),
-					);
-					let fullUrl = rel.startsWith(".") ? rel : "./" + rel;
-					if (this.map.exportedUrls.has(fullUrl)) {
-						return false;
-					}
+				if (pkg?.exportedPaths?.has(filePath)) {
+					return false;
 				}
 
 				return true;
@@ -301,7 +382,7 @@ export default class Nudeps {
 		return false;
 	}
 
-	copyPackages () {
+	async copyPackages () {
 		let { config, existingDirs, existingSymlinks, toCopy, toDelete, toDeleteIfEmpty, stats } =
 			this;
 		this.externalAliases = new Set();
@@ -332,6 +413,9 @@ export default class Nudeps {
 			}
 			else {
 				stats.copied++;
+				if (this.config.ignore.some(p => p.exclude)) {
+					pkg.exportedPaths = await this.getExportedPaths(pkg);
+				}
 				cpSync(from, to, {
 					dereference: this.dereference(pkg.name, pkg.version),
 					preserveTimestamps: true,
@@ -405,5 +489,7 @@ export default class Nudeps {
 				throw e;
 			}
 		}
+
+		this.saveExports();
 	}
 }

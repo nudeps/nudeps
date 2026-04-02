@@ -148,7 +148,7 @@ export default async function (options) {
 		}
 	}
 
-	nudeps.copyPackages();
+	await nudeps.copyPackages();
 
 	// Write import map
 	if (oldConfig && oldConfig.map !== config.map && existsSync(oldConfig.map)) {
