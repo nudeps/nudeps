@@ -24,7 +24,8 @@ export default class Nudeps {
 	toCopy = {};
 	toDelete = null;
 	toDeleteIfEmpty = new Set();
-	#exportsData = null;
+	#cachedExports = null;
+	#exportsData = {};
 	#exportsDirty = false;
 
 	constructor ({ config }) {
@@ -204,20 +205,30 @@ export default class Nudeps {
 			return new Set();
 		}
 
-		// Lazily load exports cache from disk
-		if (this.#exportsData === null) {
+		// Lazily load disk cache for lookups
+		if (this.#cachedExports === null) {
 			let cacheData = readJSONSync(".nudeps/exports.json", { optional: true });
-			this.#exportsData =
+			this.#cachedExports =
 				cacheData?.version === nudepsPkg.version ? (cacheData.packages ?? {}) : {};
 		}
 
-		let key = this.localDir(pkg);
-		let cached = this.#exportsData[key];
+		let key = pkg.dirName;
+
+		// Already populated this run (e.g. as a transitive dep of another package's trace)
+		if (this.#exportsData[key]) {
+			return new Set(this.#exportsData[key]);
+		}
+
+		// Cache hit from disk — copy to output and return
+		let cached = this.#cachedExports[key];
 		if (cached) {
+			this.#exportsData[key] = cached;
 			return new Set(cached);
 		}
 
-		// Cache miss — generate an expanded trace to enumerate concrete exported URLs.
+		// Cache miss — generate an expanded trace to enumerate concrete exported file paths.
+		// Group ALL URLs from the expanded map by package so transitive deps are also
+		// populated in one pass, avoiding re-traces on subsequent getExportedPaths calls.
 		// silent: true suppresses the CJS shim log from finalize() since this is internal.
 		let expandedGen = new ImportMapGenerator({
 			...this.generator._options,
@@ -236,32 +247,30 @@ export default class Nudeps {
 		}
 
 		let expandedMap = expandedGen.getMap();
-		let filePaths = [
+		let allUrls = [
 			...Object.values(expandedMap.imports ?? {}),
 			...Object.values(expandedMap.scopes ?? {}).flatMap(s => Object.values(s)),
-		]
-			.map(url => this.packages.parse(url).filePath)
-			.filter(Boolean);
+		];
 
-		this.#exportsData[key] = filePaths;
+		for (let url of allUrls) {
+			let { pkg: urlPkg, filePath } = this.packages.parse(url);
+			if (!urlPkg || !filePath) {
+				continue;
+			}
+			(this.#exportsData[urlPkg.dirName] ??= []).push(filePath);
+		}
+
 		this.#exportsDirty = true;
-		return new Set(filePaths);
+		return new Set(this.#exportsData[key] ?? []);
 	}
 
 	/**
 	 * Persist the exports cache to .nudeps/exports.json, but only if new entries were
-	 * generated this run. Prunes entries for packages no longer in the install cache.
+	 * generated this run. Prunes entries for packages not encountered this run.
 	 */
 	saveExports () {
 		if (!this.#exportsDirty) {
 			return;
-		}
-
-		// Prune entries for packages no longer in the install cache (already pruned by finalize)
-		for (let key of Object.keys(this.#exportsData)) {
-			if (!(key in this.installCache)) {
-				delete this.#exportsData[key];
-			}
 		}
 
 		writeJSONSync(".nudeps/exports.json", {
