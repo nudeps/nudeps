@@ -5,6 +5,7 @@ import { Generator } from "@jspm/generator";
 
 import { deepAssign, getNodeBuiltins } from "./util.js";
 import { findOverride } from "./util/jspm-overrides.js";
+import nudepsPkg from "../package.json" with { type: "json" };
 
 export class ImportMapGenerator extends Generator {
 	/**
@@ -363,7 +364,7 @@ export class ImportMap {
 
 		ret = ret.replace(terse ? /^\t+/gm : /^\t{2}/gm, "").trim();
 		ret = declarations + lf + ret;
-		ret = ["(()=>{", ret, "})();"].join(lf);
+		ret = [`(()=>{`, `/* Nudeps v${nudepsPkg.version} */`, ret, "})();"].join(lf);
 		return ret;
 	}
 }
