@@ -154,17 +154,15 @@ If something seems off, you can run `npx nudeps` explicitly, but most of the tim
 
 ### AI coding assistants
 
-If you use AI coding assistants like [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [GitHub Copilot](https://github.com/features/copilot), [Cursor](https://www.cursor.com/), etc., you may want to add the following to your project's `CLAUDE.md` and/or `AGENTS.md` so that the AI understands nudeps' workflow and doesn't try to run it manually:
+Nudeps ships with a [`SKILL.md`](SKILL.md) — a comprehensive reference that teaches AI coding agents how to work with nudeps correctly (lifecycle hooks, generated artifacts, CJS handling, common mistakes, etc.).
 
-```markdown
-## nudeps (dependency management)
+The easiest way to install it is via the [`skills`](https://github.com/nicepkg/skills) CLI, which supports 45+ agents including Claude Code, Cursor, and Copilot:
 
-- **Do NOT run `npx nudeps` after `npm install` or `npm uninstall`** — it runs automatically via an npm lifecycle hook (`dependencies` script in package.json).
-- The `dependencies` script in package.json is an npm hook that fires automatically after install/uninstall — do not modify or call it manually.
-- `client_modules/` and `importmap.js` are generated artifacts managed by nudeps. Do not edit them.
-- Only run `npx nudeps` explicitly if the import map seems out of sync.
-- To add/remove a client-side dependency, just use `npm install <pkg>` / `npm uninstall <pkg>`.
+```bash
+npx skills add nudeps/nudeps
 ```
+
+The skill file is also available at `node_modules/nudeps/SKILL.md` after installation.
 
 ## How does it work?
 

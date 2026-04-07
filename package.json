@@ -28,7 +28,8 @@
 		"nudeps": "src/cli/index.js"
 	},
 	"files": [
-		"src"
+		"src",
+		"SKILL.md"
 	],
 	"scripts": {
 		"release": "npm login && release-it",

@@ -1,3 +1,4 @@
 - Demos you can use to test stuff in ../nudeps-demos/
 - When running tests via `npx htest`, pass `--verbose` to see output for passing tests (htest suppresses output in non-TTY/piped contexts unless there are failures or `--verbose` is set).
 - In addition to running tests, also `npm run demos` or `npm run init-demos` to regenerate all import maps.
+- `SKILL.md` is an AI agent skill that ships with the package. After any code change, check if `SKILL.md` needs a corresponding update to stay accurate.
