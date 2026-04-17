@@ -7,7 +7,7 @@ import { ImportMapGenerator, ImportMap } from "./map.js";
 import { matchesGlob, ensureSymlink } from "./util/fs.js";
 
 import { getTopLevelModules } from "./util.js";
-import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
+import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync, readdirSync } from "node:fs";
 import * as path from "node:path";
 import Packages from "./util/packages.js";
 import nudepsPkg from "../package.json" with { type: "json" };
@@ -52,6 +52,7 @@ export default class Nudeps {
 		this.toDelete = new Set(this.existingDirs);
 		this.hasIgnoreExceptions = this.config.ignore.some(p => p.include);
 		this.hasDeepGlobs = this.config.ignore.some(p => (p.include ?? p.exclude)?.includes("/"));
+		this.projectDirectory = this.findProjectDirectory();
 	}
 
 	get installCache () {
@@ -88,17 +89,19 @@ export default class Nudeps {
 	}
 
 	get pkg () {
-		let value = readJSONSync("./package.json");
+		let value = readJSONSync(path.join(this.projectDirectory, "package.json"));
 		Object.defineProperty(this, "pkg", { value, configurable: true });
 		return value;
 	}
 
 	get packages () {
-		if (!existsSync("node_modules") && existsSync("package.json")) {
+		const nodeModules = path.join(this.projectDirectory, "node_modules");
+		const packageJson = path.join(this.projectDirectory, "package.json");
+		if (!existsSync(nodeModules) && existsSync(packageJson)) {
 			throw new Error("node_modules not found. Run `npm install` first.");
 		}
 
-		let data = readJSONSync("node_modules/.package-lock.json");
+		let data = readJSONSync(path.join(nodeModules, ".package-lock.json"));
 		let raw = data?.packages ?? {};
 
 		// Pre-load child lockfiles for external (linked) deps
@@ -166,6 +169,43 @@ export default class Nudeps {
 
 	error (...messages) {
 		console.error("[nudeps]", ...messages);
+	}
+
+	/**
+	 * Find the nearest package.json based on the current working directory.
+	 * Resolution strategy:
+	 * 1. If the starting dir contains one, use that. If not, try
+	 * 2. Walk all ancestor dirs in order. The nearest ancestor package.json
+	 * will be used. If none, try
+	 * 3. Walk all non-Symlink subdirectories in order, collecting up to 2
+	 * package.json files. If the walk completes and the package.json is unique,
+	 * resolve that one. If multiple or zero package.json are found,
+	 * raise an error.
+	 * @param {string} startPath
+	 * @returns {string} basename of resolved package.json, or throws an Error.
+	 */
+	findProjectDirectory(startPath = path.resolve()) {
+		let prev = "";
+		let tryUpwards = startPath;
+		do {
+			const hasIt = existsSync(path.join(tryUpwards, "package.json"));
+			if (hasIt) return tryUpwards;
+			[prev, tryUpwards] = [tryUpwards, path.resolve(tryUpwards, "..")];
+		} while (tryUpwards != prev);
+
+		const tryDownwards = readdirSync(startPath, {
+			encoding: 'utf8',
+			withFileTypes: true,
+			recursive: true,
+		}).filter(file => (file.isFile() && file.name === "package.json"))
+			.map(file => file.parentPath);
+
+		if (tryDownwards.length === 1) {
+			return tryDownwards[0];
+		} else if (tryDownwards.length === 0) {
+			throw new Error(`Couldn't find a package.json while searching through "${startPath}", is that the right place to be looking?\nHint: try running nudeps in a folder with a package.json`);
+		}
+		throw new Error(`Found multiple package.json files:\n- ${tryDownwards.join('\n- ')}\nHint: You probably meant to run nudeps in one of these directories instead.`);
 	}
 
 	/**
