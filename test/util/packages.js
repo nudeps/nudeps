@@ -44,6 +44,25 @@ let caseBPackages = new Packages({
 	children: { "../ext": { packages: { "node_modules/dep": { version: "2.0.0", name: "dep" } } } },
 });
 
+// Case C: npm workspaces. Shape captured from a real `npm install` of a workspace root:
+// each workspace package appears twice — once as a link entry under node_modules/, and
+// once as a real entry at its on-disk path — while regular deps are hoisted to the root
+// node_modules/ (here `leftpad`, a dependency of pkg-a). Pins down that workspace packages
+// resolve as external (linked) and hoisted deps resolve as ordinary, non-external packages.
+let workspacePackages = new Packages({
+	packages: {
+		"node_modules/@demo/pkg-a": { link: true, resolved: "packages/pkg-a" },
+		"node_modules/@demo/pkg-b": { link: true, resolved: "packages/pkg-b" },
+		"node_modules/leftpad": { version: "0.0.1", name: "leftpad" },
+		"packages/pkg-a": {
+			name: "@demo/pkg-a",
+			version: "1.0.0",
+			dependencies: { "@demo/pkg-b": "1.0.0", leftpad: "0.0.1" },
+		},
+		"packages/pkg-b": { name: "@demo/pkg-b", version: "1.0.0" },
+	},
+});
+
 let dir = "./client_modules";
 
 /**
@@ -203,6 +222,36 @@ export default {
 				{ arg: "isExternal", expect: true },
 				{ arg: "localDir", expect: "./client_modules/dep@2.0.0" },
 				{ arg: "sourcePath", expect: "../ext/node_modules/dep" },
+			],
+		},
+		// Case C: npm workspace package — symlinked into the root node_modules.
+		// Resolves through the link to its on-disk entry and is treated as external/linked,
+		// just like a `npm install ../foo` local dep.
+		{
+			name: "./node_modules/@demo/pkg-a/index.js",
+			packages: workspacePackages,
+			description: "npm workspace package, linked into root node_modules",
+			tests: [
+				{ arg: "name", expect: "@demo/pkg-a" },
+				{ arg: "version", expect: "1.0.0" },
+				{ arg: "isExternal", expect: true },
+				{ arg: "localDir", expect: "./client_modules/@demo/pkg-a@1.0.0" },
+				{ arg: "sourcePath", expect: "./node_modules/@demo/pkg-a" },
+			],
+		},
+		// Case C: hoisted dependency of a workspace package — npm installs it at the root
+		// node_modules/ rather than under the workspace package, so it is an ordinary,
+		// non-external package as far as nudeps is concerned.
+		{
+			name: "./node_modules/leftpad/index.js",
+			packages: workspacePackages,
+			description: "Hoisted dependency of a workspace package",
+			tests: [
+				{ arg: "name", expect: "leftpad" },
+				{ arg: "version", expect: "0.0.1" },
+				{ arg: "isExternal", expect: false },
+				{ arg: "localDir", expect: "./client_modules/leftpad@0.0.1" },
+				{ arg: "sourcePath", expect: "./node_modules/leftpad" },
 			],
 		},
 	],
