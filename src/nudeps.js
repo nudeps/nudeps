@@ -10,7 +10,7 @@ import Hooks from "blissful-hooks";
 
 import { readJSONSync, writeJSONSync, createGitignoredDir } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
-import { matchesGlob, ensureSymlink } from "./util/fs.js";
+import { matchesGlob, ensureSymlink, findLockfileDir } from "./util/fs.js";
 import { getTopLevelModules } from "./util.js";
 import Packages from "./util/packages.js";
 
@@ -177,24 +177,42 @@ export default class Nudeps {
 	}
 
 	get packages () {
-		if (!existsSync("node_modules") && existsSync("package.json")) {
-			throw new Error("node_modules not found. Run `npm install` first.");
+		// Find the lockfile, walking up for npm workspaces (where it lives at the
+		// monorepo root, not in the individual workspace package directory).
+		let lockDir = findLockfileDir(process.cwd());
+		if (lockDir === null) {
+			if (existsSync("package.json")) {
+				throw new Error("node_modules not found. Run `npm install` first.");
+			}
+			lockDir = process.cwd();
 		}
 
-		let data = readJSONSync("node_modules/.package-lock.json");
+		// In a workspace, the lockfile lives above cwd; linked entries are then
+		// workspace siblings whose deps are hoisted (no own node_modules), so the
+		// "run npm install there" warnings below don't apply.
+		let inWorkspace = lockDir !== process.cwd();
+		let prefix = inWorkspace ? path.relative(process.cwd(), lockDir) : "";
+
+		let data = readJSONSync(path.join(lockDir, "node_modules/.package-lock.json"));
 		let raw = data?.packages ?? {};
 
-		// Pre-load child lockfiles for external (linked) deps
+		// Pre-load child lockfiles for external (linked) deps. Lockfile `resolved`
+		// paths are relative to lockDir, which may differ from cwd in a workspace.
 		let children = {};
 		for (let [key, info] of Object.entries(raw)) {
 			if (info.link) {
-				let childData = readJSONSync(`${info.resolved}/node_modules/.package-lock.json`, {
-					optional: true,
-				});
+				let resolvedDir = path.resolve(lockDir, info.resolved);
+				let childData = readJSONSync(
+					path.join(resolvedDir, "node_modules/.package-lock.json"),
+					{ optional: true },
+				);
 				if (childData) {
 					children[info.resolved] = childData;
 				}
-				else if (!existsSync(`${info.resolved}/node_modules`)) {
+				else if (inWorkspace) {
+					// Workspace sibling with hoisted deps — nothing to pre-load.
+				}
+				else if (!existsSync(path.join(resolvedDir, "node_modules"))) {
 					this.info(
 						`Warning: node_modules not found at ${info.resolved}. Run \`npm install\` there first.`,
 					);
@@ -205,7 +223,7 @@ export default class Nudeps {
 			}
 		}
 
-		let value = new Packages(data, { children });
+		let value = new Packages(data, { children, prefix });
 		Object.defineProperty(this, "packages", { value, configurable: true });
 		return value;
 	}
