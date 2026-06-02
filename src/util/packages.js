@@ -16,9 +16,14 @@ export default class Packages {
 	 * @param {object} data - Lockfile data (npm's .package-lock.json format)
 	 * @param {object} [options]
 	 * @param {object} [options.children] - Child lockfile data keyed by resolved path, for merging transitive deps of local deps
+	 * @param {string} [options.prefix] - Path from cwd to the lockfile's directory (e.g. "../.." when run inside an npm workspace package). Lockfile paths are relative to that directory; this rebases them to be cwd-relative. Keys (used for URL matching) stay as-is.
 	 */
-	constructor (data, { children = {} } = {}) {
+	constructor (data, { children = {}, prefix = "" } = {}) {
 		let raw = data?.packages ?? {};
+
+		// Rebase a lockfile-relative path to cwd. Without a prefix this preserves the
+		// historical "./"-prefixed form; with one (workspace mode) it prepends e.g. "../..".
+		let rebase = p => (prefix ? prefix + "/" + p : "./" + p);
 
 		for (let [key, info] of Object.entries(raw).filter(([key, info]) => key)) {
 			if (!key) {
@@ -32,8 +37,12 @@ export default class Packages {
 				installName,
 				name: resolved?.name,
 				version: resolved?.version,
-				path: "./" + key,
-				resolvedPath: info.link ? info.resolved : undefined,
+				path: rebase(key),
+				resolvedPath: info.link
+					? prefix
+						? prefix + "/" + info.resolved
+						: info.resolved
+					: undefined,
 				info: resolved,
 			});
 		}

@@ -2,6 +2,7 @@
  * Utils for generating and manipulating import maps
  */
 import { Generator } from "@jspm/generator";
+import { existsSync } from "node:fs";
 
 import { deepAssign, getNodeBuiltins } from "./util.js";
 import { findOverride } from "./util/jspm-overrides.js";
@@ -63,7 +64,17 @@ export class ImportMapGenerator extends Generator {
 		return this.traceMap.resolver.pm;
 	}
 
-	async install (alias, target = `./node_modules/${alias}`, { noRetry, ...installOptions } = {}) {
+	async install (alias, target, { noRetry, ...installOptions } = {}) {
+		if (target === undefined) {
+			// Default to the package's local node_modules copy. If it isn't there —
+			// e.g. deps hoisted to a monorepo root under npm workspaces — fall back to
+			// bare-name resolution so the nodemodules provider walks up the tree to find
+			// it. (Pinning a non-existent ./node_modules/<name> path crashes subpath
+			// tracing.) Bare targets aren't parsed to a package, so they skip the cache.
+			let local = `./node_modules/${alias}`;
+			target = existsSync(local) ? local : alias;
+		}
+
 		// Check if this install is cacheable:
 		// must have a cache, not be the root package ("."), and not be a symlink (local dep)
 		let pkg = this.nudeps && target !== "." ? this.nudeps.packages.parse(target).pkg : null;
