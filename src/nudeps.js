@@ -6,6 +6,8 @@ import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "n
 import * as path from "node:path";
 import { execSync } from "node:child_process";
 
+import Hooks from "blissful-hooks";
+
 import { readJSONSync, writeJSONSync, createGitignoredDir } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import { matchesGlob, ensureSymlink } from "./util/fs.js";
@@ -54,6 +56,17 @@ export default class Nudeps {
 		this.toDelete = new Set(this.existingDirs);
 		this.hasIgnoreExceptions = this.config.ignore.some(p => p.include);
 		this.hasDeepGlobs = this.config.ignore.some(p => (p.include ?? p.exclude)?.includes("/"));
+
+		if (this.config.hooks) {
+			this.hooks.add(this.config.hooks);
+		}
+
+		this.$hook("constructed");
+	}
+
+	hooks = new Hooks();
+	$hook (name, env, options) {
+		this.hooks.run(name, env, { context: this, ...options });
 	}
 
 	get installCache () {
