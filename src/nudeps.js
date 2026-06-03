@@ -16,6 +16,10 @@ import Packages from "./util/packages.js";
 
 import nudepsPkg from "../package.json" with { type: "json" };
 
+/**
+ * @import Package from "./util/package.js"
+ */
+
 export default class Nudeps {
 	stats = {
 		entries: 0,
@@ -249,7 +253,7 @@ export default class Nudeps {
 	/**
 	 * Compute the client_modules output directory for a package.
 	 * All packages go to top-level client_modules.
-	 * @param {import("./util/package.js").default} pkg
+	 * @param {Package} pkg
 	 * @returns {string}
 	 */
 	localDir (pkg) {
@@ -262,7 +266,7 @@ export default class Nudeps {
 
 	/**
 	 * Compute the client_modules output path for a file within a package.
-	 * @param {import("./util/package.js").default} pkg
+	 * @param {Package} pkg
 	 * @param {string} filePath
 	 * @returns {string}
 	 */
@@ -275,7 +279,7 @@ export default class Nudeps {
 	 * .nudeps/exports.json on first access and generating an expanded trace
 	 * (expandWildcards: true) on cache miss. The result is stored on pkg.exportedPaths
 	 * so isPathIgnored() can access it synchronously during the subsequent cpSync call.
-	 * @param {import("./util/package.js").default} pkg
+	 * @param {Package} pkg
 	 * @returns {Promise<Set<string>>}
 	 */
 	async getExportedPaths (pkg) {
@@ -359,7 +363,7 @@ export default class Nudeps {
 
 	/**
 	 * Resolve alias config into alias paths for a package.
-	 * @param {import("./util/package.js").default} pkg
+	 * @param {Package} pkg
 	 * @param {*} [alias] - Alias config; defaults to this.config.alias
 	 * @returns {string[]}
 	 */

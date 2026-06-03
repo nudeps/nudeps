@@ -7,11 +7,15 @@ import { deepAssign, getNodeBuiltins } from "./util.js";
 import { findOverride } from "./util/jspm-overrides.js";
 import nudepsPkg from "../package.json" with { type: "json" };
 
+/**
+ * @import Nudeps from "./nudeps.js"
+ */
+
 export class ImportMapGenerator extends Generator {
 	/**
 	 * @param {object} [options]
 	 * @param {object} [options.installCache] - Per-package output map cache (mutated on miss), or null
-	 * @param {import("../nudeps.js").default} [options.nudeps] - Nudeps instance for lock data access
+	 * @param {Nudeps} [options.nudeps] - Nudeps instance for lock data access
 	 * @param {boolean} [options.silent] - Suppress user-facing log messages (for internal temp generators)
 	 */
 	constructor ({ mode, installCache, silent, nudeps, ...generatorOptions } = {}) {
