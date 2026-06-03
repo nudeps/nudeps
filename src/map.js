@@ -2,7 +2,6 @@
  * Utils for generating and manipulating import maps
  */
 import { Generator } from "@jspm/generator";
-import { existsSync } from "node:fs";
 
 import { deepAssign, getNodeBuiltins } from "./util.js";
 import { findOverride } from "./util/jspm-overrides.js";
@@ -70,11 +69,9 @@ export class ImportMapGenerator extends Generator {
 
 	async install (alias, target, { noRetry, ...installOptions } = {}) {
 		if (target === undefined) {
-			// Default to the local copy, but fall back to bare-name resolution when it's
-			// missing (deps hoisted to a workspace root): a non-existent target crashes
-			// subpath tracing, whereas a bare name lets the provider walk up to find it.
-			let local = `./node_modules/${alias}`;
-			target = existsSync(local) ? local : alias;
+			// Locate the dep in node_modules — at the monorepo root (prefix) under workspaces.
+			let prefix = this.nudeps?.modules.prefix ?? "";
+			target = `${prefix ? prefix + "/" : "./"}node_modules/${alias}`;
 		}
 
 		// Check if this install is cacheable:

@@ -127,29 +127,6 @@ export function createGitignoredDir (dir) {
 }
 
 /**
- * Walk up from `startDir` to the nearest directory with node_modules/.package-lock.json.
- * Lets nudeps run inside an npm workspace package, where the only lockfile is at the root.
- * @param {string} startDir
- * @returns {string|null} The directory, or null if none up to the filesystem root.
- */
-export function findLockfileDir (startDir) {
-	let dir = path.resolve(startDir);
-
-	while (true) {
-		if (existsSync(path.join(dir, "node_modules", ".package-lock.json"))) {
-			return dir;
-		}
-
-		let parent = path.dirname(dir);
-		if (parent === dir) {
-			return null;
-		}
-
-		dir = parent;
-	}
-}
-
-/**
  * Create a symlink, optionally replacing an existing one.
  * With `force`, removes any existing entry at `linkPath` before creating.
  * @param {string} target - The symlink target (what it points to)
