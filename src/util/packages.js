@@ -133,7 +133,9 @@ export default class Packages {
 
 		let parts = url.split("/");
 		let index = parts.indexOf("node_modules");
-		let base = index === -1 ? null : parts.slice(0, index).join("/") || ".";
+		// Drop any leading "./" so base matches #byKey's key format (keys have no "./",
+		// but pkg.path does, so re-parsing a sourcePath would otherwise miss).
+		let base = index === -1 ? null : (parts.slice(0, index).join("/") || ".").replace(/^\.\//, "");
 
 		if (index === -1) {
 			return (this.#parseCache[url] = { pkg: null, filePath: "", sourcePath: url });
@@ -160,34 +162,23 @@ export default class Packages {
 			return (this.#parseCache[url] = { pkg: null, filePath, sourcePath: url });
 		}
 
-		let key = packageNames.map(n => "node_modules/" + n).join("/");
-		let pkg = this.#byKey[key] ?? null;
-
-		// If not found directly, check if the path goes through an external dep.
-		// Case A: base is the external's resolved path (e.g., ../vue/node_modules/vue)
-		// Case B: first package is external (e.g., node_modules/ext-pkg/node_modules/dep)
-		let effectiveBase = base;
-		if (!pkg) {
-			let resolvedBase = base && base !== "." ? base : null;
-
-			if (!resolvedBase && packageNames.length > 1) {
-				let topPkg = this.#byKey["node_modules/" + packageNames[0]];
-				if (topPkg?.resolvedPath !== topPkg?.path) {
-					resolvedBase = topPkg.resolvedPath;
-					key = packageNames
-						.slice(1)
-						.map(n => "node_modules/" + n)
-						.join("/");
-				}
+		// Walk the package chain one segment at a time, following each linked dep's
+		// resolved target before resolving the next. JSPM emits symbolic node_modules
+		// paths, but npm records a linked package's subtree under its resolved location,
+		// so every intermediate link must be dereferenced — not just the first.
+		let pkg = null;
+		let cursor = base;
+		for (let name of packageNames) {
+			let key = (cursor === "." ? "" : cursor + "/") + "node_modules/" + name;
+			pkg = this.#byKey[key] ?? null;
+			if (!pkg) {
+				break;
 			}
-
-			if (resolvedBase) {
-				pkg = this.#byKey[resolvedBase + "/" + key] ?? null;
-				if (pkg) effectiveBase = resolvedBase;
-			}
+			// Descend into the link target for external deps, else the package's own dir.
+			cursor = pkg.resolvedPath !== pkg.path ? pkg.resolvedPath : key;
 		}
 
-		let sourcePath = (effectiveBase === "." ? "" : effectiveBase + "/") + key;
+		let sourcePath = pkg ? pkg.path : url;
 		if (!sourcePath.startsWith(".")) sourcePath = "./" + sourcePath;
 
 		return (this.#parseCache[url] = { pkg, filePath, sourcePath });
