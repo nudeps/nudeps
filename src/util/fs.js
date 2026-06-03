@@ -127,16 +127,10 @@ export function createGitignoredDir (dir) {
 }
 
 /**
- * Walk up from `startDir` to find the nearest directory containing
- * node_modules/.package-lock.json (npm's hidden lockfile).
- *
- * This enables running nudeps inside an npm workspace package: under default
- * hoisting, individual workspace packages have no node_modules/.package-lock.json
- * of their own — the only one lives at the monorepo root. The generator already
- * resolves hoisted deps and linked siblings via standard upward node resolution,
- * so reading the root lockfile is enough for nudeps to map and copy them.
+ * Walk up from `startDir` to the nearest directory with node_modules/.package-lock.json.
+ * Lets nudeps run inside an npm workspace package, where the only lockfile is at the root.
  * @param {string} startDir
- * @returns {string|null} Directory containing node_modules/.package-lock.json, or null if none up to the filesystem root.
+ * @returns {string|null} The directory, or null if none up to the filesystem root.
  */
 export function findLockfileDir (startDir) {
 	let dir = path.resolve(startDir);

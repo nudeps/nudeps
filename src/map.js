@@ -66,11 +66,9 @@ export class ImportMapGenerator extends Generator {
 
 	async install (alias, target, { noRetry, ...installOptions } = {}) {
 		if (target === undefined) {
-			// Default to the package's local node_modules copy. If it isn't there —
-			// e.g. deps hoisted to a monorepo root under npm workspaces — fall back to
-			// bare-name resolution so the nodemodules provider walks up the tree to find
-			// it. (Pinning a non-existent ./node_modules/<name> path crashes subpath
-			// tracing.) Bare targets aren't parsed to a package, so they skip the cache.
+			// Default to the local copy, but fall back to bare-name resolution when it's
+			// missing (deps hoisted to a workspace root): a non-existent target crashes
+			// subpath tracing, whereas a bare name lets the provider walk up to find it.
 			let local = `./node_modules/${alias}`;
 			target = existsSync(local) ? local : alias;
 		}

@@ -94,8 +94,7 @@ export default class Nudeps {
 	}
 
 	get packages () {
-		// Find the lockfile, walking up for npm workspaces (where it lives at the
-		// monorepo root, not in the individual workspace package directory).
+		// Walk up for the lockfile, which in a workspace lives at the monorepo root.
 		let lockDir = findLockfileDir(process.cwd());
 		if (lockDir === null) {
 			if (existsSync("package.json")) {
@@ -104,17 +103,14 @@ export default class Nudeps {
 			lockDir = process.cwd();
 		}
 
-		// In a workspace, the lockfile lives above cwd; linked entries are then
-		// workspace siblings whose deps are hoisted (no own node_modules), so the
-		// "run npm install there" warnings below don't apply.
+		// prefix rebases the root-relative lockfile paths to cwd when run in a subdir.
 		let inWorkspace = lockDir !== process.cwd();
 		let prefix = inWorkspace ? path.relative(process.cwd(), lockDir) : "";
 
 		let data = readJSONSync(path.join(lockDir, "node_modules/.package-lock.json"));
 		let raw = data?.packages ?? {};
 
-		// Pre-load child lockfiles for external (linked) deps. Lockfile `resolved`
-		// paths are relative to lockDir, which may differ from cwd in a workspace.
+		// Pre-load child lockfiles for external (linked) deps; `resolved` is relative to lockDir.
 		let children = {};
 		for (let [key, info] of Object.entries(raw)) {
 			if (info.link) {
@@ -127,7 +123,7 @@ export default class Nudeps {
 					children[info.resolved] = childData;
 				}
 				else if (inWorkspace) {
-					// Workspace sibling with hoisted deps — nothing to pre-load.
+					// Workspace siblings hoist their deps — nothing to pre-load.
 				}
 				else if (!existsSync(path.join(resolvedDir, "node_modules"))) {
 					this.info(
