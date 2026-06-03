@@ -30,6 +30,7 @@ export default class Nudeps {
 		startTime: performance.now(),
 	};
 	toCopy = {};
+	toAlias = {};
 	toDelete = null;
 	toDeleteIfEmpty = new Set();
 	#cachedExports = null;
@@ -517,8 +518,6 @@ export default class Nudeps {
 	async copyPackages () {
 		let { config, existingDirs, existingSymlinks, toCopy, toDelete, toDeleteIfEmpty, stats } =
 			this;
-		this.externalAliases = new Set();
-		let resolvedDir = path.resolve(config.dir);
 
 		// Copy (or symlink) package directories
 		for (let from in toCopy) {
@@ -581,14 +580,7 @@ export default class Nudeps {
 						toDelete.delete(aliasPath);
 					}
 
-					// Track aliases that resolve outside config.dir
-					if (!path.resolve(aliasPath).startsWith(resolvedDir + path.sep)) {
-						this.externalAliases.add(aliasPath);
-					}
-
-					if (ensureSymlink(relTarget, aliasPath, "dir", { force: exists })) {
-						stats.aliased++;
-					}
+					this.toAlias[aliasPath] = relTarget;
 				}
 			}
 		}
@@ -622,6 +614,33 @@ export default class Nudeps {
 			}
 		}
 
+		this.createAliases();
+
 		this.saveExports();
+	}
+
+	createAliases () {
+		let resolvedDir = path.resolve(this.dir);
+		let externalAliases = new Set();
+
+		for (let aliasPath in this.toAlias) {
+			let target = this.toAlias[aliasPath];
+
+			if (!path.resolve(aliasPath).startsWith(resolvedDir + path.sep)) {
+				externalAliases.add(aliasPath);
+			}
+
+			if (ensureSymlink(target, aliasPath, "dir", { force: true })) {
+				this.stats.aliased++;
+			}
+		}
+
+		// Persist external alias paths so they can be cleaned up on next run
+		if (externalAliases?.size > 0) {
+			writeJSONSync(".nudeps/external-aliases.json", [...externalAliases]);
+		}
+		else if (existsSync(".nudeps/external-aliases.json")) {
+			rmSync(".nudeps/external-aliases.json");
+		}
 	}
 }
