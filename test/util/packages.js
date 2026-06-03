@@ -67,11 +67,8 @@ let caseBPackages = new Packages(
 	},
 );
 
-// Case C: npm workspaces. Shape captured from a real `npm install` of a workspace root:
-// each workspace package appears twice — once as a link entry under node_modules/, and
-// once as a real entry at its on-disk path — while regular deps are hoisted to the root
-// node_modules/ (here `leftpad`, a dependency of pkg-a). Pins down that workspace packages
-// resolve as external (linked) and hoisted deps resolve as ordinary, non-external packages.
+// Case C: npm workspace root lockfile (from a real `npm install`). Workspace packages appear
+// as a link entry plus a real on-disk entry; regular deps (leftpad) are hoisted to the root.
 let workspacePackages = new Packages({
 	packages: {
 		"node_modules/@demo/pkg-a": { link: true, resolved: "packages/pkg-a" },
@@ -86,10 +83,8 @@ let workspacePackages = new Packages({
 	},
 });
 
-// Case D: workspace run from inside a package (prefix set). The lockfile lives at the
-// monorepo root, two levels up, so paths are rebased to cwd ("../..") while keys — which
-// match the generator's "../../node_modules/..." URLs — stay as-is. Pins down that parse()
-// still finds packages and that path/resolvedPath/sourcePath become cwd-relative.
+// Case D: same lockfile read from inside a package (prefix "../.."), so paths rebase to cwd
+// while keys still match the generator's "../../node_modules/..." URLs.
 let workspacePrefixPackages = new Packages(
 	{
 		packages: {
@@ -310,9 +305,7 @@ export default {
 				{ arg: "sourcePath", expect: "./node_modules/leftpad" },
 			],
 		},
-		// Case D: run from inside a workspace package — generator emits "../../node_modules/..."
-		// URLs (deps live at the monorepo root). With prefix set, paths rebase to cwd while the
-		// package is still found and copied from the right place.
+		// Case D: parsing the generator's "../../node_modules/..." URLs under prefix.
 		{
 			name: "../../node_modules/leftpad/index.js",
 			packages: workspacePrefixPackages,
