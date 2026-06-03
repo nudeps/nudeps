@@ -70,7 +70,7 @@ export class ImportMapGenerator extends Generator {
 	async install (alias, target, { noRetry, ...installOptions } = {}) {
 		if (target === undefined) {
 			// Locate the dep in node_modules — at the monorepo root (prefix) under workspaces.
-			let prefix = this.nudeps?.modules.prefix ?? "";
+			let prefix = this.nudeps?.packages.prefix ?? "";
 			target = `${prefix ? prefix + "/" : "./"}node_modules/${alias}`;
 		}
 
