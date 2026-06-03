@@ -100,53 +100,8 @@ export default async function (options) {
 		createGitignoredDir(config.dir);
 	}
 
-	// Extract top-level directories, copy them over to config.dir
-	// using the package version at the end of the directory (e.g. @foo/bar@3.1.2 instead of @foo/bar)
-	// and update the import map to use that directory instead
-
-	let { toCopy } = nudeps;
-
-	const { map, stats, packages } = nudeps;
-
-	for (let { specifier, url, map: subMap } of map) {
-		stats.entries++;
-
-		if (!url.includes("node_modules/")) {
-			// Nothing to copy or rewrite
-			continue;
-		}
-
-		let { pkg, filePath, sourcePath } = packages.parse(url);
-
-		let localPath = pkg ? nudeps.localPath(pkg, filePath) : config.dir + "/" + filePath;
-		let urlFromMap = path.relative(path.dirname(config.map), localPath); // Note: path.relative() might normalize away the trailing slash for directories
-		urlFromMap = urlFromMap.startsWith(".") ? urlFromMap : "./" + urlFromMap;
-		if (specifier.endsWith("/") && !urlFromMap.endsWith("/")) {
-			// Preserve directory specifiers that require a trailing slash in import maps
-			urlFromMap += "/";
-		}
-		subMap[specifier] = urlFromMap;
-		if (pkg) {
-			toCopy[sourcePath] ??= nudeps.localDir(pkg);
-		}
-	}
-
-	if (map.scopes) {
-		for (let scope in map.scopes) {
-			if (!scope.includes("node_modules/")) {
-				continue;
-			}
-
-			// Rewrite scope itself
-			let { pkg: scopePkg } = packages.parse(scope);
-			let scopeLocalDir = scopePkg ? nudeps.localDir(scopePkg) : config.dir;
-			let scopeFromMap = path.relative(path.dirname(config.map), scopeLocalDir);
-			scopeFromMap = scopeFromMap.startsWith(".") ? scopeFromMap : "./" + scopeFromMap;
-			map.scopes[scopeFromMap] = map.scopes[scope];
-			delete map.scopes[scope];
-		}
-	}
-
+	// Rewrite the import map to point at local copies, then materialize those copies in config.dir
+	nudeps.localizeMap();
 	await nudeps.copyPackages();
 
 	// Write import map
@@ -157,6 +112,7 @@ export default async function (options) {
 
 	// Detect whether the map actually changed (used to skip propagation on no-ops,
 	// which also naturally breaks cycles between mutually-local deps).
+	const { map, stats } = nudeps;
 	let mapContent = map.toJS({ module: config.module, terse: config.terse });
 	let existingMap = existsSync(config.map) ? readFileSync(config.map, "utf8") : null;
 	let mapChanged = mapContent !== existingMap;

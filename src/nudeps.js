@@ -460,6 +460,56 @@ export default class Nudeps {
 		return false;
 	}
 
+	/**
+	 * Rewrite the import map in place so node_modules specifiers and scopes point at the local
+	 * copies under config.dir (versioned, e.g. @foo/bar@3.1.2), and record which package
+	 * directories need to be copied there (this.toCopy). Also tallies the total number of map
+	 * entries into this.stats.entries. The recorded copies are materialized by copyPackages().
+	 */
+	localizeMap () {
+		let { config, map, stats, packages, toCopy } = this;
+		let mapDir = path.dirname(config.map);
+
+		for (let { specifier, url, map: subMap } of map) {
+			stats.entries++;
+
+			if (!url.includes("node_modules/")) {
+				// Nothing to copy or rewrite
+				continue;
+			}
+
+			let { pkg, filePath, sourcePath } = packages.parse(url);
+
+			let localPath = pkg ? this.localPath(pkg, filePath) : config.dir + "/" + filePath;
+			let urlFromMap = path.relative(mapDir, localPath); // Note: path.relative() might normalize away the trailing slash for directories
+			urlFromMap = urlFromMap.startsWith(".") ? urlFromMap : "./" + urlFromMap;
+			if (specifier.endsWith("/") && !urlFromMap.endsWith("/")) {
+				// Preserve directory specifiers that require a trailing slash in import maps
+				urlFromMap += "/";
+			}
+			subMap[specifier] = urlFromMap;
+			if (pkg) {
+				toCopy[sourcePath] ??= this.localDir(pkg);
+			}
+		}
+
+		if (map.scopes) {
+			for (let scope in map.scopes) {
+				if (!scope.includes("node_modules/")) {
+					continue;
+				}
+
+				// Rewrite scope itself
+				let { pkg: scopePkg } = packages.parse(scope);
+				let scopeLocalDir = scopePkg ? this.localDir(scopePkg) : config.dir;
+				let scopeFromMap = path.relative(mapDir, scopeLocalDir);
+				scopeFromMap = scopeFromMap.startsWith(".") ? scopeFromMap : "./" + scopeFromMap;
+				map.scopes[scopeFromMap] = map.scopes[scope];
+				delete map.scopes[scope];
+			}
+		}
+	}
+
 	async copyPackages () {
 		let { config, existingDirs, existingSymlinks, toCopy, toDelete, toDeleteIfEmpty, stats } =
 			this;
