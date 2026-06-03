@@ -132,6 +132,20 @@ export default async function (options) {
 		}
 	}
 
+	// Honor aliases for packages with no JS entries in the import map (CSS/font-only
+	// packages like bootstrap-icons, which expose only style/sass). Alias creation is
+	// otherwise a side effect of the import-map walk above, so these would be silently
+	// dropped — copied nowhere and never symlinked. See https://github.com/nudeps/nudeps/issues/102
+	nudeps.seedAliasedPackages(toCopy);
+
+	// Surface aliases that match no installed package (typo / removed dep): with no
+	// package to point at, they materialize nothing and would 404 at runtime.
+	for (let key of nudeps.unmatchedAliases()) {
+		nudeps.error(
+			`Alias declared for "${key}" but no matching package is installed; alias ignored.`,
+		);
+	}
+
 	if (map.scopes) {
 		for (let scope in map.scopes) {
 			if (!scope.includes("node_modules/")) {
