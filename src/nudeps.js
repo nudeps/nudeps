@@ -93,67 +93,8 @@ export default class Nudeps {
 		return value;
 	}
 
-	/**
-	 * Directory whose node_modules holds the installed deps and lockfile — cwd, or the
-	 * monorepo root when run inside a workspace package. `prefix` is the cwd→dir path
-	 * (e.g. "../.."), used to locate hoisted deps and rebase lockfile paths. Cached.
-	 */
-	get modules () {
-		let dir = process.cwd();
-		while (!existsSync(path.join(dir, "node_modules", ".package-lock.json"))) {
-			let parent = path.dirname(dir);
-			if (parent === dir) {
-				dir = null;
-				break;
-			}
-			dir = parent;
-		}
-
-		let prefix = dir && dir !== process.cwd() ? path.relative(process.cwd(), dir) : "";
-		let value = { dir, prefix };
-		Object.defineProperty(this, "modules", { value, configurable: true });
-		return value;
-	}
-
 	get packages () {
-		let { dir, prefix } = this.modules;
-		if (dir === null) {
-			if (existsSync("package.json")) {
-				throw new Error("node_modules not found. Run `npm install` first.");
-			}
-			dir = process.cwd();
-		}
-
-		let data = readJSONSync(path.join(dir, "node_modules/.package-lock.json"));
-		let raw = data?.packages ?? {};
-
-		// Pre-load child lockfiles for external (linked) deps; `resolved` is relative to dir.
-		let children = {};
-		for (let [key, info] of Object.entries(raw)) {
-			if (info.link) {
-				let resolvedDir = path.resolve(dir, info.resolved);
-				let childData = readJSONSync(
-					path.join(resolvedDir, "node_modules/.package-lock.json"),
-					{ optional: true },
-				);
-				if (childData) {
-					children[info.resolved] = childData;
-				}
-				else if (prefix) {
-					// Workspace siblings hoist their deps — nothing to pre-load.
-				}
-				else if (!existsSync(path.join(resolvedDir, "node_modules"))) {
-					this.info(
-						`Warning: node_modules not found at ${info.resolved}. Run \`npm install\` there first.`,
-					);
-				}
-				else {
-					this.info(`Warning: No lockfile found at ${info.resolved}`);
-				}
-			}
-		}
-
-		let value = new Packages(data, { children, prefix });
+		let value = Packages.load(process.cwd(), { warn: msg => this.info(msg) });
 		Object.defineProperty(this, "packages", { value, configurable: true });
 		return value;
 	}

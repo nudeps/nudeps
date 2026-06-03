@@ -1,4 +1,8 @@
+import { existsSync } from "node:fs";
+import * as path from "node:path";
+
 import Package from "./package.js";
+import { readJSONSync } from "./fs.js";
 
 export { Package };
 
@@ -13,12 +17,78 @@ export default class Packages {
 	#parseCache = {};
 
 	/**
+	 * Locate and read npm's lockfile(s) from disk, then build a Packages.
+	 * Walks up from `cwd` to the nearest node_modules/.package-lock.json — which in an
+	 * npm workspace lives at the monorepo root — and rebases paths to cwd accordingly.
+	 * @param {string} [cwd]
+	 * @param {object} [options]
+	 * @param {(message: string) => void} [options.warn] - Called for non-fatal lockfile issues.
+	 * @returns {Packages}
+	 */
+	static load (cwd = process.cwd(), { warn = () => {} } = {}) {
+		let dir = cwd;
+		while (!existsSync(path.join(dir, "node_modules", ".package-lock.json"))) {
+			let parent = path.dirname(dir);
+			if (parent === dir) {
+				dir = null;
+				break;
+			}
+			dir = parent;
+		}
+
+		if (dir === null) {
+			if (existsSync(path.join(cwd, "package.json"))) {
+				throw new Error("node_modules not found. Run `npm install` first.");
+			}
+			dir = cwd;
+		}
+
+		let prefix = dir !== cwd ? path.relative(cwd, dir) : "";
+		let data = readJSONSync(path.join(dir, "node_modules/.package-lock.json"));
+		let raw = data?.packages ?? {};
+
+		// Pre-load child lockfiles for external (linked) deps; `resolved` is relative to dir.
+		let children = {};
+		for (let info of Object.values(raw)) {
+			if (!info.link) {
+				continue;
+			}
+
+			let resolvedDir = path.resolve(dir, info.resolved);
+			let childData = readJSONSync(
+				path.join(resolvedDir, "node_modules/.package-lock.json"),
+				{
+					optional: true,
+				},
+			);
+
+			if (childData) {
+				children[info.resolved] = childData;
+			}
+			else if (prefix) {
+				// Workspace siblings hoist their deps — nothing to pre-load.
+			}
+			else if (!existsSync(path.join(resolvedDir, "node_modules"))) {
+				warn(
+					`Warning: node_modules not found at ${info.resolved}. Run \`npm install\` there first.`,
+				);
+			}
+			else {
+				warn(`Warning: No lockfile found at ${info.resolved}`);
+			}
+		}
+
+		return new Packages(data, { children, prefix });
+	}
+
+	/**
 	 * @param {object} data - Lockfile data (npm's .package-lock.json format)
 	 * @param {object} [options]
 	 * @param {object} [options.children] - Child lockfile data keyed by resolved path, for merging transitive deps of local deps
 	 * @param {string} [options.prefix] - cwd→lockfile-dir path (e.g. "../..") for workspaces, to rebase paths to cwd. Keys stay as-is for URL matching.
 	 */
 	constructor (data, { children = {}, prefix = "" } = {}) {
+		this.prefix = prefix;
 		let raw = data?.packages ?? {};
 
 		// Rebase a lockfile-relative path to cwd (no prefix keeps the historical "./" form).
