@@ -2,14 +2,16 @@
  * Main entry point
  */
 
-import { readJSONSync, writeJSONSync } from "./util.js";
-import { ImportMapGenerator, ImportMap } from "./map.js";
-import { matchesGlob, ensureSymlink } from "./util/fs.js";
-
-import { getTopLevelModules } from "./util.js";
 import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
+import { execSync } from "node:child_process";
+
+import { readJSONSync, writeJSONSync, createGitignoredDir } from "./util.js";
+import { ImportMapGenerator, ImportMap } from "./map.js";
+import { matchesGlob, ensureSymlink } from "./util/fs.js";
+import { getTopLevelModules } from "./util.js";
 import Packages from "./util/packages.js";
+
 import nudepsPkg from "../package.json" with { type: "json" };
 
 export default class Nudeps {
@@ -85,6 +87,69 @@ export default class Nudeps {
 	async finalize () {
 		await this.generator.finalize();
 		this.saveCache();
+	}
+
+	/**
+	 * Register this repo as a dependent of each local production dependency, by writing our
+	 * relative path into the dep's .nudeps/local-dependents.json. This lets the dep propagate
+	 * its changes back to us. Idempotent and unconditional: it records dependency topology, not
+	 * a change event, so it must run on every invocation. Only production dependencies are
+	 * considered — devDependencies are not installed by nudeps.
+	 */
+	registerAsDependent () {
+		let prodDeps = new Set(Object.keys(this.pkg.dependencies ?? {}));
+
+		for (let pkg of this.packages.externals) {
+			if (!prodDeps.has(pkg.installName)) {
+				continue;
+			}
+			if (!existsSync(pkg.resolvedPath)) {
+				continue;
+			}
+
+			if (!pkg.hasDependency("nudeps")) {
+				// Nudeps not installed on the local dep — propagation requires nudeps on both ends.
+				this.info(
+					`Local dependency at ${pkg.resolvedPath} doesn't have nudeps installed. ` +
+						`Install nudeps there to enable change propagation.`,
+				);
+				continue;
+			}
+
+			// Ensure .nudeps/ exists in the dep, then add ourselves to its dependents list
+			let depNudepsDir = path.join(pkg.resolvedPath, ".nudeps");
+			createGitignoredDir(depNudepsDir);
+
+			let dependentsFile = path.join(depNudepsDir, "local-dependents.json");
+			let dependents = readJSONSync(dependentsFile, { optional: true }) ?? [];
+			let relPath = path.relative(pkg.resolvedPath, ".");
+
+			if (!dependents.includes(relPath)) {
+				dependents.push(relPath);
+				writeJSONSync(dependentsFile, dependents);
+			}
+		}
+	}
+
+	/**
+	 * Trigger the `dependencies` npm hook in every repo that depends on this one locally, so they
+	 * regenerate against our updated output. Reads our .nudeps/local-dependents.json; --if-present
+	 * silently skips repos with no such hook. Callers should only invoke this when the map actually
+	 * changed — that content-based gate is what breaks propagation cycles between mutually-local deps.
+	 */
+	notifyDependents () {
+		let dependents = readJSONSync(".nudeps/local-dependents.json", { optional: true });
+
+		for (let entry of dependents ?? []) {
+			this.info(`Propagating to dependent: ${entry}`);
+
+			try {
+				execSync("npm run dependencies --if-present", { cwd: entry, stdio: "inherit" });
+			}
+			catch (e) {
+				this.error(`Failed to propagate to ${entry}: ${e.message}`);
+			}
+		}
 	}
 
 	get pkg () {

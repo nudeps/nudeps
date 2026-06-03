@@ -5,8 +5,7 @@ import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { getConfig } from "./config.js";
 import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import { readJSONSync, writeJSONSync, createGitignoredDir } from "./util.js";
-import { execSync } from "node:child_process";
+import { writeJSONSync, createGitignoredDir } from "./util.js";
 import Nudeps from "./nudeps.js";
 
 export default async function (options) {
@@ -203,55 +202,11 @@ export default async function (options) {
 	}
 	nudeps.info(...info);
 
-	// Register this repo as a dependent of each local dep, so they can propagate changes back.
-	// Only process production dependencies — devDependencies are not installed by nudeps.
-	let prodDeps = new Set(Object.keys(nudeps.pkg.dependencies ?? {}));
-	for (let pkg of packages.externals) {
-		if (!prodDeps.has(pkg.installName)) {
-			continue;
-		}
-		if (!existsSync(pkg.resolvedPath)) {
-			continue;
-		}
-
-		if (!pkg.hasDependency("nudeps")) {
-			// Nudeps not installed on the local dep — propagation requires nudeps on both ends.
-			nudeps.info(
-				`Local dependency at ${pkg.resolvedPath} doesn't have nudeps installed. ` +
-					`Install nudeps there to enable change propagation.`,
-			);
-			continue;
-		}
-
-		// Ensure .nudeps/ exists in the dep, then add ourselves to its dependents list
-		let depNudepsDir = path.join(pkg.resolvedPath, ".nudeps");
-		createGitignoredDir(depNudepsDir);
-
-		let dependentsFile = path.join(depNudepsDir, "local-dependents.json");
-		let dependents = readJSONSync(dependentsFile, { optional: true }) ?? [];
-		let relPath = path.relative(pkg.resolvedPath, ".");
-
-		if (!dependents.includes(relPath)) {
-			dependents.push(relPath);
-			writeJSONSync(dependentsFile, dependents);
-		}
-	}
-
-	// Propagate: if our map changed, trigger the dependencies hook in repos that depend on
-	// this one locally. --if-present silently skips if no hook is configured.
-	// Content-based comparison naturally breaks cycles (map converges → no change → stops).
+	// Register as a dependent of our local deps so they can notify us of their changes (always),
+	// then notify our own dependents if our output changed. The mapChanged gate breaks
+	// propagation cycles between mutually-local deps (map converges → no change → stops).
+	nudeps.registerAsDependent();
 	if (mapChanged) {
-		let dependents = readJSONSync(".nudeps/local-dependents.json", { optional: true });
-
-		for (let entry of dependents ?? []) {
-			nudeps.info(`Propagating to dependent: ${entry}`);
-
-			try {
-				execSync("npm run dependencies --if-present", { cwd: entry, stdio: "inherit" });
-			}
-			catch (e) {
-				nudeps.error(`Failed to propagate to ${entry}: ${e.message}`);
-			}
-		}
+		nudeps.notifyDependents();
 	}
 }
