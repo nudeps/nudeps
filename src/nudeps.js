@@ -4,7 +4,7 @@
 
 import { readJSONSync, writeJSONSync } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
-import { matchesGlob, ensureSymlink, findLockfileDir } from "./util/fs.js";
+import { matchesGlob, ensureSymlink } from "./util/fs.js";
 
 import { getTopLevelModules } from "./util.js";
 import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
@@ -93,28 +93,45 @@ export default class Nudeps {
 		return value;
 	}
 
+	/**
+	 * Directory whose node_modules holds the installed deps and lockfile — cwd, or the
+	 * monorepo root when run inside a workspace package. `prefix` is the cwd→dir path
+	 * (e.g. "../.."), used to locate hoisted deps and rebase lockfile paths. Cached.
+	 */
+	get modules () {
+		let dir = process.cwd();
+		while (!existsSync(path.join(dir, "node_modules", ".package-lock.json"))) {
+			let parent = path.dirname(dir);
+			if (parent === dir) {
+				dir = null;
+				break;
+			}
+			dir = parent;
+		}
+
+		let prefix = dir && dir !== process.cwd() ? path.relative(process.cwd(), dir) : "";
+		let value = { dir, prefix };
+		Object.defineProperty(this, "modules", { value, configurable: true });
+		return value;
+	}
+
 	get packages () {
-		// Walk up for the lockfile, which in a workspace lives at the monorepo root.
-		let lockDir = findLockfileDir(process.cwd());
-		if (lockDir === null) {
+		let { dir, prefix } = this.modules;
+		if (dir === null) {
 			if (existsSync("package.json")) {
 				throw new Error("node_modules not found. Run `npm install` first.");
 			}
-			lockDir = process.cwd();
+			dir = process.cwd();
 		}
 
-		// prefix rebases the root-relative lockfile paths to cwd when run in a subdir.
-		let inWorkspace = lockDir !== process.cwd();
-		let prefix = inWorkspace ? path.relative(process.cwd(), lockDir) : "";
-
-		let data = readJSONSync(path.join(lockDir, "node_modules/.package-lock.json"));
+		let data = readJSONSync(path.join(dir, "node_modules/.package-lock.json"));
 		let raw = data?.packages ?? {};
 
-		// Pre-load child lockfiles for external (linked) deps; `resolved` is relative to lockDir.
+		// Pre-load child lockfiles for external (linked) deps; `resolved` is relative to dir.
 		let children = {};
 		for (let [key, info] of Object.entries(raw)) {
 			if (info.link) {
-				let resolvedDir = path.resolve(lockDir, info.resolved);
+				let resolvedDir = path.resolve(dir, info.resolved);
 				let childData = readJSONSync(
 					path.join(resolvedDir, "node_modules/.package-lock.json"),
 					{ optional: true },
@@ -122,7 +139,7 @@ export default class Nudeps {
 				if (childData) {
 					children[info.resolved] = childData;
 				}
-				else if (inWorkspace) {
+				else if (prefix) {
 					// Workspace siblings hoist their deps — nothing to pre-load.
 				}
 				else if (!existsSync(path.join(resolvedDir, "node_modules"))) {
