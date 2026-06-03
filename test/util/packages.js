@@ -100,6 +100,22 @@ let workspacePrefixPackages = new Packages(
 	{ prefix: "../.." },
 );
 
+// Case E: workspace prefix + external linked dep with children.
+let workspaceExternalPackages = new Packages(
+	{
+		packages: {
+			"node_modules/ext-pkg": { link: true, resolved: "../ext" },
+			"../ext": { version: "1.0.0", name: "ext-pkg", devDependencies: { nudeps: "latest" } },
+		},
+	},
+	{
+		prefix: "../..",
+		children: {
+			"../../../ext": { packages: { "node_modules/dep": { version: "2.0.0", name: "dep" } } },
+		},
+	},
+);
+
 let dir = "./client_modules";
 
 /**
@@ -330,6 +346,16 @@ export default {
 				{ arg: "resolvedPath", expect: "../../packages/pkg-a" },
 				{ arg: "sourcePath", expect: "../../node_modules/@demo/pkg-a" },
 				{ arg: "localDir", expect: "./client_modules/@demo/pkg-a@1.0.0" },
+			],
+		},
+		// Case E: transitive dep of external linked dep, with workspace prefix.
+		{
+			name: "../../../ext/node_modules/dep/index.js",
+			packages: workspaceExternalPackages,
+			description: "Transitive dep merged under prefix",
+			tests: [
+				{ arg: "name", expect: "dep" },
+				{ arg: "version", expect: "2.0.0" },
 			],
 		},
 	],

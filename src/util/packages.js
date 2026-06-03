@@ -44,7 +44,9 @@ export default class Packages {
 		}
 
 		let prefix = dir !== cwd ? path.relative(cwd, dir) : "";
-		let data = readJSONSync(path.join(dir, "node_modules/.package-lock.json"));
+		let data = readJSONSync(path.join(dir, "node_modules/.package-lock.json"), {
+			optional: true,
+		});
 		let raw = data?.packages ?? {};
 
 		// Pre-load child lockfiles for external (linked) deps; `resolved` is relative to dir.
@@ -63,7 +65,7 @@ export default class Packages {
 			);
 
 			if (childData) {
-				children[info.resolved] = childData;
+				children[prefix ? prefix + "/" + info.resolved : info.resolved] = childData;
 			}
 			else if (prefix) {
 				// Workspace siblings hoist their deps — nothing to pre-load.
@@ -109,7 +111,7 @@ export default class Packages {
 				path: rebase(key),
 				resolvedPath: info.link
 					? prefix
-						? prefix + "/" + info.resolved
+						? rebase(info.resolved)
 						: info.resolved
 					: undefined,
 				info: resolved,
