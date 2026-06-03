@@ -102,6 +102,23 @@ export default async function (options) {
 
 	// Rewrite the import map to point at local copies, then materialize those copies in config.dir
 	nudeps.localizeMap();
+
+	// Seed aliased deps the map walk missed (CSS-only packages — #102)
+	if (config.alias) {
+		let exclude = new Set(config.exclude ?? []);
+		for (let dep in nudeps.pkg.dependencies) {
+			if (exclude.has(dep)) {
+				continue;
+			}
+
+			let pkg = nudeps.packages.get(dep);
+
+			if (pkg && !pkg.parent && nudeps.aliases(pkg).length > 0) {
+				nudeps.toCopy[pkg.path] ??= nudeps.localDir(pkg);
+			}
+		}
+	}
+
 	await nudeps.copyPackages();
 
 	// Write import map
