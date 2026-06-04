@@ -116,6 +116,17 @@ let workspaceExternalPackages = new Packages(
 	},
 );
 
+// Case F: workspace prefix + non-hoisted dep in the child's own node_modules.
+let workspaceChildNodeModulesPackages = new Packages(
+	{
+		packages: {
+			"node_modules/color-name": { version: "1.1.4", name: "color-name" },
+			"packages/pkg-a/node_modules/color-name": { version: "2.1.0", name: "color-name" },
+		},
+	},
+	{ prefix: "../.." },
+);
+
 // Chained links: two linked packages in series before a leaf dep.
 // Models: app (link) → core (nested link) → util (regular dep)
 // npm flattens intermediate links into the root lockfile with their resolved paths.
@@ -390,6 +401,20 @@ export default {
 				{ arg: "isExternal", expect: true },
 				{ arg: "localDir", expect: "./client_modules/util-lib@0.1.5" },
 				{ arg: "sourcePath", expect: "../core/node_modules/util-lib" },
+			],
+		},
+		// Case F: non-hoisted dep in workspace child's own node_modules.
+		{
+			name: "./node_modules/color-name/index.js",
+			description:
+				"Version conflict: npm installs v2.1.0 under packages/pkg-a/node_modules/ while v1.1.4 is hoisted. Should resolve to the child's version, not the hoisted one.",
+			packages: workspaceChildNodeModulesPackages,
+			tests: [
+				{ arg: "name", expect: "color-name" },
+				{ arg: "version", expect: "2.1.0" },
+				{ arg: "path", expect: "../../packages/pkg-a/node_modules/color-name" },
+				{ arg: "sourcePath", expect: "../../packages/pkg-a/node_modules/color-name" },
+				{ arg: "localDir", expect: "./client_modules/color-name@2.1.0" },
 			],
 		},
 	],

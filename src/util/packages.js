@@ -228,6 +228,16 @@ export default class Packages {
 			if (base === this.prefix) {
 				base = ".";
 			}
+			else if (base === ".") {
+				// cwd's own node_modules (non-hoisted dep). Find the child path from lockfile keys.
+				for (let key of Object.keys(this.#byKey)) {
+					let index = key.indexOf("/node_modules/");
+					if (index > 0 && !key.startsWith(".") && !key.startsWith("node_modules/")) {
+						base = key.slice(0, index);
+						break;
+					}
+				}
+			}
 		}
 		else {
 			base = base.replace(/^\.\//, "");
