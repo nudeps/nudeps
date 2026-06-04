@@ -18,7 +18,7 @@ export default async function (options) {
 		!existsSync(path.join(root, "node_modules", ".package-lock.json"))
 	) {
 		console.info(
-			"[nudeps] Skipping import map generation during workspace install — it runs once the lockfile is written.",
+			"[nudeps] Skipping import map generation during workspace install — it runs once the lockfile is written. If this is not a workspace, please run Nudeps from the package root.",
 		);
 		return;
 	}
