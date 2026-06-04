@@ -13,6 +13,7 @@ import { ImportMapGenerator, ImportMap } from "./map.js";
 import { matchesGlob, ensureSymlink } from "./util/fs.js";
 import { getTopLevelModules } from "./util.js";
 import Packages from "./util/packages.js";
+import * as hosts from "./hosts.js";
 
 import nudepsPkg from "../package.json" with { type: "json" };
 
@@ -40,6 +41,30 @@ export default class Nudeps {
 	constructor ({ config }) {
 		this.config = config;
 		this.oldConfig = readJSONSync(".nudeps/config.json", { optional: true });
+
+		if (this.config.host) {
+			this.host = hosts[this.config.host];
+			if (!this.host) {
+				this.warn(`Unknown host: ${this.config.host}`);
+			}
+		}
+		else {
+			// Auto-detect host
+			for (let hostId in hosts) {
+				let host = hosts[hostId];
+				if (host.detect()) {
+					this.host = host;
+					this.info(`Detected host: ${host.name}`);
+					break;
+				}
+			}
+		}
+
+		this.host ??= {};
+
+		if (this.host.hooks) {
+			this.hooks.add(this.host.hooks);
+		}
 
 		let { dirs, symlinks } = config.init
 			? { dirs: [], symlinks: [] }
@@ -70,8 +95,9 @@ export default class Nudeps {
 	}
 
 	hooks = new Hooks();
-	$hook (name, env, options) {
-		this.hooks.run(name, env, { context: this, ...options });
+	$hook (name, env) {
+		env.context = this;
+		this.hooks.run(name, env);
 	}
 
 	get installCache () {
@@ -600,27 +626,38 @@ export default class Nudeps {
 	}
 
 	createAliases () {
-		let resolvedDir = path.resolve(this.dir);
-		let externalAliases = new Set();
+		let env = {};
+		env.resolvedDir = path.resolve(this.dir);
+		env.externalAliases = new Set();
+
+		this.$hook("create-aliases-start", env);
 
 		for (let aliasPath in this.toAlias) {
 			let target = this.toAlias[aliasPath];
 
-			if (!path.resolve(aliasPath).startsWith(resolvedDir + path.sep)) {
-				externalAliases.add(aliasPath);
+			if (!path.resolve(aliasPath).startsWith(env.resolvedDir + path.sep)) {
+				env.externalAliases.add(aliasPath);
 			}
+		}
+
+		// Persist external alias paths so they can be cleaned up on next run
+		if (env.externalAliases?.size > 0) {
+			writeJSONSync(".nudeps/external-aliases.json", [...env.externalAliases]);
+		}
+		else if (existsSync(".nudeps/external-aliases.json")) {
+			rmSync(".nudeps/external-aliases.json");
+		}
+
+		this.$hook("create-aliases-after-external", env);
+
+		for (let aliasPath in this.toAlias) {
+			let target = this.toAlias[aliasPath];
 
 			if (ensureSymlink(target, aliasPath, "dir", { force: true })) {
 				this.stats.aliased++;
 			}
 		}
 
-		// Persist external alias paths so they can be cleaned up on next run
-		if (externalAliases?.size > 0) {
-			writeJSONSync(".nudeps/external-aliases.json", [...externalAliases]);
-		}
-		else if (existsSync(".nudeps/external-aliases.json")) {
-			rmSync(".nudeps/external-aliases.json");
-		}
+		this.$hook("create-aliases-end", env);
 	}
 }
