@@ -1,5 +1,6 @@
 import { readJSONSync, writeJSONSync } from "./util.js";
 import { execSync } from "node:child_process";
+import * as path from "node:path";
 
 /**
  * Add a command to an npm lifecycle hook, falling back to pre/post variants if the hook is already taken.
@@ -38,4 +39,23 @@ export default async function () {
 	addHook(pkg, "prepare", command);
 
 	writeJSONSync("package.json", pkg, 2);
+
+	// Handle workspaces: walk up to find a parent with `workspaces`.
+	// Can't use npm_config_local_prefix — it's only set during npm lifecycle hooks, not `npx nudeps install`.
+	// TODO move to Packages.findRoot()
+	let dir = path.dirname(process.cwd());
+	while (dir !== path.dirname(dir)) {
+		let rootPkg = readJSONSync(path.join(dir, "package.json"), { optional: true });
+
+		if (rootPkg?.workspaces) {
+			// Add hooks that delegate to children, so `npm install` at the root re-triggers nudeps after the lockfile is written.
+			for (let hook of ["dependencies", "prepare"]) {
+				addHook(rootPkg, hook, `npm run ${hook} --if-present --workspaces`);
+			}
+			writeJSONSync(path.join(dir, "package.json"), rootPkg);
+			break;
+		}
+
+		dir = path.dirname(dir);
+	}
 }
