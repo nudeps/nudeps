@@ -177,35 +177,7 @@ export default class Nudeps {
 	}
 
 	get packages () {
-		if (!existsSync("node_modules") && existsSync("package.json")) {
-			throw new Error("node_modules not found. Run `npm install` first.");
-		}
-
-		let data = readJSONSync("node_modules/.package-lock.json");
-		let raw = data?.packages ?? {};
-
-		// Pre-load child lockfiles for external (linked) deps
-		let children = {};
-		for (let [key, info] of Object.entries(raw)) {
-			if (info.link) {
-				let childData = readJSONSync(`${info.resolved}/node_modules/.package-lock.json`, {
-					optional: true,
-				});
-				if (childData) {
-					children[info.resolved] = childData;
-				}
-				else if (!existsSync(`${info.resolved}/node_modules`)) {
-					this.info(
-						`Warning: node_modules not found at ${info.resolved}. Run \`npm install\` there first.`,
-					);
-				}
-				else {
-					this.info(`Warning: No lockfile found at ${info.resolved}`);
-				}
-			}
-		}
-
-		let value = new Packages(data, { children });
+		let value = Packages.load(process.cwd(), { warn: msg => this.info(msg) });
 		Object.defineProperty(this, "packages", { value, configurable: true });
 		return value;
 	}

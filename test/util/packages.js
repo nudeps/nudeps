@@ -14,35 +14,107 @@ let defaultData = {
 let defaultPackages = new Packages(defaultData);
 
 // Case A: transitive dep via local dep's resolved path (../vue → nudeps-demo-vue)
-let caseAPackages = new Packages({
-	packages: {
-		"node_modules/nudeps-demo-vue": { link: true, resolved: "../vue" },
-		"../vue": { version: "0.0.1", name: "nudeps-demo-vue", devDependencies: { nudeps: "latest" } },
+let caseAPackages = new Packages(
+	{
+		packages: {
+			"node_modules/nudeps-demo-vue": { link: true, resolved: "../vue" },
+			"../vue": {
+				version: "0.0.1",
+				name: "nudeps-demo-vue",
+				devDependencies: { nudeps: "latest" },
+			},
+		},
 	},
-}, {
-	children: { "../vue": { packages: { "node_modules/vue": { version: "3.5.26", name: "vue" } } } },
-});
+	{
+		children: {
+			"../vue": { packages: { "node_modules/vue": { version: "3.5.26", name: "vue" } } },
+		},
+	},
+);
 
 // Case A with reuse: main lockfile also has vue@3.5.26
-let caseAReusePackages = new Packages({
-	packages: {
-		"node_modules/nudeps-demo-vue": { link: true, resolved: "../vue" },
-		"../vue": { version: "0.0.1", name: "nudeps-demo-vue", devDependencies: { nudeps: "latest" } },
-		"node_modules/vue": { version: "3.5.26", name: "vue" },
+let caseAReusePackages = new Packages(
+	{
+		packages: {
+			"node_modules/nudeps-demo-vue": { link: true, resolved: "../vue" },
+			"../vue": {
+				version: "0.0.1",
+				name: "nudeps-demo-vue",
+				devDependencies: { nudeps: "latest" },
+			},
+			"node_modules/vue": { version: "3.5.26", name: "vue" },
+		},
 	},
-}, {
-	children: { "../vue": { packages: { "node_modules/vue": { version: "3.5.26", name: "vue" } } } },
-});
+	{
+		children: {
+			"../vue": { packages: { "node_modules/vue": { version: "3.5.26", name: "vue" } } },
+		},
+	},
+);
 
 // Case B: nested under an external (linked) package
-let caseBPackages = new Packages({
-	packages: {
-		"node_modules/ext-pkg": { link: true, resolved: "../ext" },
-		"../ext": { version: "1.0.0", name: "ext-pkg", devDependencies: { nudeps: "latest" } },
+let caseBPackages = new Packages(
+	{
+		packages: {
+			"node_modules/ext-pkg": { link: true, resolved: "../ext" },
+			"../ext": { version: "1.0.0", name: "ext-pkg", devDependencies: { nudeps: "latest" } },
+		},
 	},
-}, {
-	children: { "../ext": { packages: { "node_modules/dep": { version: "2.0.0", name: "dep" } } } },
+	{
+		children: {
+			"../ext": { packages: { "node_modules/dep": { version: "2.0.0", name: "dep" } } },
+		},
+	},
+);
+
+// Case C: npm workspace root lockfile (from a real `npm install`). Workspace packages appear
+// as a link entry plus a real on-disk entry; regular deps (leftpad) are hoisted to the root.
+let workspacePackages = new Packages({
+	packages: {
+		"node_modules/@demo/pkg-a": { link: true, resolved: "packages/pkg-a" },
+		"node_modules/@demo/pkg-b": { link: true, resolved: "packages/pkg-b" },
+		"node_modules/leftpad": { version: "0.0.1", name: "leftpad" },
+		"packages/pkg-a": {
+			name: "@demo/pkg-a",
+			version: "1.0.0",
+			dependencies: { "@demo/pkg-b": "1.0.0", leftpad: "0.0.1" },
+		},
+		"packages/pkg-b": { name: "@demo/pkg-b", version: "1.0.0" },
+	},
 });
+
+// Case D: same lockfile read from inside a package (prefix "../.."), so paths rebase to cwd
+// while keys still match the generator's "../../node_modules/..." URLs.
+let workspacePrefixPackages = new Packages(
+	{
+		packages: {
+			"node_modules/@demo/pkg-a": { link: true, resolved: "packages/pkg-a" },
+			"node_modules/leftpad": { version: "0.0.1", name: "leftpad" },
+			"packages/pkg-a": {
+				name: "@demo/pkg-a",
+				version: "1.0.0",
+				dependencies: { leftpad: "0.0.1" },
+			},
+		},
+	},
+	{ prefix: "../.." },
+);
+
+// Case E: workspace prefix + external linked dep with children.
+let workspaceExternalPackages = new Packages(
+	{
+		packages: {
+			"node_modules/ext-pkg": { link: true, resolved: "../ext" },
+			"../ext": { version: "1.0.0", name: "ext-pkg", devDependencies: { nudeps: "latest" } },
+		},
+	},
+	{
+		prefix: "../..",
+		children: {
+			"../../../ext": { packages: { "node_modules/dep": { version: "2.0.0", name: "dep" } } },
+		},
+	},
+);
 
 let dir = "./client_modules";
 
@@ -61,18 +133,34 @@ export default {
 		let { pkg, filePath, sourcePath } = packages.parse(url);
 
 		switch (prop) {
-			case "filePath": return filePath;
-			case "sourcePath": return sourcePath;
-			case "pkg": return pkg;
-			case "name": return pkg?.name;
-			case "version": return pkg?.version;
-			case "installName": return pkg?.installName;
-			case "isExternal": return pkg?.isExternal ?? false;
-			case "isNested": return !!pkg?.parent;
-			case "localDir": return localDir(pkg);
-			case "localPath": return [localDir(pkg), filePath].join("/");
-			case "dirName": return pkg?.dirName;
-			case "parentName": return pkg?.parent?.name;
+			case "filePath":
+				return filePath;
+			case "sourcePath":
+				return sourcePath;
+			case "path":
+				return pkg?.path;
+			case "resolvedPath":
+				return pkg?.resolvedPath;
+			case "pkg":
+				return pkg;
+			case "name":
+				return pkg?.name;
+			case "version":
+				return pkg?.version;
+			case "installName":
+				return pkg?.installName;
+			case "isExternal":
+				return pkg?.isExternal ?? false;
+			case "isNested":
+				return !!pkg?.parent;
+			case "localDir":
+				return localDir(pkg);
+			case "localPath":
+				return [localDir(pkg), filePath].join("/");
+			case "dirName":
+				return pkg?.dirName;
+			case "parentName":
+				return pkg?.parent?.name;
 		}
 	},
 	tests: [
@@ -189,9 +277,7 @@ export default {
 		{
 			name: "../vue/node_modules/vue/dist/vue.esm-bundler.js",
 			packages: caseAReusePackages,
-			tests: [
-				{ arg: "localDir", expect: "./client_modules/vue@3.5.26" },
-			],
+			tests: [{ arg: "localDir", expect: "./client_modules/vue@3.5.26" }],
 		},
 		// Case B: nested under external — flat top-level
 		{
@@ -203,6 +289,73 @@ export default {
 				{ arg: "isExternal", expect: true },
 				{ arg: "localDir", expect: "./client_modules/dep@2.0.0" },
 				{ arg: "sourcePath", expect: "../ext/node_modules/dep" },
+			],
+		},
+		// Case C: npm workspace package — symlinked into the root node_modules.
+		// Resolves through the link to its on-disk entry and is treated as external/linked,
+		// just like a `npm install ../foo` local dep.
+		{
+			name: "./node_modules/@demo/pkg-a/index.js",
+			packages: workspacePackages,
+			description: "npm workspace package, linked into root node_modules",
+			tests: [
+				{ arg: "name", expect: "@demo/pkg-a" },
+				{ arg: "version", expect: "1.0.0" },
+				{ arg: "isExternal", expect: true },
+				{ arg: "localDir", expect: "./client_modules/@demo/pkg-a@1.0.0" },
+				{ arg: "sourcePath", expect: "./node_modules/@demo/pkg-a" },
+			],
+		},
+		// Case C: hoisted dependency of a workspace package — npm installs it at the root
+		// node_modules/ rather than under the workspace package, so it is an ordinary,
+		// non-external package as far as nudeps is concerned.
+		{
+			name: "./node_modules/leftpad/index.js",
+			packages: workspacePackages,
+			description: "Hoisted dependency of a workspace package",
+			tests: [
+				{ arg: "name", expect: "leftpad" },
+				{ arg: "version", expect: "0.0.1" },
+				{ arg: "isExternal", expect: false },
+				{ arg: "localDir", expect: "./client_modules/leftpad@0.0.1" },
+				{ arg: "sourcePath", expect: "./node_modules/leftpad" },
+			],
+		},
+		// Case D: parsing the generator's "../../node_modules/..." URLs under prefix.
+		{
+			name: "../../node_modules/leftpad/index.js",
+			packages: workspacePrefixPackages,
+			description: "Hoisted dep resolved from inside a workspace package (prefix)",
+			tests: [
+				{ arg: "name", expect: "leftpad" },
+				{ arg: "version", expect: "0.0.1" },
+				{ arg: "isExternal", expect: false },
+				{ arg: "path", expect: "../../node_modules/leftpad" },
+				{ arg: "sourcePath", expect: "../../node_modules/leftpad" },
+				{ arg: "localDir", expect: "./client_modules/leftpad@0.0.1" },
+			],
+		},
+		{
+			name: "../../node_modules/@demo/pkg-a/index.js",
+			packages: workspacePrefixPackages,
+			description: "Sibling workspace package resolved from inside a package (prefix)",
+			tests: [
+				{ arg: "name", expect: "@demo/pkg-a" },
+				{ arg: "isExternal", expect: true },
+				{ arg: "path", expect: "../../node_modules/@demo/pkg-a" },
+				{ arg: "resolvedPath", expect: "../../packages/pkg-a" },
+				{ arg: "sourcePath", expect: "../../node_modules/@demo/pkg-a" },
+				{ arg: "localDir", expect: "./client_modules/@demo/pkg-a@1.0.0" },
+			],
+		},
+		// Case E: transitive dep of external linked dep, with workspace prefix.
+		{
+			name: "../../../ext/node_modules/dep/index.js",
+			packages: workspaceExternalPackages,
+			description: "Transitive dep merged under prefix",
+			tests: [
+				{ arg: "name", expect: "dep" },
+				{ arg: "version", expect: "2.0.0" },
 			],
 		},
 	],

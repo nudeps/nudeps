@@ -67,7 +67,13 @@ export class ImportMapGenerator extends Generator {
 		return this.traceMap.resolver.pm;
 	}
 
-	async install (alias, target = `./node_modules/${alias}`, { noRetry, ...installOptions } = {}) {
+	async install (alias, target, { noRetry, ...installOptions } = {}) {
+		if (target === undefined) {
+			// Locate the dep in node_modules — at the monorepo root (prefix) under workspaces.
+			let prefix = this.nudeps?.packages.prefix ?? "";
+			target = `${prefix ? prefix + "/" : "./"}node_modules/${alias}`;
+		}
+
 		// Check if this install is cacheable:
 		// must have a cache, not be the root package ("."), and not be a symlink (local dep)
 		let pkg = this.nudeps && target !== "." ? this.nudeps.packages.parse(target).pkg : null;

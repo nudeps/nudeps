@@ -94,6 +94,10 @@ nudeps logs a summary after each run: number of import map entries, time taken, 
 
 `npm install ../other-repo` works — nudeps symlinks local packages by default instead of copying. If the local dep doesn't have nudeps installed, a warning is printed — run `npx nudeps install` there too. When the local dependency's import map changes, nudeps automatically propagates to dependents.
 
+## npm Workspaces
+
+Running nudeps inside a workspace package works: it finds the lockfile at the monorepo root (deps are hoisted there), so hoisted dependencies and sibling workspace packages both resolve — hoisted deps get copied, siblings get symlinked into the package's output dir. Limitation: change propagation between sibling workspace packages is not wired up.
+
 ## Programmatic API
 
 For build scripts or CI pipelines that need nudeps as a step. Accepts the same options as the config file:
