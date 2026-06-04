@@ -95,7 +95,7 @@ export default class Nudeps {
 	}
 
 	hooks = new Hooks();
-	$hook (name, env) {
+	$hook (name, env = {}) {
 		env.context = this;
 		this.hooks.run(name, env);
 	}
