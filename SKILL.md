@@ -96,7 +96,7 @@ nudeps logs a summary after each run: number of import map entries, time taken, 
 
 ## npm Workspaces
 
-Running nudeps inside a workspace package works: it finds the lockfile at the monorepo root (deps are hoisted there), so hoisted dependencies and sibling workspace packages both resolve — hoisted deps get copied, siblings get symlinked into the package's output dir. Limitation: change propagation between sibling workspace packages is not wired up.
+Running nudeps inside a workspace package works: it finds the lockfile at the monorepo root (deps are hoisted there), so hoisted dependencies and sibling workspace packages both resolve — hoisted deps get copied, siblings get symlinked into the package's output dir. `npx nudeps install` in a workspace child automatically adds `dependencies` and `prepare` hooks to the workspace root that delegate to children (`npm run <hook> --if-present --workspaces`), so `npm install` at the root triggers import map generation in each child. Limitation: change propagation between sibling workspace packages is not wired up.
 
 ## Programmatic API
 
