@@ -44,6 +44,27 @@ let caseBPackages = new Packages({
 	children: { "../ext": { packages: { "node_modules/dep": { version: "2.0.0", name: "dep" } } } },
 });
 
+// Chained links: two linked packages in series before a leaf dep.
+// Models: app (link) → core (nested link) → util (regular dep)
+// npm flattens intermediate links into the root lockfile with their resolved paths.
+let chainedLinksPackages = new Packages(
+	{
+		packages: {
+			"node_modules/app": { link: true, resolved: "../app" },
+			"../app": { version: "3.0.0", name: "app", dependencies: { "@ns/core": "^3" } },
+			"../app/node_modules/@ns/core": { link: true, resolved: "../core" },
+			"../core": { version: "3.0.0", name: "@ns/core", dependencies: { "util-lib": "^0.1" } },
+		},
+	},
+	{
+		children: {
+			"../core": {
+				packages: { "node_modules/util-lib": { version: "0.1.5", name: "util-lib" } },
+			},
+		},
+	},
+);
+
 let dir = "./client_modules";
 
 /**
@@ -203,6 +224,18 @@ export default {
 				{ arg: "isExternal", expect: true },
 				{ arg: "localDir", expect: "./client_modules/dep@2.0.0" },
 				{ arg: "sourcePath", expect: "../ext/node_modules/dep" },
+			],
+		},
+		{
+			name: "./node_modules/app/node_modules/@ns/core/node_modules/util-lib/src/index.js",
+			description: "Chained links: dep nested 2 levels deep through two linked packages",
+			packages: chainedLinksPackages,
+			tests: [
+				{ arg: "version", expect: "0.1.5" },
+				{ arg: "name", expect: "util-lib" },
+				{ arg: "isExternal", expect: true },
+				{ arg: "localDir", expect: "./client_modules/util-lib@0.1.5" },
+				{ arg: "sourcePath", expect: "../core/node_modules/util-lib" },
 			],
 		},
 	],
