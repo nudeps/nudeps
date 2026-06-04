@@ -491,9 +491,17 @@ export default class Nudeps {
 		let { config, existingDirs, existingSymlinks, toCopy, toDelete, toDeleteIfEmpty, stats } =
 			this;
 
-		// Copy (or symlink) package directories
+		// Copy (or symlink) package directories. The same package can be reached via
+		// multiple link paths (e.g. a linked dep depended on by two other linked deps),
+		// yielding several sources for one destination dir — materialize each dest once.
+		let materialized = new Set();
 		for (let from in toCopy) {
 			let to = toCopy[from];
+			if (materialized.has(to)) {
+				continue;
+			}
+			materialized.add(to);
+
 			let { pkg } = this.packages.parse(from);
 
 			let exists = existingDirs.has(to);
