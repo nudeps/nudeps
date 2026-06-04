@@ -13,6 +13,20 @@ export default async function (options) {
 	let nudeps = new Nudeps({ config });
 	let oldConfig = nudeps.oldConfig;
 
+	// A workspace child's install-time hooks (e.g. `prepare`) run before npm writes the lockfile —
+	// skip that too-early run; the post-install re-run (lockfile now present) regenerates.
+	let root = process.env.npm_config_local_prefix;
+	if (
+		root &&
+		root !== process.cwd() &&
+		!existsSync(path.join(root, "node_modules", ".package-lock.json"))
+	) {
+		nudeps.info(
+			"Skipping import map generation during workspace install — it runs once the lockfile is written.",
+		);
+		return;
+	}
+
 	let cacheExists = existsSync(".nudeps");
 	if (cacheExists && config.init) {
 		// Note: this also clears local-dependents.json. Dependents will
