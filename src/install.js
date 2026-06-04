@@ -42,6 +42,7 @@ export default async function () {
 
 	// Handle workspaces: walk up to find a parent with `workspaces`.
 	// Can't use npm_config_local_prefix — it's only set during npm lifecycle hooks, not `npx nudeps install`.
+	// TODO move to Packages.findRoot()
 	let dir = path.dirname(process.cwd());
 	while (dir !== path.dirname(dir)) {
 		let rootPkg = readJSONSync(path.join(dir, "package.json"), { optional: true });
