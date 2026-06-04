@@ -52,7 +52,7 @@ export default class Nudeps {
 			// Auto-detect host
 			for (let hostId in hosts) {
 				let host = hosts[hostId];
-				if (host.detect()) {
+				if (host.detect?.()) {
 					this.host = host;
 					this.info(`Detected host: ${host.name}`);
 					break;
