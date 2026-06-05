@@ -17,6 +17,24 @@ export default class Packages {
 	#parseCache = {};
 
 	/**
+	 * Find the nearest ancestor (or `cwd` itself) with `node_modules/.package-lock.json`.
+	 * In npm workspaces this is the monorepo root.
+	 * @param {string} [cwd]
+	 * @returns {string|null}
+	 */
+	static findRoot (cwd = process.cwd()) {
+		let dir = cwd;
+		while (!existsSync(path.join(dir, "node_modules", ".package-lock.json"))) {
+			let parent = path.dirname(dir);
+			if (parent === dir) {
+				return null;
+			}
+			dir = parent;
+		}
+		return dir;
+	}
+
+	/**
 	 * Locate and read npm's lockfile(s) from disk, then build a Packages.
 	 * Walks up from `cwd` to the nearest node_modules/.package-lock.json — which in an
 	 * npm workspace lives at the monorepo root — and rebases paths to cwd accordingly.
@@ -26,15 +44,7 @@ export default class Packages {
 	 * @returns {Packages}
 	 */
 	static load (cwd = process.cwd(), { warn = () => {} } = {}) {
-		let dir = cwd;
-		while (!existsSync(path.join(dir, "node_modules", ".package-lock.json"))) {
-			let parent = path.dirname(dir);
-			if (parent === dir) {
-				dir = null;
-				break;
-			}
-			dir = parent;
-		}
+		let dir = Packages.findRoot(cwd);
 
 		if (dir === null) {
 			if (existsSync(path.join(cwd, "package.json"))) {
