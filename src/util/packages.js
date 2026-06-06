@@ -18,7 +18,8 @@ export default class Packages {
 
 	/**
 	 * Find the nearest ancestor (or `cwd` itself) with `node_modules/.package-lock.json`.
-	 * In npm workspaces this is the monorepo root.
+	 * In npm workspaces this is the monorepo root; npm never writes the hidden
+	 * lockfile inside workspace children, even those with their own `node_modules/`.
 	 * @param {string} [cwd]
 	 * @returns {string|null}
 	 */
