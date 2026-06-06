@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import * as path from "node:path";
 
 export const netlify = {
 	name: "Netlify",
@@ -15,7 +16,10 @@ export const netlify = {
 			// Netlify doesn't support symlinks, add _rewrites
 			let redirectsFile = fs.openSync("_redirects", "a");
 			let redirects = aliasEntries
-				.map(([aliasPath, target]) => `${aliasPath}/* ${target}/:splat 302`)
+				.map(
+					([aliasPath, target]) =>
+						`/${aliasPath}/* /${path.join(path.dirname(aliasPath), target)}/:splat 302`,
+				)
 				.join("\n");
 			fs.writeSync(redirectsFile, `${redirects}\n`);
 			fs.closeSync(redirectsFile);
