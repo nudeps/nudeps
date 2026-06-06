@@ -285,7 +285,12 @@ export default class Packages {
 			let key = (cursor === "." ? "" : cursor + "/") + "node_modules/" + name;
 			pkg = this.#byKey[key] ?? null;
 			if (!pkg) {
-				break;
+				// Global installs don't produce a child lockfile; try hoisted root
+				key = "node_modules/" + name;
+				pkg = this.#byKey[key] ?? null;
+				if (!pkg) {
+					break;
+				}
 			}
 			// Descend into the link target for external deps, else the package's own dir.
 			cursor = pkg.resolvedPath !== pkg.path ? pkg.resolvedPath : key;

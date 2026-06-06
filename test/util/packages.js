@@ -148,6 +148,34 @@ let chainedLinksPackages = new Packages(
 	},
 );
 
+// Case G: npm-linked to global store, no child lockfile.
+// Transitive dep is hoisted in the root lockfile only.
+let globalLinkedPackages = new Packages({
+	packages: {
+		"node_modules/@ns/core": { link: true, resolved: "../../.nvm/lib/node_modules/@ns/core" },
+		"../../.nvm/lib/node_modules/@ns/core": {
+			version: "3.0.0",
+			name: "@ns/core",
+			dependencies: { hooks: "^0.0" },
+		},
+		"node_modules/hooks": { version: "0.0.2", name: "hooks" },
+	},
+});
+
+// Case G variant: same as G, but the hoisted transitive dep is also npm-linked.
+let globalLinkedBothPackages = new Packages({
+	packages: {
+		"node_modules/@ns/core": { link: true, resolved: "../../.nvm/lib/node_modules/@ns/core" },
+		"../../.nvm/lib/node_modules/@ns/core": {
+			version: "3.0.0",
+			name: "@ns/core",
+			dependencies: { hooks: "^0.0" },
+		},
+		"node_modules/hooks": { link: true, resolved: "../../.nvm/lib/node_modules/hooks" },
+		"../../.nvm/lib/node_modules/hooks": { version: "0.0.2", name: "hooks" },
+	},
+});
+
 let dir = "./client_modules";
 
 /**
@@ -415,6 +443,34 @@ export default {
 				{ arg: "path", expect: "../../packages/pkg-a/node_modules/color-name" },
 				{ arg: "sourcePath", expect: "../../packages/pkg-a/node_modules/color-name" },
 				{ arg: "localDir", expect: "./client_modules/color-name@2.1.0" },
+			],
+		},
+		// Case G: npm-linked to global store, no child lockfile.
+		{
+			name: "./node_modules/@ns/core/node_modules/hooks/src/index.js",
+			description:
+				"Transitive dep hoisted in root lockfile, no child lockfile for linked package",
+			packages: globalLinkedPackages,
+			tests: [
+				{ arg: "name", expect: "hooks" },
+				{ arg: "version", expect: "0.0.2" },
+				{ arg: "path", expect: "./node_modules/hooks" },
+				{ arg: "sourcePath", expect: "./node_modules/hooks" },
+				{ arg: "localDir", expect: "./client_modules/hooks@0.0.2" },
+			],
+		},
+		// Case G variant: transitive dep is also npm-linked.
+		{
+			name: "./node_modules/@ns/core/node_modules/hooks/src/index.js",
+			description: "Both the parent and the hoisted transitive dep are npm-linked",
+			packages: globalLinkedBothPackages,
+			tests: [
+				{ arg: "name", expect: "hooks" },
+				{ arg: "version", expect: "0.0.2" },
+				{ arg: "isExternal", expect: true },
+				{ arg: "path", expect: "./node_modules/hooks" },
+				{ arg: "sourcePath", expect: "./node_modules/hooks" },
+				{ arg: "localDir", expect: "./client_modules/hooks@0.0.2" },
 			],
 		},
 	],
