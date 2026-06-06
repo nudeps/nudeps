@@ -245,6 +245,10 @@ export default class Nudeps {
 		console.info("[nudeps]", ...messages);
 	}
 
+	warn (...messages) {
+		console.warn("[nudeps]", ...messages);
+	}
+
 	error (...messages) {
 		console.error("[nudeps]", ...messages);
 	}
