@@ -176,6 +176,71 @@ let globalLinkedBothPackages = new Packages({
 	},
 });
 
+// Case H: linked package whose child lockfile contains link entries and
+// grandchild lockfiles. Tests child link resolution (link entries carry no
+// name/version) and recursive child lockfile loading (2+ levels deep).
+let childLinkedDepsPackages = new Packages(
+	{
+		packages: {
+			"node_modules/framework": { link: true, resolved: "../framework" },
+			"../framework": {
+				version: "3.0.0",
+				name: "framework",
+				dependencies: { "@scope/core": "^3", "plain-dep": "^1" },
+			},
+			"node_modules/@scope/core": { link: true, resolved: "../@scope/core" },
+			"../@scope/core": { version: "3.0.0", name: "@scope/core" },
+		},
+	},
+	{
+		children: {
+			"../framework": {
+				packages: {
+					"node_modules/@scope/core": { link: true, resolved: "../core" },
+					"../core": {
+						version: "3.0.0",
+						name: "@scope/core",
+						dependencies: { "leaf-dep": "^1" },
+					},
+					"node_modules/plain-dep": { link: true, resolved: "../plain-dep" },
+					"../plain-dep": { version: "1.2.0", name: "plain-dep" },
+				},
+			},
+			"../core": {
+				packages: {
+					"node_modules/leaf-dep": { version: "1.0.0", name: "leaf-dep" },
+				},
+			},
+		},
+	},
+);
+
+// Case I: dev-only entries (dev: true) in lockfiles should be filtered out
+// to prevent devDependencies from leaking into the package index.
+let childDevDepsPackages = new Packages(
+	{
+		packages: {
+			"node_modules/ext-pkg": { link: true, resolved: "../ext" },
+			"../ext": {
+				version: "1.0.0",
+				name: "ext-pkg",
+				dependencies: { "prod-dep": "^1" },
+				devDependencies: { "dev-dep": "^2" },
+			},
+		},
+	},
+	{
+		children: {
+			"../ext": {
+				packages: {
+					"node_modules/prod-dep": { version: "1.0.0", name: "prod-dep" },
+					"node_modules/dev-dep": { version: "2.0.0", name: "dev-dep", dev: true },
+				},
+			},
+		},
+	},
+);
+
 let dir = "./client_modules";
 
 /**
@@ -472,6 +537,66 @@ export default {
 				{ arg: "sourcePath", expect: "./node_modules/hooks" },
 				{ arg: "localDir", expect: "./client_modules/hooks@0.0.2" },
 			],
+		},
+		// Case H: child lockfile contains link entries (no name/version on the link).
+		{
+			name: "./node_modules/framework/node_modules/@scope/core/inspire.mjs",
+			description: "Scoped child link entry resolved from its target",
+			packages: childLinkedDepsPackages,
+			tests: [
+				{ arg: "name", expect: "@scope/core" },
+				{ arg: "version", expect: "3.0.0" },
+				{ arg: "localDir", expect: "./client_modules/@scope/core@3.0.0" },
+				{ arg: "isExternal", expect: true },
+				{ arg: "path", expect: "../framework/node_modules/@scope/core" },
+				{ arg: "resolvedPath", expect: "../core" },
+				{ arg: "sourcePath", expect: "../framework/node_modules/@scope/core" },
+			],
+		},
+		// Case H: unscoped variant — same link resolution applies.
+		{
+			name: "./node_modules/framework/node_modules/plain-dep/index.js",
+			description: "Unscoped child link entry resolved from its target",
+			packages: childLinkedDepsPackages,
+			tests: [
+				{ arg: "name", expect: "plain-dep" },
+				{ arg: "version", expect: "1.2.0" },
+				{ arg: "localDir", expect: "./client_modules/plain-dep@1.2.0" },
+				{ arg: "isExternal", expect: true },
+				{ arg: "path", expect: "../framework/node_modules/plain-dep" },
+				{ arg: "resolvedPath", expect: "../plain-dep" },
+				{ arg: "sourcePath", expect: "../framework/node_modules/plain-dep" },
+			],
+		},
+		// Case H: leaf dep from grandchild lockfile (2+ levels deep).
+		{
+			name: "./node_modules/framework/node_modules/@scope/core/node_modules/leaf-dep/index.js",
+			description: "Leaf dep from a child link's own child lockfile",
+			packages: childLinkedDepsPackages,
+			tests: [
+				{ arg: "name", expect: "leaf-dep" },
+				{ arg: "version", expect: "1.0.0" },
+				{ arg: "isExternal", expect: true },
+				{ arg: "path", expect: "../core/node_modules/leaf-dep" },
+				{ arg: "sourcePath", expect: "../core/node_modules/leaf-dep" },
+				{ arg: "localDir", expect: "./client_modules/leaf-dep@1.0.0" },
+			],
+		},
+		// Case I: dev-only entries in child lockfile should be filtered out.
+		{
+			name: "./node_modules/ext-pkg/node_modules/prod-dep/index.js",
+			description: "Production dep from child lockfile is merged",
+			packages: childDevDepsPackages,
+			tests: [
+				{ arg: "name", expect: "prod-dep" },
+				{ arg: "version", expect: "1.0.0" },
+			],
+		},
+		{
+			name: "./node_modules/ext-pkg/node_modules/dev-dep/index.js",
+			description: "Dev-only dep from child lockfile must not be merged",
+			packages: childDevDepsPackages,
+			tests: [{ arg: "pkg", expect: null }],
 		},
 	],
 };

@@ -376,7 +376,9 @@ export default class Nudeps {
 		}
 
 		if (alias === true) {
-			return pkg.parent ? [] : [pkg.installName];
+			// Skip alias when a shallower copy with a different version exists
+			let root = this.packages.get(pkg.name);
+			return root?.version !== pkg.version ? [] : [pkg.installName];
 		}
 
 		if (Array.isArray(alias)) {
