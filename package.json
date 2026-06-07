@@ -38,15 +38,15 @@
 		"init-demos": "cd ../nudeps-demos/ && ./each.sh 'npm link nudeps && npx nudeps --init'"
 	},
 	"devDependencies": {
-		"htest.dev": "^0.0.22",
-		"prettier": "~3.5.3",
+		"htest.dev": "^0.0.27",
+		"prettier": "~3.8.3",
 		"prettier-plugin-brace-style": "latest",
 		"prettier-plugin-merge": "latest",
 		"prettier-plugin-space-before-function-paren": "latest",
 		"release-it": "latest"
 	},
 	"dependencies": {
-		"@jspm/generator": "^2.11.0",
+		"@jspm/generator": "^2.16.1",
 		"@jspm/overrides": "^1.0.0",
 		"blissful-hooks": "^0.0.2",
 		"cjs-browser-shim": "latest",
