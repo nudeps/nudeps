@@ -70,9 +70,7 @@ export default class Packages {
 			let resolvedDir = path.resolve(dir, info.resolved);
 			let childData = readJSONSync(
 				path.join(resolvedDir, "node_modules/.package-lock.json"),
-				{
-					optional: true,
-				},
+				{ optional: true },
 			);
 
 			if (childData) {

@@ -33,14 +33,18 @@ function readExternalConfig (args) {
  * @param {Set} [options.seen] - Tracks visited modes for cycle detection
  * @returns {object} Merged defaults for this mode chain
  */
-export function resolveDefaults (name, allModes, { baseModes = builtInModes, seen = new Set() } = {}) {
+export function resolveDefaults (
+	name,
+	allModes,
+	{ baseModes = builtInModes, seen = new Set() } = {},
+) {
 	if (name === undefined) {
 		return {};
 	}
 
 	if (!(name in allModes)) {
 		let available = Object.keys(allModes).join(", ");
-		console.warn(`Unknown mode "${ name }". Available modes: ${ available }`);
+		console.warn(`Unknown mode "${name}". Available modes: ${available}`);
 		return {};
 	}
 
@@ -51,7 +55,7 @@ export function resolveDefaults (name, allModes, { baseModes = builtInModes, see
 			return resolveDefaults(name, baseModes, { baseModes: null, seen: new Set() });
 		}
 
-		console.warn(`Circular mode reference detected: ${ name }`);
+		console.warn(`Circular mode reference detected: ${name}`);
 		return {};
 	}
 
