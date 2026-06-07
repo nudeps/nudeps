@@ -60,14 +60,18 @@ export default class Packages {
 		});
 		let raw = data?.packages ?? {};
 
-		// Pre-load child lockfiles for external (linked) deps; `resolved` is relative to dir.
+		// Pre-load child lockfiles for external (linked) deps. Nested links in
+		// child lockfiles are pushed onto the same array, so they're visited too.
 		let children = {};
-		for (let info of Object.values(raw)) {
-			if (!info.link) {
+		let links = Object.values(raw).filter(info => info.link);
+		let seen = new Set();
+		for (let info of links) {
+			let resolvedDir = path.resolve(dir, info.resolved);
+			if (seen.has(resolvedDir)) {
 				continue;
 			}
+			seen.add(resolvedDir);
 
-			let resolvedDir = path.resolve(dir, info.resolved);
 			let childData = readJSONSync(
 				path.join(resolvedDir, "node_modules/.package-lock.json"),
 				{ optional: true },
@@ -75,6 +79,12 @@ export default class Packages {
 
 			if (childData) {
 				children[prefix ? prefix + "/" + info.resolved : info.resolved] = childData;
+
+				for (let childInfo of Object.values(childData.packages ?? {})) {
+					if (childInfo.link) {
+						links.push({ resolved: path.join(info.resolved, childInfo.resolved) });
+					}
+				}
 			}
 			else if (prefix) {
 				// Workspace siblings hoist their deps — nothing to pre-load.
@@ -105,9 +115,9 @@ export default class Packages {
 		// Rebase a lockfile-relative path to cwd (no prefix keeps the historical "./" form).
 		let rebase = p => (prefix ? prefix + "/" + p : "./" + p);
 
-		for (let [key, info] of Object.entries(raw).filter(([key, info]) => key)) {
-			if (!key) {
-				continue; // Skip root entry
+		for (let [key, info] of Object.entries(raw)) {
+			if (!key || info.dev) {
+				continue;
 			}
 
 			let resolved = info.link ? raw[info.resolved] : info;
@@ -139,7 +149,7 @@ export default class Packages {
 			let childRaw = children[pkg.resolvedPath]?.packages ?? {};
 
 			for (let [childKey, childInfo] of Object.entries(childRaw)) {
-				if (!childKey) {
+				if (!childKey || childInfo.dev) {
 					continue;
 				}
 
@@ -149,11 +159,18 @@ export default class Packages {
 				}
 
 				let installName = childKey.split("node_modules/").at(-1).replace(/\/$/, "");
+				// Resolve child link entries the same way top-level links are resolved.
+				let resolvedPath;
+				if (childInfo.link) {
+					resolvedPath = path.join(pkg.resolvedPath, childInfo.resolved);
+					childInfo = childRaw[childInfo.resolved] ?? childInfo;
+				}
 				let childPkg = new Package({
 					installName,
 					name: childInfo?.name,
 					version: childInfo?.version,
 					path: fullKey.startsWith(".") ? fullKey : "./" + fullKey,
+					resolvedPath,
 					parent: pkg,
 					info: childInfo,
 				});
