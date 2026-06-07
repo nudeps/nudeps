@@ -115,7 +115,11 @@ export default class Packages {
 		// Rebase a lockfile-relative path to cwd (no prefix keeps the historical "./" form).
 		let rebase = p => (prefix ? prefix + "/" + p : "./" + p);
 
-		for (let [key, info] of Object.entries(raw).filter(([key, info]) => key && !info.dev)) {
+		for (let [key, info] of Object.entries(raw)) {
+			if (!key || info.dev) {
+				continue;
+			}
+
 			let resolved = info.link ? raw[info.resolved] : info;
 			let installName = key.split("node_modules/").at(-1).replace(/\/$/, "");
 
@@ -144,9 +148,11 @@ export default class Packages {
 
 			let childRaw = children[pkg.resolvedPath]?.packages ?? {};
 
-			for (let [childKey, childInfo] of Object.entries(childRaw).filter(
-				([childKey, childInfo]) => childKey && !childInfo.dev,
-			)) {
+			for (let [childKey, childInfo] of Object.entries(childRaw)) {
+				if (!childKey || childInfo.dev) {
+					continue;
+				}
+
 				let fullKey = pkg.resolvedPath + "/" + childKey;
 				if (fullKey in this.#byKey) {
 					continue;
