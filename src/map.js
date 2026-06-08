@@ -32,7 +32,10 @@ export class ImportMapGenerator extends Generator {
 			flattenScopes: false,
 			combineSubpaths: false,
 			commonJS: true,
-			ignore: getNodeBuiltins(),
+			// Skip .d.ts files whose presence in wildcard exports causes
+			// JSPM trace failures (jspm/jspm#2717, #122).
+			ignore: specifier =>
+				getNodeBuiltins().includes(specifier) || /\.d\.[cm]?ts(\.map)?$/.test(specifier),
 			...generatorOptions,
 		});
 
