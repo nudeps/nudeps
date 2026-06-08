@@ -7,6 +7,7 @@ import {
 	opendirSync,
 	symlinkSync,
 	readlinkSync,
+	unlinkSync,
 	rmSync,
 } from "node:fs";
 import * as path from "node:path";
@@ -145,6 +146,11 @@ export function ensureSymlink (target, linkPath, type, { force } = {}) {
 	catch {}
 
 	if (force) {
+		try {
+			// rmSync alone skips dangling symlinks (#124)
+			unlinkSync(linkPath);
+		}
+		catch {}
 		rmSync(linkPath, { recursive: true, force: true });
 	}
 
