@@ -46,6 +46,10 @@ export const overrides = {
 	cli: false,
 };
 
+export const hooks = {
+	cli: false,
+};
+
 export const module = {
 	default: false,
 };
