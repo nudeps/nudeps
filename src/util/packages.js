@@ -17,22 +17,37 @@ export default class Packages {
 	#parseCache = {};
 
 	/**
-	 * Find the nearest ancestor (or `cwd` itself) with `node_modules/.package-lock.json`.
-	 * In npm workspaces this is the monorepo root; npm never writes the hidden
-	 * lockfile inside workspace children, even those with their own `node_modules/`.
+	 * Find the nearest `node_modules/.package-lock.json` ancestor, preferring
+	 * the workspace root's lockfile when inside an npm workspace.
 	 * @param {string} [cwd]
 	 * @returns {string|null}
 	 */
 	static findRoot (cwd = process.cwd()) {
+		let found = null;
 		let dir = cwd;
-		while (!existsSync(path.join(dir, "node_modules", ".package-lock.json"))) {
+
+		while (true) {
+			if (existsSync(path.join(dir, "node_modules", ".package-lock.json"))) {
+				// Don't stop — child lockfiles can be stale after workspace hoisting
+				found ??= dir;
+
+				// Only adopt this workspace root if our project is actually a member
+				let workspaces = readJSONSync(path.join(dir, "package.json"), { optional: true })?.workspaces;
+				if (workspaces) {
+					let member = path.relative(dir, found);
+					if (workspaces.some(workspace => path.matchesGlob(member, workspace))) {
+						return dir;
+					}
+					return found;
+				}
+			}
+
 			let parent = path.dirname(dir);
 			if (parent === dir) {
-				return null;
+				return found;
 			}
 			dir = parent;
 		}
-		return dir;
 	}
 
 	/**
