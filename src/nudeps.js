@@ -2,7 +2,7 @@
  * Main entry point
  */
 
-import { existsSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
+import { existsSync, unlinkSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
 import { execSync } from "node:child_process";
 
@@ -537,10 +537,16 @@ export default class Nudeps {
 			let { pkg } = this.packages.parse(from);
 
 			let exists = existingDirs.has(to);
-			let needsRecreate = exists && existingSymlinks.has(to) !== this.shouldSymlink(pkg);
+			let needsRecreate =
+				exists && (existingSymlinks.has(to) !== this.shouldSymlink(pkg) || !existsSync(to));
 
 			if (needsRecreate) {
-				rmSync(to, { recursive: true });
+				if (existingSymlinks.has(to)) {
+					unlinkSync(to);
+				}
+				else {
+					rmSync(to, { recursive: true });
+				}
 				toDelete.delete(to);
 			}
 
