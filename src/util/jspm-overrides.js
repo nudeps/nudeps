@@ -11,6 +11,33 @@ import overrides from "@jspm/overrides" with { type: "json" };
 export { overrides };
 
 /**
+ * Strip export conditions not in `conditions`, so non-runtime ones
+ * don't shadow `default` in JSPM's wildcard resolution (jspm/jspm#2717).
+ * @param {import("@jspm/generator").ExportsTarget} exports
+ * @param {string[]} conditions
+ * @returns {import("@jspm/generator").ExportsTarget}
+ */
+export function stripConditions (exports, conditions) {
+	if (!exports || typeof exports !== "object") {
+		return exports;
+	}
+
+	if (Array.isArray(exports)) {
+		// Fallback array: strip each alternative
+		return exports.map(item => stripConditions(item, conditions));
+	}
+
+	let ret = {};
+	for (let key in exports) {
+		if (key.startsWith(".") || key === "default" || conditions.includes(key)) {
+			ret[key] = stripConditions(exports[key], conditions);
+		}
+	}
+
+	return ret;
+}
+
+/**
  * Find the best matching override for a given package name and version.
  * Override keys like "3" or "16.8.0" mean "same major, >= this version".
  * Among multiple matches, the most specific (most segments) wins.

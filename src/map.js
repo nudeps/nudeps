@@ -4,7 +4,7 @@
 import { Generator } from "@jspm/generator";
 
 import { deepAssign, getNodeBuiltins } from "./util.js";
-import { findOverride } from "./util/jspm-overrides.js";
+import { findOverride, stripConditions } from "./util/jspm-overrides.js";
 import nudepsPkg from "../package.json" with { type: "json" };
 
 /**
@@ -51,8 +51,11 @@ export class ImportMapGenerator extends Generator {
 		// sub-generators created on cache miss still produce user-facing log messages.
 		this._options = { mode, nudeps, ...generatorOptions };
 
-		// Apply JSPM community overrides (client-side equivalent of what jspm.io CDN does server-side)
+		// Patch package configs before JSPM resolves them:
+		// 1. Apply community overrides (client-side equivalent of what jspm.io CDN does server-side)
+		// 2. Strip non-runtime export conditions that shadow `default` in wildcards (#126)
 		let pm = this.provider;
+		let { env } = this.traceMap.resolver;
 		pm._getPackageConfig = pm.getPackageConfig;
 		pm.getPackageConfig = async function (pkgUrl) {
 			let pcfg = await pm._getPackageConfig(pkgUrl);
@@ -62,6 +65,11 @@ export class ImportMapGenerator extends Generator {
 					Object.assign(pcfg, override);
 				}
 			}
+
+			if (pcfg?.exports) {
+				pcfg.exports = stripConditions(pcfg.exports, env);
+			}
+
 			return pcfg;
 		};
 	}
