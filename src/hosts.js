@@ -14,15 +14,19 @@ export const netlify = {
 			}
 
 			// Netlify doesn't support symlinks, add _rewrites
-			let redirectsFile = fs.openSync("_redirects", "a");
+			// In a workspace child, prefix paths with the child dir and write to root
+			// e.g. /child/client_modules/foo/* /child/client_modules/foo@1.0.0/:splat 302
+			let { prefix } = this.packages;
+			let pathPrefix = prefix ? path.relative(path.resolve(prefix), process.cwd()) + "/" : "";
+
 			let redirects = aliasEntries
 				.map(
 					([aliasPath, target]) =>
-						`/${aliasPath}/* /${path.join(path.dirname(aliasPath), target)}/:splat 302`,
+						`/${pathPrefix}${aliasPath}/* /${pathPrefix}${path.join(path.dirname(aliasPath), target)}/:splat 302`,
 				)
 				.join("\n");
-			fs.writeSync(redirectsFile, `${redirects}\n`);
-			fs.closeSync(redirectsFile);
+
+			fs.appendFileSync(path.join(prefix, "_redirects"), `${redirects}\n`);
 		},
 	},
 };
