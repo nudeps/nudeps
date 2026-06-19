@@ -66,6 +66,7 @@ Config file uses ES module syntax: `export default { ... }`.
 | `cjs`     | `true`             | Include CJS shim for CommonJS packages                                                                                                                   |
 | `prune`   | `false`            | Subset import map to only used specifiers                                                                                                                |
 | `alias`   | `true`             | Unversioned symlinks for stable asset URLs (CSS, images). Use the unversioned path in HTML/CSS (e.g., `<link href="[output-dir]/open-props/style.css">`) |
+| `hooks`   | —                  | Object of lifecycle hook callbacks (e.g., `constructed`, `create-aliases-start`). See [blissful-hooks](https://github.com/LeaVerou/blissful-hooks) |
 
 Full option reference and troubleshooting: see README.md in the nudeps package directory.
 
