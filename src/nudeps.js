@@ -203,7 +203,7 @@ export default class Nudeps {
 	}
 
 	get packages () {
-		let value = Packages.load(process.cwd(), { warn: msg => this.info(msg) });
+		let value = Packages.load(process.cwd(), { warn: msg => this.info(msg), pkg: this.pkg });
 		Object.defineProperty(this, "packages", { value, configurable: true });
 		return value;
 	}

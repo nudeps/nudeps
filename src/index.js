@@ -60,6 +60,15 @@ export default async function (options) {
 		var rootInstallError = e;
 	}
 
+	// Surface promoted clientDependencies as regular deps so the trace below picks them up.
+	// Skipped in prune mode — that path doesn't pre-install pkg.dependencies either.
+	if (!config.prune && nudeps.packages.clientDependencies?.size) {
+		nudeps.pkg.dependencies ??= {};
+		for (let name of nudeps.packages.clientDependencies) {
+			nudeps.pkg.dependencies[name] ??= "*";
+		}
+	}
+
 	if (!config.prune && nudeps.pkg.dependencies) {
 		let exclude = new Set(config.exclude ?? []);
 

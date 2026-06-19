@@ -72,9 +72,12 @@ export class ImportMapGenerator extends Generator {
 
 	async install (alias, target, { noRetry, ...installOptions } = {}) {
 		if (target === undefined) {
-			// Locate the dep in node_modules — at the monorepo root (prefix) under workspaces.
-			let prefix = this.nudeps?.packages.prefix ?? "";
-			target = `${prefix ? prefix + "/" : "./"}node_modules/${alias}`;
+			// Use the Packages-known install path — handles workspace prefix + nested deps
+			// (e.g., promoted clientDependencies inside a linked dev tool's tree).
+			target = this.nudeps?.packages.get(alias)?.path;
+			if (target === undefined) {
+				throw new Error(`Cannot find "${alias}" in lockfile.`);
+			}
 		}
 
 		// Check if this install is cacheable:

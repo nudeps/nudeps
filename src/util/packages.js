@@ -57,9 +57,10 @@ export default class Packages {
 	 * @param {string} [cwd]
 	 * @param {object} [options]
 	 * @param {(message: string) => void} [options.warn] - Called for non-fatal lockfile issues.
+	 * @param {object} [options.pkg] - Consumer's parsed package.json. Its `devDependencies` seed the clientDependencies chain.
 	 * @returns {Packages}
 	 */
-	static load (cwd = process.cwd(), { warn = () => {} } = {}) {
+	static load (cwd = process.cwd(), { warn = () => {}, pkg } = {}) {
 		let dir = Packages.findRoot(cwd);
 
 		if (dir === null) {
@@ -114,7 +115,65 @@ export default class Packages {
 			}
 		}
 
-		return new Packages(data, { children, prefix });
+		// Promote clientDependencies past the dev filter by flipping `dev: true` →
+		// `dev: false` on promoted entries. Custom fields aren't in the lockfile, so we
+		// read each dev tool's package.json — but only along the chain from cwd's
+		// devDependencies, not every dev entry. Child lockfile entries are flipped too.
+		let clientDependencies = new Set();
+		let toCheck = new Set(Object.keys(pkg?.devDependencies ?? {}));
+
+		if (toCheck.size) {
+			let lockfiles = [
+				[raw, dir],
+				...Object.entries(children).map(([childPath, childData]) => [
+					childData.packages ?? {},
+					path.resolve(cwd, childPath),
+				]),
+			];
+
+			// Names added during iteration are picked up by Set-mutation-during-`for...of`.
+			for (let name of toCheck) {
+				let suffix = "node_modules/" + name;
+				let chainRead = false;
+				for (let [pkgs, lockfileDir] of lockfiles) {
+					for (let key in pkgs) {
+						if (key !== suffix && !key.endsWith("/" + suffix)) {
+							continue;
+						}
+
+						// Read declarations once per name. Within each lockfile, prefer the hoisted
+						// entry (the `!pkgs[suffix]` check); across lockfiles, root wins by
+						// iteration order. Multiple same-name nested copies in one lockfile: first wins.
+						if (!chainRead && (key === suffix || !pkgs[suffix])) {
+							chainRead = true;
+							let depPkg = readJSONSync(path.join(lockfileDir, key, "package.json"), {
+								optional: true,
+							});
+							for (let declared of depPkg?.clientDependencies ?? []) {
+								// Consumer's own declaration wins — listing in `devDependencies`
+								// overrides a tool's attempt to promote the same name to runtime.
+								if (pkg?.devDependencies?.[declared]) {
+									warn(`'${declared}' is a devDependency but also promoted as a clientDependency by '${name}'. Skipping — move '${declared}' to dependencies to expose it.`);
+									continue;
+								}
+								clientDependencies.add(declared);
+								toCheck.add(declared);
+							}
+						}
+
+						if (clientDependencies.has(name)) {
+							pkgs[key].dev = false;
+							for (let dep in pkgs[key]?.dependencies) {
+								clientDependencies.add(dep);
+								toCheck.add(dep);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return new Packages(data, { children, prefix, clientDependencies });
 	}
 
 	/**
@@ -122,9 +181,11 @@ export default class Packages {
 	 * @param {object} [options]
 	 * @param {object} [options.children] - Child lockfile data keyed by resolved path, for merging transitive deps of local deps
 	 * @param {string} [options.prefix] - cwd→lockfile-dir path (e.g. "../..") for workspaces, to rebase paths to cwd. Keys stay as-is for URL matching.
+	 * @param {Set<string>} [options.clientDependencies] - Install names of packages `load()` promoted by flipping `dev: true` → `dev: false`. Caller reads this to inject promoted names into the consumer's `pkg.dependencies` for JSPM tracing.
 	 */
-	constructor (data, { children = {}, prefix = "" } = {}) {
+	constructor (data, { children = {}, prefix = "", clientDependencies } = {}) {
 		this.prefix = prefix;
+		this.clientDependencies = clientDependencies;
 		let raw = data?.packages ?? {};
 
 		// Rebase a lockfile-relative path to cwd (no prefix keeps the historical "./" form).
