@@ -21,6 +21,23 @@ import nudepsPkg from "../package.json" with { type: "json" };
  * @import Package from "./util/package.js"
  */
 
+/**
+ * Fingerprint a cached resolution via the `name@version` dirNames it depends on. The map's
+ * URLs are versionless by design (`./node_modules/foo/...`); this side-channel detects
+ * in-place transitive-dep upgrades. Sound because cacheable URLs are registry-only (immutable).
+ *
+ * @param {object} map
+ * @param {Packages} packages
+ * @returns {string}
+ */
+function cacheFingerprint (map, packages) {
+	let dirNames = [map.imports ?? {}, ...Object.values(map.scopes ?? {})]
+		.flatMap(s => Object.values(s))
+		.map(url => packages.parse(url).pkg?.dirName)
+		.filter(Boolean);
+	return [...new Set(dirNames)].sort().join(",");
+}
+
 export default class Nudeps {
 	stats = {
 		entries: 0,
@@ -107,6 +124,12 @@ export default class Nudeps {
 			cacheData = null;
 		}
 		let value = cacheData?.packages ?? {};
+		let fingerprints = cacheData?.fingerprints ?? {};
+		for (let key in value) {
+			if (cacheFingerprint(value[key], this.packages) !== fingerprints[key]) {
+				delete value[key];
+			}
+		}
 		Object.defineProperty(this, "installCache", { value, writable: true, configurable: true });
 		return value;
 	}
@@ -115,13 +138,19 @@ export default class Nudeps {
 	 * Persist the install cache and exports cache to disk.
 	 */
 	saveCache () {
-		if (Object.keys(this.installCache).length === 0) {
+		let cache = this.installCache;
+		if (Object.keys(cache).length === 0) {
 			return;
 		}
 
+		let fingerprints = Object.fromEntries(
+			Object.entries(cache).map(([k, m]) => [k, cacheFingerprint(m, this.packages)]),
+		);
+
 		writeJSONSync(".nudeps/cache.json", {
 			version: nudepsPkg.version,
-			packages: this.installCache,
+			packages: cache,
+			fingerprints,
 		});
 	}
 
