@@ -20,6 +20,7 @@ Copies npm packages to a local output directory, generates an import map mapping
 | Hardcoding `client_modules/` or `importmap.js` paths            | These are configurable defaults (`dir` and `map` options). Read the project's nudeps config to determine actual paths                                                                           |
 | Specifier fails to resolve at runtime                           | Ensure entry points are declared in package.json, then run `npx nudeps`. See Troubleshooting in README.md (in the nudeps package directory)                                                     |
 | Using an unsupported package manager                            | Only npm is officially supported. nudeps reads `node_modules/.package-lock.json` which other package managers may not produce                                                                   |
+| Adding `clientDependencies` to the consumer's `package.json`    | `clientDependencies` is declared by a dev tool in *its own* `package.json` to expose deps to consumers. The consumer declares nothing — installing the tool is enough                          |
 
 ## Lifecycle
 
@@ -90,6 +91,25 @@ const { createElement } = require("react");
 ## Output
 
 nudeps logs a summary after each run: number of import map entries, time taken, and cache hits. If packages were copied or deleted, that's logged too. Warnings about CJS packages, missing lockfiles, or local dependencies appear inline — read them before proceeding.
+
+## Client Dependencies
+
+By default, nudeps excludes `devDependencies` from the import map. A dev dep that needs some of its own deps on the client declares them via a `clientDependencies` array in *its own* `package.json`:
+
+```jsonc
+// site-builder/package.json — declared by the dev tool
+{
+  "name": "site-builder",
+  "dependencies": { "widget-lib": "^1.0.0" },
+  "clientDependencies": ["widget-lib"]
+}
+```
+
+A consumer that installs `site-builder` as a devDep gets `widget-lib` in its import map automatically. The consumer declares nothing.
+
+Promoted deps behave identically to regular deps. Their transitive production dependencies are included automatically.
+
+If a promoted name is also listed in the consumer's `devDependencies`, the promotion is skipped with a warning — the consumer's own declaration wins. Fix: move the name to `dependencies`.
 
 ## Local Dependencies
 

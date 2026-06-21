@@ -105,18 +105,19 @@ For background, see these blog posts:
 	3. [Modes](#modes)
 	4. [Pruning (`nudeps --prune`)](#pruning-nudeps---prune)
 	5. [Force initialization (`nudeps --init`)](#force-initialization-nudeps---init)
-6. [Local dependencies (via `npm install ../other-repo`)](#local-dependencies-via-npm-install-other-repo)
+6. [Client dependencies (`clientDependencies`)](#client-dependencies-clientdependencies)
+7. [Local dependencies (via `npm install ../other-repo`)](#local-dependencies-via-npm-install-other-repo)
 	1. [Registration](#registration)
 	2. [Propagation](#propagation)
-7. [Programmatic API](#programmatic-api)
-8. [FAQ](#faq)
+8. [Programmatic API](#programmatic-api)
+9. [FAQ](#faq)
 	1. [Which browsers are supported?](#which-browsers-are-supported)
 	2. [Does this support pnpm/bun/yarn/etc.?](#does-this-support-pnpmbunyarnetc)
 	3. [Why does it add the version number to the directory name?](#why-does-it-add-the-version-number-to-the-directory-name)
 	4. [Do I need to add `.nudeps`, `client_modules` and `importmap.js` to my `.gitignore`?](#do-i-need-to-add-nudeps-client_modules-and-importmapjs-to-my-gitignore)
 	5. [Why doesn't Nudeps have an option to add integrity hashes to the import map?](#why-doesnt-nudeps-have-an-option-to-add-integrity-hashes-to-the-import-map)
 	6. [How are CJS (CommonJS) packages handled?](#how-are-cjs-commonjs-packages-handled)
-9. [Troubleshooting](#troubleshooting)
+10. [Troubleshooting](#troubleshooting)
 	1. [Getting an error about a specifier failing to resolve](#getting-an-error-about-a-specifier-failing-to-resolve)
 	2. [Package assumes a bundler is being used](#package-assumes-a-bundler-is-being-used)
 	3. [Packages that use extension-less paths](#packages-that-use-extension-less-paths)
@@ -397,6 +398,41 @@ You can set `prune: true` in your config file to always prune dependencies but t
 
 Force initialization, even if nudeps has already run.
 Note that this also clears the list of local dependents (see below). They will re-register the next time they run nudeps.
+
+## Client dependencies (`clientDependencies`)
+
+By default, Nudeps only processes production `dependencies` — `devDependencies` are excluded from the import map and not copied to `client_modules`.
+This is usually the right thing, since most dev dependencies (linters, test frameworks, build tools) have no business running in the browser.
+
+However, some dev dependencies — typically build tools — ship browser code that depends on other packages.
+A static site generator, for example, may emit components that `import` from a UI library.
+The consumer installs the generator as a `devDependency` and never imports the UI library directly, yet the UI library must still resolve in the browser.
+
+To make this work, a dev dependency declares which of *its own* dependencies should reach the consumer's import map via a `clientDependencies` field in *its own* `package.json`:
+
+```jsonc
+// site-builder/package.json — declared by the dev tool itself
+{
+  "name": "site-builder",
+  "dependencies": {
+    "widget-lib": "^1.0.0"
+  },
+  "clientDependencies": ["widget-lib"]
+}
+```
+
+Then any consumer that installs `site-builder` as a `devDependency` gets `widget-lib` in its import map automatically.
+**The consumer declares nothing** — installing `site-builder` is enough.
+
+Promoted dependencies behave identically to regular dependencies — they get an import map entry, are copied (or symlinked) to `client_modules`, get aliases, and (when installed locally) participate in change propagation.
+Their transitive production dependencies are included automatically.
+
+The syntax follows the same shape as [`bundledDependencies`](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#bundledependencies) — an array of package names.
+Scoped packages (`@scope/pkg`) and [npm aliases](https://docs.npmjs.com/cli/v11/using-npm/package-spec#aliases) are supported.
+
+Nudeps only reads `clientDependencies` from dev dependencies. The field is silently ignored on regular runtime dependencies — they reach the import map already, so there's nothing to promote.
+
+If a promoted name is also listed in the consumer's `devDependencies`, the promotion is skipped with a warning — the consumer's own "dev-only" declaration wins. Move it to `dependencies` to expose it.
 
 ## Local dependencies (via `npm install ../other-repo`)
 
