@@ -21,23 +21,6 @@ import nudepsPkg from "../package.json" with { type: "json" };
  * @import Package from "./util/package.js"
  */
 
-/**
- * Fingerprint a cached resolution via the `name@version` dirNames it depends on. The map's
- * URLs are versionless by design (`./node_modules/foo/...`); this side-channel detects
- * in-place transitive-dep upgrades. Sound because cacheable URLs are registry-only (immutable).
- *
- * @param {object} map
- * @param {Packages} packages
- * @returns {string}
- */
-function cacheFingerprint (map, packages) {
-	let dirNames = [map.imports ?? {}, ...Object.values(map.scopes ?? {})]
-		.flatMap(s => Object.values(s))
-		.map(url => packages.parse(url).pkg?.dirName)
-		.filter(Boolean);
-	return [...new Set(dirNames)].sort().join(",");
-}
-
 export default class Nudeps {
 	stats = {
 		entries: 0,
@@ -124,12 +107,26 @@ export default class Nudeps {
 			cacheData = null;
 		}
 		let value = cacheData?.packages ?? {};
-		let fingerprints = cacheData?.fingerprints ?? {};
-		for (let key in value) {
-			if (cacheFingerprint(value[key], this.packages) !== fingerprints[key]) {
+
+		let oldDirNames = new Set(cacheData?.dirNames ?? []);
+		let dirNames = new Set(Array.from(this.packages, p => p.dirName));
+		// Detect changes: dirNames added, removed, or version-bumped since save
+		let changed = oldDirNames.symmetricDifference(dirNames);
+
+		for (let [key, cached] of Object.entries(value)) {
+			let urls = [cached.imports ?? {}, ...Object.values(cached.scopes ?? {})].flatMap(b =>
+				Object.values(b));
+			// URL no longer resolves, or its dirName changed since save → bust the entry
+			if (
+				urls.some(url => {
+					let dirName = this.packages.parse(url).pkg?.dirName;
+					return !dirName || changed.has(dirName);
+				})
+			) {
 				delete value[key];
 			}
 		}
+
 		Object.defineProperty(this, "installCache", { value, writable: true, configurable: true });
 		return value;
 	}
@@ -138,19 +135,14 @@ export default class Nudeps {
 	 * Persist the install cache and exports cache to disk.
 	 */
 	saveCache () {
-		let cache = this.installCache;
-		if (Object.keys(cache).length === 0) {
+		if (Object.keys(this.installCache).length === 0) {
 			return;
 		}
 
-		let fingerprints = Object.fromEntries(
-			Object.entries(cache).map(([k, m]) => [k, cacheFingerprint(m, this.packages)]),
-		);
-
 		writeJSONSync(".nudeps/cache.json", {
 			version: nudepsPkg.version,
-			packages: cache,
-			fingerprints,
+			dirNames: Array.from(this.packages, p => p.dirName),
+			packages: this.installCache,
 		});
 	}
 
