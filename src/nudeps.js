@@ -107,6 +107,26 @@ export default class Nudeps {
 			cacheData = null;
 		}
 		let value = cacheData?.packages ?? {};
+
+		let oldDirNames = new Set(cacheData?.dirNames ?? []);
+		let dirNames = new Set(Array.from(this.packages, p => p.dirName));
+		// Detect changes: dirNames added, removed, or version-bumped since save
+		let changed = oldDirNames.symmetricDifference(dirNames);
+
+		for (let [key, cached] of Object.entries(value)) {
+			let urls = [cached.imports ?? {}, ...Object.values(cached.scopes ?? {})].flatMap(b =>
+				Object.values(b));
+			// URL no longer resolves, or its dirName changed since save → bust the entry
+			if (
+				urls.some(url => {
+					let dirName = this.packages.parse(url).pkg?.dirName;
+					return !dirName || changed.has(dirName);
+				})
+			) {
+				delete value[key];
+			}
+		}
+
 		Object.defineProperty(this, "installCache", { value, writable: true, configurable: true });
 		return value;
 	}
@@ -121,6 +141,7 @@ export default class Nudeps {
 
 		writeJSONSync(".nudeps/cache.json", {
 			version: nudepsPkg.version,
+			dirNames: Array.from(this.packages, p => p.dirName),
 			packages: this.installCache,
 		});
 	}
