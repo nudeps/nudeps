@@ -133,8 +133,10 @@ export default class Packages {
 		let rebase = p => (prefix ? prefix + "/" + p : "./" + p);
 
 		for (let [key, info] of Object.entries(raw)) {
-			if (!key || info.dev) {
-				continue;
+			// Keep dev-flagged entries: what gets deployed is gated by the import map, not the
+			// lockfile, so a package a consumer references should resolve regardless of its dev flag.
+			if (!key) {
+				continue; // Skip root entry
 			}
 
 			let resolved = info.link ? raw[info.resolved] : info;
@@ -166,7 +168,8 @@ export default class Packages {
 			let childRaw = children[pkg.resolvedPath]?.packages ?? {};
 
 			for (let [childKey, childInfo] of Object.entries(childRaw)) {
-				if (!childKey || childInfo.dev) {
+				// Dev-flagged entries are kept here too — see the root loop above.
+				if (!childKey) {
 					continue;
 				}
 

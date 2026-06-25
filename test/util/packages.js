@@ -9,6 +9,8 @@ let defaultData = {
 		"node_modules/foo/node_modules/bar": v,
 		"node_modules/foo/node_modules/@bar/baz": v,
 		"node_modules/@foo/bar/node_modules/@baz/quux": v,
+		// Hoisted but dev-flagged (e.g. a consumer's devDependency) — must still resolve
+		"node_modules/devlib": { version: "2.0.0", dev: true },
 	},
 };
 let defaultPackages = new Packages(defaultData);
@@ -215,8 +217,8 @@ let childLinkedDepsPackages = new Packages(
 	},
 );
 
-// Case I: dev-only entries (dev: true) in lockfiles should be filtered out
-// to prevent devDependencies from leaking into the package index.
+// Case I: dev-only entries (dev: true) in lockfiles are retained, so a package a consumer
+// references resolves regardless of its dev flag (deployment is gated by the map, not the lockfile).
 let childDevDepsPackages = new Packages(
 	{
 		packages: {
@@ -383,6 +385,15 @@ export default {
 				{ arg: "name", expect: "foo" },
 				{ arg: "filePath", expect: "@bar/" },
 				{ arg: "localPath", expect: "./client_modules/foo@1.2.3/@bar/" },
+			],
+		},
+		{
+			name: "./node_modules/devlib/index.js",
+			description: "Hoisted dev-flagged package resolves (deployment is gated by the map)",
+			tests: [
+				{ arg: "name", expect: "devlib" },
+				{ arg: "version", expect: "2.0.0" },
+				{ arg: "isExternal", expect: false },
 			],
 		},
 		// Case A: transitive dep via local dep's resolved path — flat top-level
@@ -582,7 +593,7 @@ export default {
 				{ arg: "localDir", expect: "./client_modules/leaf-dep@1.0.0" },
 			],
 		},
-		// Case I: dev-only entries in child lockfile should be filtered out.
+		// Case I: dev-flagged entries in a child lockfile are retained and resolve normally.
 		{
 			name: "./node_modules/ext-pkg/node_modules/prod-dep/index.js",
 			description: "Production dep from child lockfile is merged",
@@ -594,9 +605,12 @@ export default {
 		},
 		{
 			name: "./node_modules/ext-pkg/node_modules/dev-dep/index.js",
-			description: "Dev-only dep from child lockfile must not be merged",
+			description: "Dev-flagged dep from child lockfile is also merged",
 			packages: childDevDepsPackages,
-			tests: [{ arg: "pkg", expect: null }],
+			tests: [
+				{ arg: "name", expect: "dev-dep" },
+				{ arg: "version", expect: "2.0.0" },
+			],
 		},
 	],
 };
