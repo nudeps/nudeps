@@ -32,7 +32,9 @@ export default class Packages {
 				found ??= dir;
 
 				// Only adopt this workspace root if our project is actually a member
-				let workspaces = readJSONSync(path.join(dir, "package.json"), { optional: true })?.workspaces;
+				let workspaces = readJSONSync(path.join(dir, "package.json"), {
+					optional: true,
+				})?.workspaces;
 				if (workspaces) {
 					let member = path.relative(dir, found);
 					if (workspaces.some(workspace => path.matchesGlob(member, workspace))) {
