@@ -44,5 +44,15 @@ export default {
 				],
 			},
 		},
+		{
+			name: "Allowlist mode drops unknown conditions in favor of default",
+			arg: { "./x": { deno: "./d.js", default: "./def.js" } },
+			expect: { "./x": { default: "./def.js" } },
+		},
+		{
+			name: "Blocklist mode keeps unknowns but still drops types/typings",
+			arg: { "./x": { deno: "./d.js", types: "./d.ts", typings: "./d2.ts" } },
+			expect: { "./x": { deno: "./d.js" } },
+		},
 	],
 };
