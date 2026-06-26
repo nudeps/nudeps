@@ -125,11 +125,15 @@ export default class Nudeps {
 		}
 		this.stats.resolveTime = performance.now() - resolveStart;
 
-		// If root package installation failed due to missing dependencies in the entry point,
-		// add it manually after all dependencies are installed using JSPM's resolver.
-		// We do this AFTER dependency installation because generator.install() regenerates the
-		// import map, which would overwrite any mappings added earlier.
-		// See https://github.com/nudeps/nudeps/issues/30
+		// Finalize (CJS shim install + cache pruning) before the root-mapping fallback below.
+		// The shim step is itself an install(), and every install() rebuilds JSPM's map and drops
+		// manually-set entries — so the fallback has to be the last thing that touches the map.
+		await this.finalize();
+
+		// If the root install failed because the entry point imports a package that isn't installed,
+		// JSPM never maps the root package to its own entry point. Resolve the entry point ourselves
+		// and pin it — last, so finalize()'s shim install can't wipe it.
+		// See https://github.com/nudeps/nudeps/issues/30 and https://github.com/nudeps/nudeps/issues/144
 		// Note: string prefix match on JSPM error message — may need updating if JSPM changes it.
 		if (rootInstallError?.message.startsWith("Cannot find package")) {
 			try {

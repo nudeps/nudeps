@@ -49,7 +49,6 @@ export default async function (options) {
 	}
 
 	await nudeps.installAll();
-	await nudeps.finalize();
 
 	let dirExists = existsSync(config.dir);
 	if (config.init && dirExists) {
