@@ -27,6 +27,16 @@ export const exclude = {
 	default: [],
 };
 
+// Extra packages to add to the import map beyond the host's `dependencies` — e.g. a tool
+// (static site generator, etc.) calling nudeps programmatically can inject its own client
+// libraries. Treated exactly like `dependencies` (installed unless pruned, subject to
+// `exclude`); a no-op for anything already in `dependencies`.
+export const additionalDependencies = {
+	cli: false,
+	default: [],
+	normalize: (v, defaultValue) => (v == null ? defaultValue : [v].flat()),
+};
+
 export const prune = {
 	default: false,
 };

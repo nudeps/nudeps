@@ -223,6 +223,21 @@ export default class Nudeps {
 		return value;
 	}
 
+	/**
+	 * The specifiers nudeps installs directly (beyond what the root trace pulls in): the host's
+	 * production `dependencies` plus any `additionalDependencies`, minus `exclude`d ones. Deduped,
+	 * so an `additionalDependencies` entry already in `dependencies` is a no-op.
+	 * @returns {string[]}
+	 */
+	get directDependencies () {
+		let exclude = new Set(this.config.exclude ?? []);
+		let names = new Set([
+			...Object.keys(this.pkg.dependencies ?? {}),
+			...this.config.additionalDependencies,
+		]);
+		return [...names].filter(name => !exclude.has(name));
+	}
+
 	get packages () {
 		let value = Packages.load(process.cwd(), { warn: msg => this.info(msg) });
 		Object.defineProperty(this, "packages", { value, configurable: true });
