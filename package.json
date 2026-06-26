@@ -34,7 +34,7 @@
 	"scripts": {
 		"release": "npm login && release-it",
 		"test": "npx htest ./test/index.js",
-		"test:regressions": "npx htest ./test/regressions/",
+		"test:e2e": "npx htest ./test/e2e/",
 		"demos": "cd ../nudeps-demos/ && ./each.sh 'npm link nudeps && npx nudeps'",
 		"init-demos": "cd ../nudeps-demos/ && ./each.sh 'npm link nudeps && npx nudeps --init'"
 	},
