@@ -4,6 +4,7 @@
 
 import { existsSync, unlinkSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
 
 import Hooks from "blissful-hooks";
@@ -98,6 +99,55 @@ export default class Nudeps {
 	$hook (name, env = {}) {
 		env.context = this;
 		this.hooks.run(name, env);
+	}
+
+	async installAll () {
+		const generator = this.generator;
+		let resolveStart = performance.now();
+		try {
+			await generator.install(this.pkg.name, ".");
+		}
+		catch (e) {
+			this.error(`Failed to install root package. ${e.message}`);
+			// Store the error for potential manual mapping later
+			var rootInstallError = e;
+		}
+
+		if (!this.config.prune) {
+			for (const dep of this.directDependencies) {
+				try {
+					await generator.install(dep);
+				}
+				catch (e) {
+					this.error(`Error installing ${dep}: ${e.message}`);
+				}
+			}
+		}
+		this.stats.resolveTime = performance.now() - resolveStart;
+
+		// If root package installation failed due to missing dependencies in the entry point,
+		// add it manually after all dependencies are installed using JSPM's resolver.
+		// We do this AFTER dependency installation because generator.install() regenerates the
+		// import map, which would overwrite any mappings added earlier.
+		// See https://github.com/nudeps/nudeps/issues/30
+		// Note: string prefix match on JSPM error message — may need updating if JSPM changes it.
+		if (rootInstallError?.message.startsWith("Cannot find package")) {
+			try {
+				let entryPoint = await generator.traceMap.resolver.resolveExport(
+					pathToFileURL(process.cwd() + "/").href,
+					".",
+					false,
+					false,
+					this.pkg.name,
+				);
+				entryPoint = path.relative(process.cwd(), fileURLToPath(entryPoint));
+				entryPoint = entryPoint.startsWith(".") ? entryPoint : `./${entryPoint}`;
+				generator.map.set(this.pkg.name, entryPoint);
+			}
+			catch (e) {
+				this.error(`Failed to manually resolve root package entry point. ${e.message}`);
+			}
+		}
 	}
 
 	get installCache () {

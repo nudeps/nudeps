@@ -2,7 +2,6 @@
  * Main entry point
  */
 import * as path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
 import { getConfig } from "./config.js";
 import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { writeJSONSync, createGitignoredDir } from "./util.js";
@@ -49,53 +48,7 @@ export default async function (options) {
 		}
 	}
 
-	const generator = nudeps.generator;
-	let resolveStart = performance.now();
-	try {
-		await generator.install(nudeps.pkg.name, ".");
-	}
-	catch (e) {
-		nudeps.error(`Failed to install root package. ${e.message}`);
-		// Store the error for potential manual mapping later
-		var rootInstallError = e;
-	}
-
-	if (!config.prune) {
-		for (const dep of nudeps.directDependencies) {
-			try {
-				await generator.install(dep);
-			}
-			catch (e) {
-				nudeps.error(`Error installing ${dep}: ${e.message}`);
-			}
-		}
-	}
-	nudeps.stats.resolveTime = performance.now() - resolveStart;
-
-	// If root package installation failed due to missing dependencies in the entry point,
-	// add it manually after all dependencies are installed using JSPM's resolver.
-	// We do this AFTER dependency installation because generator.install() regenerates the
-	// import map, which would overwrite any mappings added earlier.
-	// See https://github.com/nudeps/nudeps/issues/30
-	// Note: string prefix match on JSPM error message — may need updating if JSPM changes it.
-	if (rootInstallError?.message.startsWith("Cannot find package")) {
-		try {
-			let entryPoint = await generator.traceMap.resolver.resolveExport(
-				pathToFileURL(process.cwd() + "/").href,
-				".",
-				false,
-				false,
-				nudeps.pkg.name,
-			);
-			entryPoint = path.relative(process.cwd(), fileURLToPath(entryPoint));
-			entryPoint = entryPoint.startsWith(".") ? entryPoint : `./${entryPoint}`;
-			generator.map.set(nudeps.pkg.name, entryPoint);
-		}
-		catch (e) {
-			nudeps.error(`Failed to manually resolve root package entry point. ${e.message}`);
-		}
-	}
-
+	await nudeps.installAll();
 	await nudeps.finalize();
 
 	let dirExists = existsSync(config.dir);
@@ -156,7 +109,7 @@ export default async function (options) {
 				: parts.join(" and ");
 		info.push(msg + ` in ${config.dir}.`);
 	}
-	let { cacheHits, cacheMisses } = generator.stats;
+	let { cacheHits, cacheMisses } = nudeps.generator.stats;
 	let cacheInfo = cacheHits > 0 ? `, ${cacheHits}/${cacheHits + cacheMisses} cached` : "";
 	if (mapChanged) {
 		info.push(
