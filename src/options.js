@@ -37,6 +37,15 @@ export const additionalDependencies = {
 	normalize: (v, defaultValue) => (v == null ? defaultValue : [v].flat()),
 };
 
+// Packages to keep in the import map even when `prune` is true. Like `additionalDependencies`,
+// but not subject to pruning — use for packages you always want available regardless of whether
+// the entry points reference them. Subject to `exclude` (a name in both is excluded, with a warning).
+export const forceDependencies = {
+	cli: false,
+	default: [],
+	normalize: (v, defaultValue) => (v == null ? defaultValue : [v].flat()),
+};
+
 export const prune = {
 	default: false,
 };

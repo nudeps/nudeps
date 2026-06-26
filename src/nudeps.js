@@ -43,6 +43,16 @@ export default class Nudeps {
 		this.config = config;
 		this.oldConfig = readJSONSync(".nudeps/config.json", { optional: true });
 
+		// Warn on contradictory config: a package both forced and excluded. exclude wins (forced
+		// names are filtered out of directDependencies), so the force entry would silently do nothing.
+		let excluded = new Set(this.config.exclude ?? []);
+		let forcedAndExcluded = this.config.forceDependencies.filter(name => excluded.has(name));
+		if (forcedAndExcluded.length > 0) {
+			this.warn(
+				`Ignoring forceDependencies also listed in exclude (exclude wins): ${forcedAndExcluded.join(", ")}`,
+			);
+		}
+
 		if (this.config.host) {
 			this.host = hosts[this.config.host];
 			if (!this.host) {
@@ -113,16 +123,21 @@ export default class Nudeps {
 			var rootInstallError = e;
 		}
 
-		if (!this.config.prune) {
-			for (const dep of this.directDependencies) {
-				try {
-					await generator.install(dep);
-				}
-				catch (e) {
-					this.error(`Error installing ${dep}: ${e.message}`);
-				}
+		// forceDependencies install even when pruning; the rest of directDependencies only when not.
+		let forced = new Set(this.config.forceDependencies);
+		let toInstall = this.config.prune
+			? this.directDependencies.filter(name => forced.has(name))
+			: this.directDependencies;
+
+		for (const dep of toInstall) {
+			try {
+				await generator.install(dep);
+			}
+			catch (e) {
+				this.error(`Error installing ${dep}: ${e.message}`);
 			}
 		}
+
 		this.stats.resolveTime = performance.now() - resolveStart;
 
 		// Finalize (CJS shim install + cache pruning) before the root-mapping fallback below.
@@ -279,8 +294,10 @@ export default class Nudeps {
 
 	/**
 	 * The specifiers nudeps installs directly (beyond what the root trace pulls in): the host's
-	 * production `dependencies` plus any `additionalDependencies`, minus `exclude`d ones. Deduped,
-	 * so an `additionalDependencies` entry already in `dependencies` is a no-op.
+	 * production `dependencies` plus any `additionalDependencies` and `forceDependencies`, minus
+	 * `exclude`d ones. Deduped, so an entry already in `dependencies` is a no-op. This is the full
+	 * (non-pruned) set; `prune` is applied by `installAll`, which installs only the
+	 * `forceDependencies` subset — not here.
 	 * @returns {string[]}
 	 */
 	get directDependencies () {
@@ -288,6 +305,7 @@ export default class Nudeps {
 		let names = new Set([
 			...Object.keys(this.pkg.dependencies ?? {}),
 			...this.config.additionalDependencies,
+			...this.config.forceDependencies,
 		]);
 		return [...names].filter(name => !exclude.has(name));
 	}
