@@ -60,14 +60,8 @@ export default async function (options) {
 		var rootInstallError = e;
 	}
 
-	if (!config.prune && nudeps.pkg.dependencies) {
-		let exclude = new Set(config.exclude ?? []);
-
-		for (const dep in nudeps.pkg.dependencies) {
-			if (exclude.has(dep)) {
-				continue;
-			}
-
+	if (!config.prune) {
+		for (const dep of nudeps.directDependencies) {
 			try {
 				await generator.install(dep);
 			}
@@ -119,12 +113,7 @@ export default async function (options) {
 
 	// Seed aliased deps the map walk missed (CSS-only packages — #102)
 	if (config.alias) {
-		let exclude = new Set(config.exclude ?? []);
-		for (let dep in nudeps.pkg.dependencies) {
-			if (exclude.has(dep)) {
-				continue;
-			}
-
+		for (let dep of nudeps.directDependencies) {
 			let pkg = nudeps.packages.get(dep);
 
 			if (pkg && !pkg.parent && nudeps.aliases(pkg).length > 0) {

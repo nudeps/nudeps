@@ -214,9 +214,10 @@ export class ImportMapGenerator extends Generator {
 		await this.install("cjs-browser-shim", shimPath, { noRetry: true });
 
 		let cjsPackages = [...new Set(cjsEntries.map(([url]) => packages.parse(url).pkg?.name))];
-		let directCjsDeps = cjsPackages.filter(
-			name => name in (this.nudeps.pkg.dependencies ?? {}),
-		);
+		// directDependencies (not just pkg.dependencies) so a CJS package injected via
+		// additionalDependencies is named in the require() hint too.
+		let directDeps = new Set(this.nudeps.directDependencies);
+		let directCjsDeps = cjsPackages.filter(name => directDeps.has(name));
 
 		let requireMsg = "";
 		if (directCjsDeps.length > 0) {
