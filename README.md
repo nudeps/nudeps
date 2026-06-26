@@ -168,6 +168,7 @@ The skill file is also available at `node_modules/nudeps/SKILL.md` after install
 
 Nudeps copies your dependencies to a **local directory** you specify (`./client_modules` by default), adds versions to directory names for **cache busting** just like a CDN, generates an [**import map**](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script/type/importmap) that maps specifiers to these local paths, and an injection script that injects the import map into any HTML page.
 For example, `lit` may be mapped to `"./client_modules/lit@3.3.2/index.js"`.
+The injection script rebases each address to an absolute URL at runtime, against its own location rather than the page's — so a single import map resolves correctly from every page of a multi-page site, at any directory depth.
 
 It then optimistically adds your direct dependencies to your import map, so that you can use them straight away.
 In production (or if you use the `prune` option), it will subset the import map to only include the dependencies you actually use.
