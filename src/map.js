@@ -72,9 +72,11 @@ export class ImportMapGenerator extends Generator {
 
 	async install (alias, target, { noRetry, ...installOptions } = {}) {
 		if (target === undefined) {
-			// Locate the dep in node_modules — at the monorepo root (prefix) under workspaces.
+			// The lockfile knows where the dep really lives (nested deps, workspace prefix); guess otherwise.
 			let prefix = this.nudeps?.packages.prefix ?? "";
-			target = `${prefix ? prefix + "/" : "./"}node_modules/${alias}`;
+			target =
+				this.nudeps?.packages.get(alias)?.path ??
+				`${prefix ? prefix + "/" : "./"}node_modules/${alias}`;
 		}
 
 		// Check if this install is cacheable:
@@ -200,19 +202,10 @@ export class ImportMapGenerator extends Generator {
 			return;
 		}
 
-		// Find cjs-browser-shim in the lockfile — prefer the user's own copy (shallowest).
-		// If not found, look for it under nudeps' own node_modules.
-		let { packages } = this.nudeps;
-		let shimPkg = packages.getAll("cjs-browser-shim")[0];
-		let shimPath = shimPkg?.path;
-		if (!shimPath) {
-			let nudepsPkg = packages.getAll("nudeps")[0];
-			shimPath = nudepsPkg
-				? nudepsPkg.path + "/node_modules/cjs-browser-shim"
-				: "./node_modules/cjs-browser-shim";
-		}
-		await this.install("cjs-browser-shim", shimPath, { noRetry: true });
+		// install() resolves the shim's path from the lockfile — it's nudeps' own dependency.
+		await this.install("cjs-browser-shim", undefined, { noRetry: true });
 
+		let { packages } = this.nudeps;
 		let cjsPackages = [...new Set(cjsEntries.map(([url]) => packages.parse(url).pkg?.name))];
 		// directDependencies (not just pkg.dependencies) so a CJS package injected via
 		// additionalDependencies is named in the require() hint too.
