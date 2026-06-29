@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-export const netlify = {
+export const netlify = ({ publishDir } = {}) => ({
 	name: "Netlify",
 	detect: () => process.env.NETLIFY === "true",
 	symlinks: false,
@@ -13,23 +13,24 @@ export const netlify = {
 				return;
 			}
 
-			// Netlify doesn't support symlinks, add _rewrites
-			// In a workspace child, prefix paths with the child dir and write to root
-			// e.g. /child/client_modules/foo/* /child/client_modules/foo@1.0.0/:splat 302
-			let { prefix } = this.packages;
-			let pathPrefix = prefix ? path.relative(path.resolve(prefix), process.cwd()) + "/" : "";
+			// No publishDir → fall back to the workspace prefix (cwd → lockfile root): in npm workspaces the lockfile root is typically the deploy root
+			let pathPrefix = publishDir ?? this.packages.prefix;
 
 			let redirects = aliasEntries
 				.map(
 					([aliasPath, target]) =>
-						`/${pathPrefix}${aliasPath}/* /${pathPrefix}${path.join(path.dirname(aliasPath), target)}/:splat 302`,
+						`/${path.relative(pathPrefix, aliasPath)}/* /${path.relative(pathPrefix, path.join(path.dirname(aliasPath), target))}/:splat 302`,
 				)
 				.join("\n");
 
-			fs.appendFileSync(path.join(prefix, "_redirects"), `${redirects}\n`);
+			fs.appendFileSync(path.join(pathPrefix, "_redirects"), `${redirects}\n`);
+
+			this.info(
+				`${this.host.name} host: _redirects written to ${path.resolve(pathPrefix, "_redirects")}`,
+			);
 		},
 	},
-};
+});
 
 export const vercel = {
 	name: "Vercel",
@@ -39,11 +40,11 @@ export const vercel = {
 };
 
 // same file, same syntax
-export const cloudflare = {
-	...netlify,
+export const cloudflare = ({ publishDir } = {}) => ({
+	...netlify({ publishDir }),
 	name: "Cloudflare",
 	detect: () => process.env.CLOUDFLARE_PAGES === "true",
-};
+});
 
 export const apache = ({ publishDir, file = ".htaccess" } = {}) => ({
 	name: "Apache",

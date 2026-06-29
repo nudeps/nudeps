@@ -53,25 +53,29 @@ export default class Nudeps {
 			);
 		}
 
-		if (this.config.host) {
-			this.host = hosts[this.config.host];
-			if (!this.host) {
+		let resolve = host =>
+			typeof host === "function" ? host({ publishDir: this.config.publishDir }) : host;
+
+		let host = this.config.host;
+		if (typeof host === "string") {
+			host = hosts[host];
+			if (!host) {
 				this.warn(`Unknown host: ${this.config.host}`);
 			}
 		}
-		else {
+		else if (!host) {
 			// Auto-detect host
 			for (let hostId in hosts) {
-				let host = hosts[hostId];
-				if (host.detect?.()) {
-					this.host = host;
+				let candidate = resolve(hosts[hostId]);
+				if (candidate.detect?.()) {
+					host = candidate;
 					this.info(`Detected host: ${host.name}`);
 					break;
 				}
 			}
 		}
 
-		this.host ??= {};
+		this.host = resolve(host) ?? {};
 
 		if (this.host.hooks) {
 			this.hooks.add(this.host.hooks);

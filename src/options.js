@@ -69,6 +69,19 @@ export const hooks = {
 	cli: false,
 };
 
+export const host = {
+	cli: false,
+	validate: v =>
+		(typeof v === "string" && v) ||
+		typeof v === "function" ||
+		(typeof v === "object" && v !== null && !Array.isArray(v)),
+};
+
+export const publishDir = {
+	cli: false,
+	validate: v => typeof v === "string" && v,
+};
+
 export const module = {
 	default: false,
 };
