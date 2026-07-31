@@ -69,6 +69,13 @@ export const hooks = {
 	cli: false,
 };
 
+// The directory the host serves as `/`. Only needed when `dir` lives inside a build output
+// directory (e.g. an SSG's `dist/`), since redirect rules are URLs, not file paths.
+export const publishDir = {
+	flag: "publish-dir",
+	validate: v => typeof v === "string",
+};
+
 export const module = {
 	default: false,
 };

@@ -13,20 +13,30 @@ export const netlify = {
 				return;
 			}
 
-			// Netlify doesn't support symlinks, add _rewrites
-			// In a workspace child, prefix paths with the child dir and write to root
+			// Netlify doesn't support symlinks, so aliases become redirect rules.
+			// Rules match URLs, so both the file and the paths in it are relative to the publish dir,
 			// e.g. /child/client_modules/foo/* /child/client_modules/foo@1.0.0/:splat 302
-			let { prefix } = this.packages;
-			let pathPrefix = prefix ? path.relative(path.resolve(prefix), process.cwd()) + "/" : "";
+			let { publishDir } = this;
+			let url = p => "/" + path.relative(publishDir, p);
+
+			if (url(this.dir).startsWith("/..")) {
+				this.warn(
+					`${this.dir} is outside the publish directory (${publishDir || "."}), so its redirect rules cannot match any URL. Set the publishDir option.`,
+				);
+			}
 
 			let redirects = aliasEntries
 				.map(
 					([aliasPath, target]) =>
-						`/${pathPrefix}${aliasPath}/* /${pathPrefix}${path.join(path.dirname(aliasPath), target)}/:splat 302`,
+						`${url(aliasPath)}/* ${url(path.join(path.dirname(aliasPath), target))}/:splat 302`,
 				)
 				.join("\n");
 
-			fs.appendFileSync(path.join(prefix, "_redirects"), `${redirects}\n`);
+			let file = path.join(publishDir, "_redirects");
+			// The publish dir may not exist yet: nudeps can run before the build that fills it
+			fs.mkdirSync(path.resolve(publishDir), { recursive: true });
+			fs.appendFileSync(file, `${redirects}\n`);
+			this.info(`Wrote ${aliasEntries.length} alias redirects to ${file}`);
 		},
 	},
 };

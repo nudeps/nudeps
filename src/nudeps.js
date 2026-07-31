@@ -345,6 +345,15 @@ export default class Nudeps {
 		return this.config.dir;
 	}
 
+	/**
+	 * The directory served as `/`, which host adapters need to turn file paths into URLs.
+	 * Defaults to the workspace root, which in npm workspaces is typically the deploy root.
+	 * @returns {string} Path relative to cwd (`""` when cwd is itself the publish dir)
+	 */
+	get publishDir () {
+		return this.config.publishDir ?? this.packages.prefix;
+	}
+
 	get elapsedTime () {
 		return performance.now() - this.stats.startTime;
 	}
