@@ -58,19 +58,19 @@ import { someFunction } from "some-package";
 
 Config file uses ES module syntax: `export default { ... }`.
 
-| Option                   | Default            | Description                                                                                                                                                                                                     |
-| ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dir`                    | `"client_modules"` | Output directory for copied packages                                                                                                                                                                            |
-| `map`                    | `"importmap.js"`   | Import map injection script path                                                                                                                                                                                |
-| `publishDir`             | Workspace root     | Directory the host serves as `/`. Set it when `dir` lives inside a build output directory (e.g. an SSG's `dist/`), so hosts that need redirects write them there with correct URLs                              |
-| `mode`                   | —                  | Preset: `"dev"` (symlink) or `"prod"` (prune + terse)                                                                                                                                                           |
-| `exclude`                | `[]`               | Packages to omit from import map (e.g., server-only deps)                                                                                                                                                       |
-| `additionalDependencies` | `[]`               | Extra packages to add beyond `dependencies` — e.g. a tool calling nudeps programmatically injecting its own client libraries. Treated like `dependencies`; no-op if already in `dependencies`                   |
-| `forceDependencies`      | `[]`               | Like `additionalDependencies`, but kept even when `prune` is on — use for packages you always want in the map regardless of what entry points reference. Subject to `exclude` (both → excluded, with a warning) |
-| `cjs`                    | `true`             | Include CJS shim for CommonJS packages                                                                                                                                                                          |
-| `prune`                  | `false`            | Subset import map to only used specifiers                                                                                                                                                                       |
-| `alias`                  | `true`             | Unversioned symlinks for stable asset URLs (CSS, images). Use the unversioned path in HTML/CSS (e.g., `<link href="[output-dir]/open-props/style.css">`)                                                        |
-| `hooks`                  | —                  | Object of lifecycle hook callbacks (e.g., `constructed`, `create-aliases-start`). See [blissful-hooks](https://github.com/LeaVerou/blissful-hooks)                                                              |
+| Option                   | Default            | Description                                                                                                                                                                                                                             |
+| ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dir`                    | `"client_modules"` | Output directory for copied packages                                                                                                                                                                                                    |
+| `map`                    | `"importmap.js"`   | Import map injection script path                                                                                                                                                                                                        |
+| `publishDir`             | Workspace root     | Directory the host serves as `/`. Set it when `dir` lives inside a build output directory (e.g. an SSG's `dist/`), so hosts that need redirects write them there with correct URLs. An SSG calling nudeps usually supplies this for you |
+| `mode`                   | —                  | Preset: `"dev"` (symlink) or `"prod"` (prune + terse)                                                                                                                                                                                   |
+| `exclude`                | `[]`               | Packages to omit from import map (e.g., server-only deps)                                                                                                                                                                               |
+| `additionalDependencies` | `[]`               | Extra packages to add beyond `dependencies` — e.g. a tool calling nudeps programmatically injecting its own client libraries. Treated like `dependencies`; no-op if already in `dependencies`                                           |
+| `forceDependencies`      | `[]`               | Like `additionalDependencies`, but kept even when `prune` is on — use for packages you always want in the map regardless of what entry points reference. Subject to `exclude` (both → excluded, with a warning)                         |
+| `cjs`                    | `true`             | Include CJS shim for CommonJS packages                                                                                                                                                                                                  |
+| `prune`                  | `false`            | Subset import map to only used specifiers                                                                                                                                                                                               |
+| `alias`                  | `true`             | Unversioned symlinks for stable asset URLs (CSS, images). Use the unversioned path in HTML/CSS (e.g., `<link href="[output-dir]/open-props/style.css">`)                                                                                |
+| `hooks`                  | —                  | Object of lifecycle hook callbacks (e.g., `constructed`, `create-aliases-start`). See [blissful-hooks](https://github.com/LeaVerou/blissful-hooks)                                                                                      |
 
 Full option reference and troubleshooting: see README.md in the nudeps package directory.
 
@@ -110,6 +110,12 @@ For build scripts or CI pipelines that need nudeps as a step. Accepts the same o
 ```js
 import nudeps from "nudeps";
 await nudeps({ prune: true });
+```
+
+Options passed this way **override** the project's `nudeps.js`. For values a tool knows but the project should still control, use `defaults`, which loses to both the config file and modes — e.g. an SSG that owns `dir`/`map` but only suggests where the site is served from:
+
+```js
+await nudeps({ dir, map, defaults: { publishDir: output } });
 ```
 
 ## Generated Artifacts — Do Not Edit

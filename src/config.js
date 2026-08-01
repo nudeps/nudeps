@@ -69,10 +69,13 @@ export function resolveDefaults (
 
 /**
  * Get the resolved config regardless of where settings come from
+ * @param {object} [overrides] - Programmatic options, which win over the config file. The
+ * exception is `overrides.defaults`, whose entries *lose* to it: that is how a tool calling
+ * nudeps supplies a value it knows without taking the decision away from the project.
  * @returns
  */
 export async function getConfig (overrides = {}) {
-	let args = overrides;
+	let { defaults = {}, ...args } = overrides;
 
 	let config = readExternalConfig(args) ?? {};
 
@@ -81,7 +84,7 @@ export async function getConfig (overrides = {}) {
 	}
 
 	// Resolve mode and its defaults
-	let mode = args.mode ?? config.mode;
+	let mode = args.mode ?? config.mode ?? defaults.mode;
 	let customModes = config.modes ?? {};
 	let allModes = { ...builtInModes, ...customModes };
 	let modeDefaults = resolveDefaults(mode, allModes);
@@ -89,7 +92,7 @@ export async function getConfig (overrides = {}) {
 	let ret = {};
 	for (let key in availableOptions) {
 		let option = availableOptions[key];
-		ret[key] = args[key] ?? config[key] ?? modeDefaults[key];
+		ret[key] = args[key] ?? config[key] ?? modeDefaults[key] ?? defaults[key];
 
 		if (ret[key] !== undefined) {
 			if (option.validate && !option.validate(ret[key])) {

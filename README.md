@@ -445,6 +445,26 @@ import nudeps from "nudeps";
 await nudeps({ prune: true, forceDependencies: ["my-design-system"] });
 ```
 
+### Overriding vs. defaulting
+
+Options you pass programmatically **override** the project's own `nudeps.js`, which is what you want for things your tool genuinely owns — a static site generator decides where its output goes, so `dir` and `map` are not up for negotiation.
+
+Other values you merely _know_, and the project should still get the last word. Pass those in `defaults` instead: they lose to both `nudeps.js` and any [mode](#modes), so you supply a working value without taking the decision away.
+
+```js
+import nudeps from "nudeps";
+
+await nudeps({
+	// This tool owns its output layout
+	dir: `${output}/assets/client_modules`,
+	map: `${output}/assets/importmap.js`,
+	// …but a project deploying `output` into a larger site can say otherwise
+	defaults: { publishDir: output },
+});
+```
+
+`defaults` accepts any option, and is programmatic-only — in a config file it would sit below your own settings, which is where they already are.
+
 ## FAQ
 
 ### Which browsers are supported?
