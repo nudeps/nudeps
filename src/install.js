@@ -1,4 +1,4 @@
-import { readJSONSync, writeJSONSync } from "./util.js";
+import { readJSONSync, writeJSONSync, detectIndent } from "./util.js";
 import Packages from "./util/packages.js";
 import { execSync } from "node:child_process";
 import * as path from "node:path";
@@ -39,19 +39,21 @@ export default async function () {
 	addHook(pkg, "dependencies", command);
 	addHook(pkg, "prepare", command);
 
-	writeJSONSync("package.json", pkg, 2);
+	// These are the user's files, so keep their formatting (#110)
+	writeJSONSync("package.json", pkg, detectIndent("package.json"));
 
 	// Handle workspaces: if cwd's lockfile lives at a parent, that parent is the workspace root.
 	let root = Packages.findRoot();
 	if (root && root !== process.cwd()) {
-		let rootPkg = readJSONSync(path.join(root, "package.json"), { optional: true });
+		let rootPkgPath = path.join(root, "package.json");
+		let rootPkg = readJSONSync(rootPkgPath, { optional: true });
 
 		if (rootPkg?.workspaces) {
 			// Add hooks that delegate to children, so `npm install` at the root re-triggers nudeps after the lockfile is written.
 			for (let hook of ["dependencies", "prepare"]) {
 				addHook(rootPkg, hook, `npm run ${hook} --if-present --workspaces`);
 			}
-			writeJSONSync(path.join(root, "package.json"), rootPkg);
+			writeJSONSync(rootPkgPath, rootPkg, detectIndent(rootPkgPath));
 		}
 	}
 }

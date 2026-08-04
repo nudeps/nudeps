@@ -1,8 +1,9 @@
 import jspmOverridesTests from "./jspm-overrides.js";
 import packagesTests from "./packages.js";
 import readJSONTests from "./read-json.js";
+import detectIndentTests from "./detect-indent.js";
 
 export default {
 	name: "util tests",
-	tests: [jspmOverridesTests, packagesTests, readJSONTests],
+	tests: [jspmOverridesTests, packagesTests, readJSONTests, detectIndentTests],
 };

@@ -50,8 +50,28 @@ export function readJSONSync (filePath, { optional } = {}) {
 	}
 }
 
-export function writeJSONSync (path, data, indent = "\t") {
-	return writeFileSync(path, JSON.stringify(data, null, indent));
+/**
+ * Detect the indentation of an existing text file, from its first indented line.
+ * @param {string} filePath
+ * @param {string} [fallback] - Used if the file is missing, unreadable, or has no indented line
+ * @returns {string}
+ */
+export function detectIndent (filePath, fallback = "\t") {
+	try {
+		return readFileSync(filePath, "utf8").match(/^[ \t]+(?=\S)/m)?.[0] ?? fallback;
+	}
+	catch {
+		return fallback;
+	}
+}
+
+/**
+ * @param {string} filePath
+ * @param {any} data
+ * @param {string | number} [indent] - Pass `detectIndent(filePath)` for files we don't own
+ */
+export function writeJSONSync (filePath, data, indent = "\t") {
+	return writeFileSync(filePath, JSON.stringify(data, null, indent) + "\n");
 }
 
 /**
