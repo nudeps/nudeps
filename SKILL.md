@@ -19,7 +19,7 @@ Copies npm packages to a local output directory, generates an import map mapping
 | Using bare specifiers in Web Workers                                                                                                     | Specifiers don't work in workers — this is a platform limitation, not a nudeps bug                                                                                                                                                                                                            |
 | Modifying the `dependencies`/`prepare` scripts in package.json                                                                           | These are npm lifecycle hooks installed by nudeps — don't edit or call them manually                                                                                                                                                                                                          |
 | Hardcoding `client_modules/` or `importmap.js` paths                                                                                     | These are configurable defaults (`dir` and `map` options). Read the project's nudeps config to determine actual paths                                                                                                                                                                         |
-| Specifier fails to resolve at runtime                                                                                                    | Ensure entry points are declared in package.json, then run `npx nudeps`. See Troubleshooting in README.md (in the nudeps package directory)                                                                                                                                                   |
+| Specifier fails to resolve at runtime                                                                                                    | Ensure entry points are declared in package.json, then run `npx nudeps`. See https://nudeps.dev/troubleshooting/                                                                                                                                                                              |
 | Using an unsupported package manager                                                                                                     | Only npm is officially supported. nudeps reads `node_modules/.package-lock.json` which other package managers may not produce                                                                                                                                                                 |
 
 ## Lifecycle
@@ -72,7 +72,7 @@ Config file uses ES module syntax: `export default { ... }`.
 | `alias`                  | `true`             | Unversioned symlinks for stable asset URLs (CSS, images). Use the unversioned path in HTML/CSS (e.g., `<link href="[output-dir]/open-props/style.css">`)                                                        |
 | `hooks`                  | —                  | Object of lifecycle hook callbacks (e.g., `constructed`, `create-aliases-start`). See [blissful-hooks](https://github.com/LeaVerou/blissful-hooks)                                                              |
 
-Full option reference and troubleshooting: see README.md in the nudeps package directory.
+Full option reference: https://nudeps.dev/config/ · Troubleshooting: https://nudeps.dev/troubleshooting/
 
 ## CJS Packages
 
