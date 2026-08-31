@@ -11,8 +11,9 @@ import builtInModes from "./modes.js";
  * @import { NudepsOptions } from "./options.js"
  */
 
-function readExternalConfig (args) {
-	let configPath = args.config || "nudeps.js";
+function readExternalConfig (args, defaults = {}) {
+	// A path from `defaults` is only a suggestion, so a missing file falls back to no config
+	let configPath = args.config || defaults.config || "nudeps.js";
 
 	if (!existsSync(configPath)) {
 		if (args.config) {
@@ -73,20 +74,19 @@ export function resolveDefaults (
 
 /**
  * Get the resolved config regardless of where settings come from
- * @param {NudepsOptions} [overrides] - Options taking precedence over the config file and mode defaults.
+ * @param {NudepsOptions} [overrides] - Options taking precedence over the config file and mode defaults,
+ * except `defaults`, which is only consulted when nothing else supplies a value.
  * @returns {NudepsOptions} Every option, normalized, with defaults applied.
  */
-export async function getConfig (overrides = {}) {
-	let args = overrides;
-
-	let config = readExternalConfig(args) ?? {};
+export async function getConfig ({ defaults = {}, ...args } = {}) {
+	let config = readExternalConfig(args, defaults) ?? {};
 
 	if (config.then) {
 		config = await config;
 	}
 
 	// Resolve mode and its defaults
-	let mode = args.mode ?? config.mode;
+	let mode = args.mode ?? config.mode ?? defaults.mode;
 	let customModes = config.modes ?? {};
 	let allModes = { ...builtInModes, ...customModes };
 	let modeDefaults = resolveDefaults(mode, allModes);
@@ -94,7 +94,7 @@ export async function getConfig (overrides = {}) {
 	let ret = {};
 	for (let key in availableOptions) {
 		let option = availableOptions[key];
-		ret[key] = args[key] ?? config[key] ?? modeDefaults[key];
+		ret[key] = args[key] ?? config[key] ?? modeDefaults[key] ?? defaults[key];
 
 		if (ret[key] !== undefined) {
 			if (option.validate && !option.validate(ret[key])) {

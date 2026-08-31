@@ -46,6 +46,8 @@ import * as path from "node:path";
  * @property {Array<string | IgnorePattern>} [ignore] - Files to skip when copying packages.
  * Adds to the defaults (readmes, dotfiles, package and lockfiles) rather than replacing them.
  * @property {Record<string, Function | Function[]>} [hooks] - Lifecycle hook callbacks, see [blissful-hooks](https://github.com/LeaVerou/blissful-hooks).
+ * @property {NudepsOptions} [defaults] - Fallbacks for anything the config file and mode preset leave unset,
+ * so a tool running nudeps programmatically can suggest values without overriding the user's own config. Programmatic API only.
  */
 
 export const dir = {

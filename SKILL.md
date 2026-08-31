@@ -114,6 +114,12 @@ let { config } = await nudeps({ prune: true });
 
 Returns the `Nudeps` instance, whose `config` holds the resolved options (`dir`, `map`, etc.) — read it instead of guessing paths. Returns `null` when the run is skipped (workspace child installing before the lockfile exists).
 
+Pass `defaults` to suggest values the user's own config still wins over — useful when a tool (e.g. an SSG) wants its own paths unless the project says otherwise:
+
+```js
+await nudeps({ defaults: { dir: "dist/client_modules", publishDir: "dist" } });
+```
+
 ## Generated Artifacts — Do Not Edit
 
 - **Output directory** (`dir` option) — copied/symlinked packages
