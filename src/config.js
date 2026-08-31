@@ -7,6 +7,10 @@ import { existsSync } from "node:fs";
 import * as availableOptions from "./options.js";
 import builtInModes from "./modes.js";
 
+/**
+ * @import { NudepsOptions } from "./options.js"
+ */
+
 function readExternalConfig (args) {
 	let configPath = args.config || "nudeps.js";
 
@@ -69,7 +73,8 @@ export function resolveDefaults (
 
 /**
  * Get the resolved config regardless of where settings come from
- * @returns
+ * @param {NudepsOptions} [overrides] - Options taking precedence over the config file and mode defaults.
+ * @returns {NudepsOptions} Every option, normalized, with defaults applied.
  */
 export async function getConfig (overrides = {}) {
 	let args = overrides;
