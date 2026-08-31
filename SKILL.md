@@ -109,8 +109,10 @@ For build scripts or CI pipelines that need nudeps as a step. Accepts the same o
 
 ```js
 import nudeps from "nudeps";
-await nudeps({ prune: true });
+let { config } = await nudeps({ prune: true });
 ```
+
+Returns the `Nudeps` instance, whose `config` holds the resolved options (`dir`, `map`, etc.) — read it instead of guessing paths. Returns `null` when the run is skipped (workspace child installing before the lockfile exists).
 
 ## Generated Artifacts — Do Not Edit
 

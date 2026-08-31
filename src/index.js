@@ -7,6 +7,16 @@ import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, rmSync 
 import { writeJSONSync, createGitignoredDir } from "./util.js";
 import Nudeps from "./nudeps.js";
 
+/**
+ * @import { NudepsOptions } from "./options.js"
+ */
+
+/**
+ * Generate the import map and materialize client-side dependencies.
+ * @param {NudepsOptions} [options] - Overrides taking precedence over the config file and mode defaults.
+ * @returns {Promise<Nudeps | null>} The Nudeps instance, whose `config` holds the resolved options.
+ * `null` when the run was skipped (a workspace child installing before the lockfile exists).
+ */
 export default async function (options) {
 	// A workspace child's install-time hooks (e.g. `prepare`) run before npm writes the lockfile —
 	// skip that too-early run; the post-install re-run (lockfile now present) regenerates.
@@ -19,7 +29,7 @@ export default async function (options) {
 		console.info(
 			"[nudeps] Skipping import map generation during workspace install — it runs once the lockfile is written. If this is not a workspace, please run Nudeps from the package root.",
 		);
-		return;
+		return null;
 	}
 
 	let config = await getConfig(options);
@@ -129,4 +139,6 @@ export default async function (options) {
 	if (mapChanged) {
 		nudeps.notifyDependents();
 	}
+
+	return nudeps;
 }
