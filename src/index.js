@@ -4,7 +4,8 @@
 import * as path from "node:path";
 import { getConfig } from "./config.js";
 import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import { writeJSONSync, createGitignoredDir } from "./util.js";
+import { createGitignoredDir } from "./util.js";
+import { stringifyConfig } from "./util/options.js";
 import Nudeps from "./nudeps.js";
 
 /**
@@ -104,7 +105,8 @@ export default async function (options) {
 		writeFileSync(config.map, mapContent);
 	}
 
-	writeJSONSync(".nudeps/config.json", config);
+	// stringifyConfig keeps function values as source text so the cache compare sees them
+	writeFileSync(".nudeps/config.json", stringifyConfig(config) + "\n");
 
 	let info = [];
 	if (stats.copied + stats.deleted + stats.aliased > 0) {

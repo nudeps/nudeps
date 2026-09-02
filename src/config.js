@@ -5,7 +5,11 @@
 import { importCwdRelative } from "./util.js";
 import { existsSync } from "node:fs";
 import * as availableOptions from "./options.js";
+import { checkType, suggest } from "./util/options.js";
 import builtInModes from "./modes.js";
+
+// Config-file keys that are valid but not option descriptors
+const NON_OPTION_KEYS = new Set(["modes"]);
 
 /**
  * @import { NudepsOptions } from "./options.js"
@@ -85,6 +89,15 @@ export async function getConfig ({ defaults = {}, ...args } = {}) {
 		config = await config;
 	}
 
+	// Unknown config file keys are almost always typos — fail loudly with a suggestion
+	for (let key in config) {
+		if (!(key in availableOptions) && !NON_OPTION_KEYS.has(key)) {
+			let suggestion = suggest(key, Object.keys(availableOptions));
+			let hint = suggestion ? ` Did you mean "${suggestion}"?` : "";
+			throw new Error(`Unknown config option "${key}".${hint}`);
+		}
+	}
+
 	// Resolve mode and its defaults
 	let mode = args.mode ?? config.mode ?? defaults.mode;
 	let customModes = config.modes ?? {};
@@ -94,20 +107,33 @@ export async function getConfig ({ defaults = {}, ...args } = {}) {
 	let ret = {};
 	for (let key in availableOptions) {
 		let option = availableOptions[key];
-		ret[key] = args[key] ?? config[key] ?? modeDefaults[key] ?? defaults[key];
+		// Track where the value came from so validation errors can point at the culprit
+		let sources = [
+			[args[key], "options"],
+			[config[key], "config file"],
+			[modeDefaults[key], `mode "${mode}"`],
+			[defaults[key], "defaults"],
+		];
+		let [value, source] = sources.find(([v]) => v !== undefined) ?? [];
 
-		if (ret[key] !== undefined) {
-			if (option.validate && !option.validate(ret[key])) {
-				delete ret[key];
+		if (value !== undefined) {
+			let typeOk = checkType(value, option.type);
+			if (!typeOk || (option.validate && !option.validate(value))) {
+				let expected = typeOk ? "" : ` Expected ${[option.type].flat().join(" or ")}.`;
+				throw new Error(
+					`Invalid value for option "${key}" (from ${source}): ${JSON.stringify(value) ?? value}.${expected}`,
+				);
 			}
 		}
 
 		if (option.normalize) {
-			ret[key] = option.normalize(ret[key], option.default);
+			value = option.normalize(value, option.default);
 		}
 		else {
-			ret[key] ??= option.default;
+			value ??= option.default;
 		}
+
+		ret[key] = value;
 	}
 
 	return ret;

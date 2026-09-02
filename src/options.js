@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
 import * as path from "node:path";
+import * as hosts from "./hosts.js";
 
 /**
  * @import Package from "./util/package.js"
@@ -22,12 +22,13 @@ import * as path from "node:path";
  * @property {string} [map="importmap.js"] - Path of the generated import map script.
  * @property {string} [publishDir] - Directory the host serves as `/`, defaults to the package (or workspace) root.
  * Only needed when `dir` lives inside a build output directory (e.g. an SSG's `dist/`), since redirect rules are URLs, not file paths.
+ * @property {string} [host] - Deploy host adapter (a key of `hosts.js`, e.g. `"netlify"`). Auto-detected from the environment when not set.
  * @property {string} [mode] - Mode preset to take defaults from: built-in `"dev"` or `"prod"`, or a key of `modes`.
  * @property {Record<string, NudepsOptions>} [modes] - Custom mode presets, keyed by name.
  * Each can extend another by setting its own `mode`. Config file only.
  * @property {string} [config="nudeps.js"] - Path of the config file to read. Ignored if the file does not exist.
  * @property {boolean} [init=false] - Start from scratch: delete the `.nudeps` cache and `dir` before generating.
- * @property {string[]} [exclude=[]] - Dependency names to keep out of the import map entirely (e.g. server-only deps).
+ * @property {string | string[]} [exclude=[]] - Dependency names to keep out of the import map entirely (e.g. server-only deps).
  * @property {string | string[]} [additionalDependencies=[]] - Extra packages to map beyond the host's `dependencies`,
  * e.g. client libraries injected by a tool calling nudeps programmatically. Treated like `dependencies`.
  * @property {string | string[]} [forceDependencies=[]] - Like `additionalDependencies`, but kept even when `prune` is on.
@@ -52,28 +53,33 @@ import * as path from "node:path";
 
 export const dir = {
 	flag: "d",
+	type: "string",
 	default: "./client_modules",
 	normalize: (v, defaultValue) => path.normalize(v ?? defaultValue),
 };
 
 export const mode = {
 	flag: "m",
-	cli: true,
+	type: "string",
 };
 
 export const map = {
 	flag: "o",
+	type: "string",
 	default: "importmap.js",
 };
 
 export const terse = {
+	type: "boolean",
 	default: false,
 };
 
 export const exclude = {
 	flag: "e",
+	type: ["string", "list"],
 	parse: v => v.split(","),
 	default: [],
+	normalize: (v, defaultValue) => (v == null ? defaultValue : [v].flat()),
 };
 
 // Extra packages to add to the import map beyond the host's `dependencies` — e.g. a tool
@@ -82,6 +88,7 @@ export const exclude = {
 // `exclude`); a no-op for anything already in `dependencies`.
 export const additionalDependencies = {
 	cli: false,
+	type: ["string", "list"],
 	default: [],
 	normalize: (v, defaultValue) => (v == null ? defaultValue : [v].flat()),
 };
@@ -91,54 +98,65 @@ export const additionalDependencies = {
 // the entry points reference them. Subject to `exclude` (a name in both is excluded, with a warning).
 export const forceDependencies = {
 	cli: false,
+	type: ["string", "list"],
 	default: [],
 	normalize: (v, defaultValue) => (v == null ? defaultValue : [v].flat()),
 };
 
 export const prune = {
+	type: "boolean",
 	default: false,
 };
 
+// A missing explicitly-passed path throws in readExternalConfig; a path from
+// `defaults` is only a suggestion, so no existence validation here.
 export const config = {
 	flag: "c",
+	type: "string",
 	default: "nudeps.js",
-	validate: v => existsSync(v),
-	file: false,
 };
 
 export const init = {
+	type: "boolean",
 	default: false,
 };
 
 export const overrides = {
 	cli: false,
+	type: "object",
 };
 
 export const hooks = {
 	cli: false,
+	type: "object",
 };
 
 // The directory the host serves as `/`. Only needed when `dir` lives inside a build output
 // directory (e.g. an SSG's `dist/`), since redirect rules are URLs, not file paths.
 export const publishDir = {
 	flag: "publish-dir",
-	validate: v => typeof v === "string",
+	type: "string",
 };
 
 export const module = {
+	type: "boolean",
 	default: false,
 };
 
 export const cjs = {
+	type: "boolean",
 	default: true,
 };
 
 export const combineSubpaths = {
 	flag: "combine-subpaths",
+	type: ["boolean", "string"],
 	default: false,
+	validate: v => typeof v === "boolean" || v === "both",
 };
 
 export const ignore = {
+	type: ["string", "object", "list"],
 	default: [
 		// Readme files with any extension
 		"{readme,README}.*",
@@ -174,13 +192,22 @@ export const ignore = {
 };
 
 export const symlink = {
+	type: ["boolean", "function"],
 	default: pkg => pkg.isExternal,
 };
 
 export const preserveSymlinks = {
+	type: ["boolean", "list", "function"],
 	default: false,
 };
 
 export const alias = {
+	type: ["boolean", "string", "list", "object", "function"],
 	default: true,
+};
+
+// Deploy host adapter; auto-detected from the environment when not set.
+export const host = {
+	type: "string",
+	validate: v => v in hosts,
 };

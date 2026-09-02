@@ -12,6 +12,7 @@ import Hooks from "blissful-hooks";
 import { readJSONSync, writeJSONSync, createGitignoredDir } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import { matchesGlob, ensureSymlink } from "./util/fs.js";
+import { stringifyConfig } from "./util/options.js";
 import { getTopLevelModules } from "./util.js";
 import Packages from "./util/packages.js";
 import * as hosts from "./hosts.js";
@@ -54,10 +55,9 @@ export default class Nudeps {
 		}
 
 		if (this.config.host) {
-			this.host = hosts[this.config.host];
-			if (!this.host) {
-				this.warn(`Unknown host: ${this.config.host}`);
-			}
+			// Adapters may be factories taking the config (e.g. apache)
+			let adapter = hosts[this.config.host];
+			this.host = typeof adapter === "function" ? adapter(this.config) : adapter;
 		}
 		else {
 			// Auto-detect host
@@ -170,7 +170,9 @@ export default class Nudeps {
 	}
 
 	get installCache () {
-		let configChanged = JSON.stringify(this.oldConfig) !== JSON.stringify(this.config);
+		// stringifyConfig keeps function/regex values as source text, so editing e.g. a
+		// symlink callback or hooks in the config file correctly busts the cache
+		let configChanged = stringifyConfig(this.oldConfig) !== stringifyConfig(this.config);
 		let cacheData = readJSONSync(".nudeps/cache.json", { optional: true });
 		if (cacheData?.version !== nudepsPkg.version || configChanged) {
 			cacheData = null;
