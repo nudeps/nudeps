@@ -18,12 +18,7 @@ export class ImportMapGenerator extends Generator {
 	 * @param {Nudeps} [options.nudeps] - Nudeps instance for lock data access
 	 * @param {boolean} [options.silent] - Suppress user-facing log messages (for internal temp generators)
 	 */
-	constructor ({ mode, installCache, silent, nudeps, ...generatorOptions } = {}) {
-		if (mode) {
-			this.mode = mode;
-			generatorOptions.env ??= [mode, "browser", "module"];
-		}
-
+	constructor ({ installCache, silent, nudeps, ...generatorOptions } = {}) {
 		let commonJS = generatorOptions.commonJS ?? true;
 
 		super({
@@ -49,7 +44,7 @@ export class ImportMapGenerator extends Generator {
 		// installCache and silent are intentionally excluded from _options: installCache so that
 		// temp generators always have null caches (preventing recursion); silent so that
 		// sub-generators created on cache miss still produce user-facing log messages.
-		this._options = { mode, nudeps, ...generatorOptions };
+		this._options = { nudeps, ...generatorOptions };
 
 		// Patch package configs before JSPM resolves them:
 		// 1. Apply community overrides (client-side equivalent of what jspm.io CDN does server-side)
