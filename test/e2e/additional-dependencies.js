@@ -8,10 +8,10 @@ const NUDEPS_ROOT = resolve(import.meta.dirname, "../..");
 // Reproduces a tool (e.g. a static site generator) injecting its own client library into a
 // consumer's import map. `mitt` is present only as a devDependency, so npm flags it dev:true
 // in the lockfile and the root trace never reaches it — it lands in the map purely because of
-// additionalDependencies. Exercises dev-flag retention too: a dev-flagged package must resolve
+// an include: true rule. Exercises dev-flag retention too: a dev-flagged package must resolve
 // and copy, not just appear as a map entry.
 export default {
-	name: "additionalDependencies injects a package the host doesn't depend on",
+	name: "include: true injects a package the host doesn't depend on",
 	async run () {
 		let tmpDir = mkdtempSync(join(tmpdir(), "nudeps-additional-deps-"));
 		try {
@@ -29,7 +29,7 @@ export default {
 			// A consumer calling nudeps programmatically and injecting its own client library.
 			writeFileSync(
 				join(tmpDir, "build.mjs"),
-				`import nudeps from "nudeps";\nawait nudeps({ additionalDependencies: ["mitt"] });\n`,
+				`import nudeps from "nudeps";\nawait nudeps({ overrides: [{ name: "mitt", include: true }] });\n`,
 			);
 
 			let env = { ...process.env, npm_config_audit: "false", npm_config_fund: "false" };
