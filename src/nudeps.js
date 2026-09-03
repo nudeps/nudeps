@@ -2,7 +2,7 @@
  * Main entry point
  */
 
-import { existsSync, unlinkSync, rmSync, rmdirSync, cpSync, symlinkSync, mkdirSync } from "node:fs";
+import { existsSync, unlinkSync, rmSync, rmdirSync, cpSync } from "node:fs";
 import * as path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
@@ -712,9 +712,7 @@ export default class Nudeps {
 			}
 			else if (this.shouldSymlink(pkg)) {
 				// Create a symlink to the source path (resolves through links for external deps)
-				let target = path.relative(path.dirname(to), from);
-				mkdirSync(path.dirname(to), { recursive: true });
-				symlinkSync(target, to, "dir");
+				ensureSymlink(path.relative(path.dirname(to), from), to, "dir");
 				stats.linked++;
 			}
 			else {

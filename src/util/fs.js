@@ -150,15 +150,24 @@ export function createGitignoredDir (dir) {
 /**
  * Create a symlink, optionally replacing an existing one.
  * With `force`, removes any existing entry at `linkPath` before creating.
- * @param {string} target - The symlink target (what it points to)
+ * @param {string} target - The symlink target (what it points to), absolute or relative to `linkPath`'s directory
  * @param {string} linkPath - Where to create the symlink
  * @param {"dir"|"file"|"junction"} [type] - Symlink type (passed to symlinkSync)
  * @param {{ force?: boolean }} [options]
  * @returns {boolean} Whether a new symlink was created
  */
 export function ensureSymlink (target, linkPath, type, { force } = {}) {
+	let dir = path.dirname(linkPath);
+
+	if (type === "dir" && process.platform === "win32") {
+		// Directory symlinks need elevation or Developer Mode on Windows, junctions don't (#153).
+		// Junction targets must be absolute.
+		type = "junction";
+		target = path.resolve(dir, target);
+	}
+
 	try {
-		if (readlinkSync(linkPath) === target) {
+		if (path.resolve(dir, readlinkSync(linkPath)) === path.resolve(dir, target)) {
 			// Symlink already points to the correct target
 			return false;
 		}
@@ -174,7 +183,7 @@ export function ensureSymlink (target, linkPath, type, { force } = {}) {
 		rmSync(linkPath, { recursive: true, force: true });
 	}
 
-	mkdirSync(path.dirname(linkPath), { recursive: true });
+	mkdirSync(dir, { recursive: true });
 	symlinkSync(target, linkPath, type);
 	return true;
 }
