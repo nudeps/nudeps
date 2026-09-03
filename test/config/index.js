@@ -1,8 +1,9 @@
 import modeResolution from "./mode-resolution.js";
 import optionResolution from "./option-resolution.js";
 import hardening from "./hardening.js";
+import rules from "./rules.js";
 
 export default {
 	name: "config tests",
-	tests: [modeResolution, optionResolution, hardening],
+	tests: [modeResolution, optionResolution, hardening, rules],
 };

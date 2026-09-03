@@ -16,12 +16,12 @@ export const netlify = {
 			// Netlify doesn't support symlinks, so aliases become redirect rules.
 			// Rules match URLs, so both the file and the paths in it are relative to the publish dir,
 			// e.g. /child/client_modules/foo/* /child/client_modules/foo@1.0.0/:splat 302
-			let { publishDir } = this;
-			let url = p => "/" + path.relative(publishDir, p);
+			let { root } = this;
+			let url = p => "/" + path.relative(root, p);
 
 			if (url(this.dir).startsWith("/..")) {
 				this.warn(
-					`${this.dir} is outside the publish directory (${publishDir || "."}), so its redirect rules cannot match any URL. Set the publishDir option.`,
+					`${this.dir} is outside the web root (${root || "."}), so its redirect rules cannot match any URL. Set the root option.`,
 				);
 			}
 
@@ -32,9 +32,9 @@ export const netlify = {
 				)
 				.join("\n");
 
-			let file = path.join(publishDir, "_redirects");
+			let file = path.join(root, "_redirects");
 			// The publish dir may not exist yet: nudeps can run before the build that fills it
-			fs.mkdirSync(path.resolve(publishDir), { recursive: true });
+			fs.mkdirSync(path.resolve(root), { recursive: true });
 			fs.appendFileSync(file, `${redirects}\n`);
 			this.info(`Wrote ${aliasEntries.length} alias redirects to ${file}`);
 		},
@@ -55,7 +55,7 @@ export const cloudflare = {
 	detect: () => process.env.CLOUDFLARE_PAGES === "true",
 };
 
-export const apache = ({ publishDir, file = ".htaccess" } = {}) => ({
+export const apache = ({ root, file = ".htaccess" } = {}) => ({
 	name: "Apache",
 	symlinks: true, // TODO detect FollowSymLinks
 	redirects: true,

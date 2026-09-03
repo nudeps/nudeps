@@ -26,8 +26,8 @@ export default {
 	tests: [
 		{
 			name: "defaults fill in options no other layer sets, beating built-in option defaults",
-			arg: { config: CONFIG, defaults: { map: "dist/importmap.js", publishDir: "dist" } },
-			expect: { map: "dist/importmap.js", publishDir: "dist" },
+			arg: { config: CONFIG, defaults: { map: "dist/importmap.js", root: "dist" } },
+			expect: { map: "dist/importmap.js", root: "dist" },
 		},
 		{
 			name: "config file beats defaults",

@@ -14,11 +14,19 @@ function configFile (name, source) {
 }
 
 const TYPO = configFile("typo.js", `export default { trese: true };`);
-const BAD_TYPE = configFile("bad-type.js", `export default { publishDir: 42 };`);
-const BAD_ENUM = configFile("bad-enum.js", `export default { combineSubpaths: "nope" };`);
-const STRING_EXCLUDE = configFile("string-exclude.js", `export default { exclude: "foo" };`);
+const BAD_TYPE = configFile("bad-type.js", `export default { root: 42 };`);
+const BAD_ENUM = configFile("bad-enum.js", `export default { subpaths: "nope" };`);
+const RENAMED = configFile("renamed.js", `export default { exclude: ["foo"] };`);
+const OLD_OVERRIDES = configFile(
+	"old-overrides.js",
+	`export default { overrides: { imports: { foo: "./node_modules/foo/foo.js" } } };`,
+);
 const HOST = configFile("host.js", `export default { host: "netlify" };`);
 const BAD_HOST = configFile("bad-host.js", `export default { host: "geocities" };`);
+const RULES = configFile(
+	"rules.js",
+	`export default { overrides: [{ mode: "loud", terse: true }] };`,
+);
 
 export default {
 	name: "Config pipeline hardening",
@@ -38,13 +46,23 @@ export default {
 				{
 					name: "invalid type throws and names the source",
 					arg: { config: BAD_TYPE },
-					throws: e =>
-						e.message.includes("publishDir") && e.message.includes("config file"),
+					throws: e => e.message.includes("root") && e.message.includes("config file"),
 				},
 				{
 					name: "failing validate throws",
 					arg: { config: BAD_ENUM },
-					throws: e => e.message.includes("combineSubpaths"),
+					throws: e => e.message.includes("subpaths"),
+				},
+				{
+					name: "renamed keys point at the replacement",
+					arg: { config: RENAMED },
+					throws: e =>
+						e.message.includes("exclude") && e.message.includes("include: false"),
+				},
+				{
+					name: "old import-map-shaped overrides point at imports",
+					arg: { config: OLD_OVERRIDES },
+					throws: e => e.message.includes(`"imports"`),
 				},
 				{
 					name: "invalid programmatic value throws and names the source",
@@ -69,14 +87,29 @@ export default {
 			check: { subset: true, deep: true },
 			tests: [
 				{
-					name: "a string exclude becomes a one-element array",
-					arg: { config: STRING_EXCLUDE },
-					expect: { exclude: ["foo"] },
-				},
-				{
 					name: "host is a real option",
 					arg: { config: HOST },
 					expect: { host: "netlify" },
+				},
+				{
+					name: "overrides concatenate across layers instead of replacing",
+					arg: {
+						config: RULES,
+						mode: "loud",
+						overrides: [{ mode: "loud", prune: true }],
+					},
+					expect: { terse: true, prune: true },
+				},
+			],
+		},
+		{
+			name: "Programmatic misuse",
+			run: getConfig,
+			tests: [
+				{
+					name: "renamed options error for programmatic callers too",
+					arg: { config: HOST, additionalDependencies: ["x"] },
+					throws: e => e.message.includes("include: true"),
 				},
 			],
 		},
@@ -89,11 +122,6 @@ export default {
 					name: "--symlink=false coerces to a boolean",
 					arg: ["--symlink=false"],
 					expect: { symlink: false },
-				},
-				{
-					name: "-e a,b splits into a list",
-					arg: ["-e", "a,b"],
-					expect: { exclude: ["a", "b"] },
 				},
 				{
 					name: "--alias=header stays a string",
@@ -120,7 +148,7 @@ export default {
 				{
 					name: "survives a write/parse/write round trip unchanged",
 					run () {
-						let config = { symlink: pkg => pkg.isExternal, exclude: ["foo"] };
+						let config = { symlink: pkg => pkg.isExternal, ignore: ["foo"] };
 						let once = stringifyConfig(config);
 						return stringifyConfig(JSON.parse(once)) === once;
 					},
