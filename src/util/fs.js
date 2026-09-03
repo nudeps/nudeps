@@ -188,6 +188,18 @@ export function ensureSymlink (target, linkPath, type, { force } = {}) {
 	return true;
 }
 
+/**
+ * Relative path from a directory to another path, as a URL: always `/`-separated
+ * (Windows paths use `\`, URLs never do) and always explicitly relative.
+ * @param {string} from - Directory to resolve from
+ * @param {string} to
+ * @returns {string}
+ */
+export function relativeURL (from, to) {
+	let url = path.relative(from, to).split(path.sep).join("/");
+	return url.startsWith(".") ? url : "./" + url;
+}
+
 export function importCwdRelative (pathFromCwd) {
 	return import(pathToFileURL(path.resolve(process.cwd(), pathFromCwd)).href);
 }

@@ -11,7 +11,7 @@ import Hooks from "blissful-hooks";
 
 import { readJSONSync, writeJSONSync, createGitignoredDir } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
-import { matchesGlob, ensureSymlink } from "./util/fs.js";
+import { matchesGlob, ensureSymlink, relativeURL } from "./util/fs.js";
 import { stringifyConfig } from "./util/options.js";
 import { applyRules, isPackageRule, includeNames } from "./rules.js";
 import { getTopLevelModules } from "./util.js";
@@ -148,9 +148,10 @@ export default class Nudeps {
 					false,
 					this.pkg.name,
 				);
-				entryPoint = path.relative(process.cwd(), fileURLToPath(entryPoint));
-				entryPoint = entryPoint.startsWith(".") ? entryPoint : `./${entryPoint}`;
-				generator.map.set(this.pkg.name, entryPoint);
+				generator.map.set(
+					this.pkg.name,
+					relativeURL(process.cwd(), fileURLToPath(entryPoint)),
+				);
 			}
 			catch (e) {
 				this.error(`Failed to manually resolve root package entry point. ${e.message}`);
@@ -615,8 +616,8 @@ export default class Nudeps {
 			let { pkg, filePath, sourcePath } = packages.parse(url);
 
 			let localPath = pkg ? this.localPath(pkg, filePath) : config.dir + "/" + filePath;
-			let urlFromMap = path.relative(mapDir, localPath); // Note: path.relative() might normalize away the trailing slash for directories
-			urlFromMap = urlFromMap.startsWith(".") ? urlFromMap : "./" + urlFromMap;
+			// Note: relativeURL() might normalize away the trailing slash for directories
+			let urlFromMap = relativeURL(mapDir, localPath);
 			if (specifier.endsWith("/") && !urlFromMap.endsWith("/")) {
 				// Preserve directory specifiers that require a trailing slash in import maps
 				urlFromMap += "/";
@@ -636,8 +637,7 @@ export default class Nudeps {
 				// Rewrite scope itself
 				let { pkg: scopePkg } = packages.parse(scope);
 				let scopeLocalDir = scopePkg ? this.localDir(scopePkg) : config.dir;
-				let scopeFromMap = path.relative(mapDir, scopeLocalDir);
-				scopeFromMap = scopeFromMap.startsWith(".") ? scopeFromMap : "./" + scopeFromMap;
+				let scopeFromMap = relativeURL(mapDir, scopeLocalDir);
 				map.scopes[scopeFromMap] = map.scopes[scope];
 				delete map.scopes[scope];
 			}
@@ -662,8 +662,7 @@ export default class Nudeps {
 						continue;
 					}
 
-					let urlFromMap = path.relative(mapDir, this.localPath(pkg, target));
-					urlFromMap = urlFromMap.startsWith(".") ? urlFromMap : "./" + urlFromMap;
+					let urlFromMap = relativeURL(mapDir, this.localPath(pkg, target));
 					if (specifier.endsWith("/") && !urlFromMap.endsWith("/")) {
 						// Preserve directory specifiers that require a trailing slash in import maps
 						urlFromMap += "/";
