@@ -56,21 +56,64 @@ import { someFunction } from "some-package";
 
 ## Config (default: `nudeps.js`, configurable via `--config`)
 
-Config file uses ES module syntax: `export default { ... }`.
+Config file uses ES module syntax: `export default { ... }`. Unknown or invalid options throw with a pointed error (typos get a suggestion; pre-rename options name their replacement).
 
-| Option                   | Default            | Description                                                                                                                                                                                                     |
-| ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dir`                    | `"client_modules"` | Output directory for copied packages                                                                                                                                                                            |
-| `map`                    | `"importmap.js"`   | Import map injection script path                                                                                                                                                                                |
-| `publishDir`             | Workspace root     | Directory the host serves as `/`. Set it when `dir` lives inside a build output directory (e.g. an SSG's `dist/`), so hosts that need redirects write them there with correct URLs                              |
-| `mode`                   | —                  | Preset: `"dev"` (symlink) or `"prod"` (prune + terse)                                                                                                                                                           |
-| `exclude`                | `[]`               | Packages to omit from import map (e.g., server-only deps)                                                                                                                                                       |
-| `additionalDependencies` | `[]`               | Extra packages to add beyond `dependencies` — e.g. a tool calling nudeps programmatically injecting its own client libraries. Treated like `dependencies`; no-op if already in `dependencies`                   |
-| `forceDependencies`      | `[]`               | Like `additionalDependencies`, but kept even when `prune` is on — use for packages you always want in the map regardless of what entry points reference. Subject to `exclude` (both → excluded, with a warning) |
-| `cjs`                    | `true`             | Include CJS shim for CommonJS packages                                                                                                                                                                          |
-| `prune`                  | `false`            | Subset import map to only used specifiers                                                                                                                                                                       |
-| `alias`                  | `true`             | Unversioned symlinks for stable asset URLs (CSS, images). Use the unversioned path in HTML/CSS (e.g., `<link href="[output-dir]/open-props/style.css">`)                                                        |
-| `hooks`                  | —                  | Object of lifecycle hook callbacks (e.g., `constructed`, `create-aliases-start`). See [blissful-hooks](https://github.com/LeaVerou/blissful-hooks)                                                              |
+| Option             | Default            | Description                                                                                                                                                                                          |
+| ------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dir`              | `"client_modules"` | Output directory for copied packages. Per-package overridable                                                                                                                                        |
+| `map`              | `"importmap.js"`   | Import map injection script path                                                                                                                                                                     |
+| `root`             | Workspace root     | Directory the host serves as `/`. Set it when `dir` lives inside a build output directory (e.g. an SSG's `dist/`), so hosts that need redirects write them there with correct URLs                   |
+| `host`             | Auto-detected      | Deploy host adapter: `"netlify"`, `"vercel"`, `"cloudflare"`, `"gitHubPages"`                                                                                                                        |
+| `mode`             | —                  | Active mode, tested by rules with `mode` matchers. Built-in presets: `"dev"` (symlink) and `"prod"` (no symlink + prune + terse)                                                                     |
+| `prune`            | `false`            | Subset import map to specifiers the entry points use, plus `include: "force"` packages                                                                                                               |
+| `terse`            | `false`            | Lightly minify the map script                                                                                                                                                                        |
+| `module`           | `false`            | Emit the map script for `type="module"` loading (reduces browser support)                                                                                                                            |
+| `cjs`              | `true`             | Include CJS shim for CommonJS packages. Per-package overridable                                                                                                                                      |
+| `subpaths`         | `"split"`          | `"split"` keeps every used subpath mapping explicit; `"combined"` collapses within scopes; `"both"` also collapses top-level                                                                         |
+| `symlink`          | External pkgs only | Symlink packages into `dir` instead of copying                                                                                                                                                       |
+| `preserveSymlinks` | `false`            | Keep symlinks inside a copied package instead of resolving them                                                                                                                                      |
+| `alias`            | `true`             | Unversioned symlink per package for stable asset URLs (CSS, images): `<link href="[dir]/open-props/style.css">`. A string is a custom path relative to the package's `dir` (may escape it: `"../x"`) |
+| `imports`          | —                  | Import map entries merged into the generated map (`{ specifier: path }`, path relative to the map file; `undefined` deletes). In a package rule, paths are package-relative                          |
+| `ignore`           | Readmes, dotfiles… | File globs (package-relative) to skip when copying. Entries: `"glob"`, `{ ignore: glob }`, or `{ copy: glob }` (reverses earlier ignores, including the defaults). Last match wins                   |
+| `overrides`        | —                  | Conditional config rules — see below                                                                                                                                                                 |
+| `hooks`            | —                  | Object of lifecycle hook callbacks (`constructed`, `create-aliases-start`, `create-aliases-after-external`, `create-aliases-end`). See [blissful-hooks](https://github.com/LeaVerou/blissful-hooks)  |
+
+### Conditional overrides
+
+One mechanism for per-package settings, mode presets, and combinations. Dictionary form for the common case (each key is one exact name or install name):
+
+```js
+export default {
+	overrides: {
+		"open-props": { alias: "../open-props" }, // stable URL at project root
+		"canvas-confetti": { include: true }, // install beyond package.json deps (prunable)
+		vue: { include: "force" }, // install AND survive prune
+		"@netlify/blobs": { include: false }, // server-only: keep out of direct installs
+		"legacy-lib": { cjs: false },
+	},
+};
+```
+
+Array form for patterns, versions, and modes — matchers are exact strings (semver ranges for `version`), regexes, predicates, or any-of arrays; multiple matcher fields AND together; a rule with no matchers is unconditional:
+
+```js
+export default {
+	overrides: [
+		{ mode: "staging", terse: false }, // mode preset (custom modes are just rules)
+		{ installName: /^@types\//, include: false },
+		{ name: "leaflet", version: "^1", ignore: "docs/**" },
+		{ mode: "prod", name: "leaflet", symlink: false }, // package × mode
+		{ name: "vue", imports: { vue: "./dist/vue.esm-browser.prod.js" } },
+	],
+};
+```
+
+Semantics agents must know:
+
+- **Cascade**: all matching rules apply in order, later wins, merged per property. Origin order: option defaults < built-in mode rules < top-level config < user rules < CLI/programmatic args. Rule layers concatenate (a tool's programmatic rules compose with the config file's).
+- **`include: false` does not guarantee absence** — the package still lands in the map if code actively imports it.
+- `include: true`/`"force"` need exact-name matchers (you can't install a regex); `include: false` accepts patterns.
+- Package-matched rules may only set package-scoped options (`dir`, `symlink`, `preserveSymlinks`, `alias`, `ignore`, `imports`, `cjs`, `include`); mode-only/unconditional rules may set anything.
 
 Full option reference: https://nudeps.dev/config/ · Troubleshooting: https://nudeps.dev/troubleshooting/
 
@@ -101,7 +144,7 @@ nudeps logs a summary after each run: number of import map entries, time taken, 
 
 ## npm Workspaces
 
-Running nudeps inside a workspace package works: it finds the lockfile at the monorepo root (deps are hoisted there), so hoisted dependencies and sibling workspace packages both resolve — hoisted deps get copied, siblings get symlinked into the package's output dir. `npx nudeps install` in a workspace child automatically adds `dependencies` and `prepare` hooks to the workspace root that delegate to children (`npm run <hook> --if-present --workspaces`), so `npm install` at the root triggers import map generation in each child. On Netlify (and Cloudflare), workspace children write redirect rules to the **root** `_redirects` with the child directory as a path prefix — no per-child `_redirects` is created. This assumes the workspace root is the deploy root; if it isn't, set `publishDir`. Limitation: change propagation between sibling workspace packages is not wired up.
+Running nudeps inside a workspace package works: it finds the lockfile at the monorepo root (deps are hoisted there), so hoisted dependencies and sibling workspace packages both resolve — hoisted deps get copied, siblings get symlinked into the package's output dir. `npx nudeps install` in a workspace child automatically adds `dependencies` and `prepare` hooks to the workspace root that delegate to children (`npm run <hook> --if-present --workspaces`), so `npm install` at the root triggers import map generation in each child. On Netlify (and Cloudflare), workspace children write redirect rules to the **root** `_redirects` with the child directory as a path prefix — no per-child `_redirects` is created. This assumes the workspace root is the deploy root; if it isn't, set `root`. Limitation: change propagation between sibling workspace packages is not wired up.
 
 ## Programmatic API
 
@@ -117,7 +160,7 @@ Returns the `Nudeps` instance, whose `config` holds the resolved options (`dir`,
 Pass `defaults` to suggest values the user's own config still wins over — useful when a tool (e.g. an SSG) wants its own paths unless the project says otherwise:
 
 ```js
-await nudeps({ defaults: { dir: "dist/client_modules", publishDir: "dist" } });
+await nudeps({ defaults: { dir: "dist/client_modules", root: "dist" } });
 ```
 
 ## Generated Artifacts — Do Not Edit

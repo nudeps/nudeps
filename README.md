@@ -58,7 +58,7 @@ That's it. Now `npm install vue` and `import { createApp } from "vue"` just work
 - [Getting Started](https://nudeps.dev/start/)
 - [How It Works](https://nudeps.dev/how-it-works/) — including how Nudeps compares to JSPM
 - [CLI](https://nudeps.dev/cli/)
-- [Configuration](https://nudeps.dev/config/) — [deployed files](https://nudeps.dev/config/files/), [aliases](https://nudeps.dev/config/aliases/), [modes](https://nudeps.dev/config/modes/)
+- [Configuration](https://nudeps.dev/config/) — [deployed files](https://nudeps.dev/config/files/), [aliases](https://nudeps.dev/config/aliases/), [overrides & modes](https://nudeps.dev/config/overrides/)
 - [Local Dependencies](https://nudeps.dev/local-deps/)
 - [Programmatic API](https://nudeps.dev/api/)
 - [FAQ](https://nudeps.dev/faq/) · [Troubleshooting](https://nudeps.dev/troubleshooting/)
