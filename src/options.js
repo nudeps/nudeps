@@ -161,14 +161,7 @@ export const subpaths = {
 export const ignore = {
 	type: ["string", "object", "list"],
 	default: [
-		// Readme files with any extension
-		"{readme,README}.*",
-
-		// Dotfiles
-		".*",
-
-		// Package files
-		"package.json",
+		".*", // Dotfiles
 		"{package,pnpm}-lock.json",
 	],
 	normalize: (value, defaultValue) => {
