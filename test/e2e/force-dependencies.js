@@ -5,14 +5,14 @@ import { join, resolve } from "node:path";
 
 const NUDEPS_ROOT = resolve(import.meta.dirname, "../..");
 
-// The full forceDependencies contract, under `prune: true`, on one package (`mitt`):
-//   - additionalDependencies → pruned away (control: proves prune really drops it)
-//   - forceDependencies       → kept (the feature)
-//   - forceDependencies + exclude → still dropped, with a warning (exclude wins over force)
+// The full include contract, under `prune: true`, on one package (`mitt`):
+//   - include: true    → pruned away (control: proves prune really drops it)
+//   - include: "force" → kept (the feature)
+//   - a later include: false rule → dropped again (the cascade resolves the contradiction)
 // mitt is a devDependency and the entry point imports nothing, so it only reaches the map via
 // injection — exactly the intended use case (a dev-only client lib you always want present).
 export default {
-	name: "forceDependencies survives prune but still respects exclude",
+	name: 'include: "force" survives prune; a later include: false wins the cascade',
 	async run () {
 		let tmpDir = mkdtempSync(join(tmpdir(), "nudeps-force-deps-"));
 		try {
@@ -37,9 +37,9 @@ export default {
 				`import nudeps from "nudeps";\n` +
 					`let opts = { prune: true, init: true };\n` +
 					`let mode = process.env.MODE;\n` +
-					`if (mode === "force") { opts.forceDependencies = ["mitt"]; }\n` +
-					`else if (mode === "contradiction") { opts.forceDependencies = ["mitt"]; opts.exclude = ["mitt"]; }\n` +
-					`else { opts.additionalDependencies = ["mitt"]; }\n` +
+					`if (mode === "force") { opts.overrides = [{ name: "mitt", include: "force" }]; }\n` +
+					`else if (mode === "contradiction") { opts.overrides = [{ name: "mitt", include: "force" }, { name: "mitt", include: false }]; }\n` +
+					`else { opts.overrides = [{ name: "mitt", include: true }]; }\n` +
 					`await nudeps(opts);\n`,
 			);
 
@@ -57,28 +57,26 @@ export default {
 
 			execSync("npm install", { cwd: tmpDir, env, stdio: "ignore" });
 
-			run("additional"); // control: additionalDependencies is pruned away
+			run("additional"); // control: include: true is pruned away
 			let pruned = mittUrl();
 
-			run("force"); // forceDependencies survives the prune
+			run("force"); // include: "force" survives the prune
 			let forced = mittUrl();
 
-			let output = run("contradiction"); // exclude wins over force, with a warning
+			run("contradiction"); // the later include: false rule wins
 			let excluded = mittUrl();
-			let warned = /exclude wins/i.test(output);
 
-			return { pruned, forced, excluded, warned };
+			return { pruned, forced, excluded };
 		}
 		finally {
 			rmSync(tmpDir, { recursive: true, force: true });
 		}
 	},
-	// Control dropped mitt; force brought it back (copied, versioned); exclude dropped it again and warned.
-	check: ({ pruned, forced, excluded, warned }) =>
+	// Control dropped mitt; force brought it back (copied, versioned); the later rule dropped it again.
+	check: ({ pruned, forced, excluded }) =>
 		pruned === null &&
 		typeof forced === "string" &&
 		forced.includes("mitt@") &&
-		excluded === null &&
-		warned === true,
+		excluded === null,
 	expect: true,
 };
