@@ -1,105 +1,104 @@
-import { resolveDefaults } from "../../src/config.js";
-import builtInModes from "../../src/modes.js";
+import { getConfig } from "../../src/config.js";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+// getConfig() reads the config file off disk, so these are written out rather than passed in
+let dir = mkdtempSync(join(tmpdir(), "nudeps-modes-"));
+function configFile (name, source) {
+	let file = join(dir, name);
+	writeFileSync(file, source);
+	return file;
+}
+
+const EMPTY = configFile("empty.js", `export default {};`);
+const STAGING = configFile(
+	"staging.js",
+	`export default {
+		overrides: [
+			{ mode: ["prod", "staging"], prune: true },
+			{ mode: "staging", terse: false },
+		],
+	};`,
+);
+const EXPLICIT = configFile(
+	"explicit.js",
+	`export default { terse: false, overrides: [{ mode: "loud", terse: true }] };`,
+);
+const UNCONDITIONAL = configFile(
+	"unconditional.js",
+	`export default { terse: false, overrides: [{ terse: true }] };`,
+);
 
 export default {
-	name: "resolveDefaults",
-	data: { modes: builtInModes },
-	run (name) {
-		return resolveDefaults(name, this.data.modes);
+	name: "Modes as rules: cascade and origin order",
+	run: getConfig,
+	// Only the options each test is about; the rest of the resolved config is irrelevant here
+	check: { subset: true, deep: true },
+	afterAll () {
+		rmSync(dir, { recursive: true, force: true });
 	},
 	tests: [
 		{
-			name: "built-in modes",
-			tests: [
-				{
-					arg: "dev",
-					expect: { symlink: true },
-				},
-				{
-					arg: "prod",
-					expect: { symlink: false, prune: true, terse: true },
-				},
-			],
+			name: "built-in dev preset",
+			arg: { config: EMPTY, mode: "dev" },
+			expect: { symlink: true },
 		},
 		{
-			name: "custom mode inheriting from prod",
-			data: {
-				modes: {
-					...builtInModes,
-					staging: { mode: "prod", prune: false },
-				},
+			name: "built-in prod preset",
+			arg: { config: EMPTY, mode: "prod" },
+			expect: { symlink: false, prune: true, terse: true },
+		},
+		{
+			name: "no mode: presets stay dormant",
+			arg: { config: EMPTY },
+			expect: { prune: false, terse: false },
+		},
+		{
+			name: "mode group (any-of matcher) replaces mode-extends",
+			arg: { config: STAGING, mode: "staging" },
+			expect: { prune: true, terse: false },
+		},
+		{
+			name: "group rule alone applies to the other listed mode",
+			arg: { config: STAGING, mode: "prod" },
+			expect: { prune: true, terse: true },
+		},
+		{
+			name: "explicit top-level value beats a built-in preset",
+			async run (options) {
+				let config = await getConfig(options);
+				return config.terse;
 			},
-			tests: [
-				{
-					arg: "staging",
-					expect: { symlink: false, prune: false, terse: true },
-				},
-			],
+			arg: { config: EXPLICIT, mode: "prod" },
+			expect: false,
 		},
 		{
-			name: "custom mode extending same-named built-in",
-			data: {
-				modes: {
-					...builtInModes,
-					prod: { mode: "prod", prune: false },
-				},
+			name: "a user mode rule beats a top-level value",
+			arg: { config: EXPLICIT, mode: "loud" },
+			expect: { terse: true },
+		},
+		{
+			name: "an unconditional rule beats a top-level value",
+			arg: { config: UNCONDITIONAL },
+			expect: { terse: true },
+		},
+		{
+			name: "unknown active mode warns but still resolves",
+			async run (options) {
+				let warned = "";
+				let original = console.warn;
+				console.warn = msg => (warned += msg);
+				try {
+					await getConfig(options);
+				}
+				finally {
+					console.warn = original;
+				}
+				return warned.includes(`Unknown mode "nonexistent"`);
 			},
-			tests: [
-				{
-					arg: "prod",
-					expect: { symlink: false, prune: false, terse: true },
-				},
-			],
-		},
-		{
-			name: "deep inheritance chain",
-			data: {
-				modes: {
-					base: { a: 1 },
-					mid: { mode: "base", b: 2 },
-					leaf: { mode: "mid", c: 3 },
-				},
-			},
-			tests: [
-				{
-					arg: "leaf",
-					expect: { a: 1, b: 2, c: 3 },
-				},
-			],
-		},
-		{
-			name: "cycle detection",
-			data: {
-				modes: {
-					a: { mode: "b" },
-					b: { mode: "a" },
-				},
-			},
-			tests: [
-				{
-					arg: "a",
-					expect: {},
-				},
-			],
-		},
-		{
-			name: "unknown mode",
-			data: { modes: { dev: { symlink: true } } },
-			tests: [
-				{
-					arg: "nonexistent",
-					expect: {},
-				},
-			],
-		},
-		{
-			name: "undefined mode",
-			tests: [
-				{
-					arg: undefined,
-					expect: {},
-				},
-			],
+			arg: { config: STAGING, mode: "nonexistent" },
+			expect: true,
 		},
 	],
 };

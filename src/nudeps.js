@@ -13,6 +13,7 @@ import { readJSONSync, writeJSONSync, createGitignoredDir } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import { matchesGlob, ensureSymlink } from "./util/fs.js";
 import { stringifyConfig } from "./util/options.js";
+import { applyRules, isPackageRule, includeNames } from "./rules.js";
 import { getTopLevelModules } from "./util.js";
 import Packages from "./util/packages.js";
 import * as hosts from "./hosts.js";
@@ -21,6 +22,7 @@ import nudepsPkg from "../package.json" with { type: "json" };
 
 /**
  * @import Package from "./util/package.js"
+ * @import { NudepsOptions } from "./options.js"
  */
 
 export default class Nudeps {
@@ -43,16 +45,6 @@ export default class Nudeps {
 	constructor ({ config }) {
 		this.config = config;
 		this.oldConfig = readJSONSync(".nudeps/config.json", { optional: true });
-
-		// Warn on contradictory config: a package both forced and excluded. exclude wins (forced
-		// names are filtered out of directDependencies), so the force entry would silently do nothing.
-		let excluded = new Set(this.config.exclude ?? []);
-		let forcedAndExcluded = this.config.forceDependencies.filter(name => excluded.has(name));
-		if (forcedAndExcluded.length > 0) {
-			this.warn(
-				`Ignoring forceDependencies also listed in exclude (exclude wins): ${forcedAndExcluded.join(", ")}`,
-			);
-		}
 
 		if (this.config.host) {
 			// Adapters may be factories taking the config (e.g. apache)
@@ -95,8 +87,6 @@ export default class Nudeps {
 		}
 
 		this.toDelete = new Set(this.existingDirs);
-		this.hasIgnoreExceptions = this.config.ignore.some(p => p.include);
-		this.hasDeepGlobs = this.config.ignore.some(p => (p.include ?? p.exclude)?.includes("/"));
 
 		if (this.config.hooks) {
 			this.hooks.add(this.config.hooks);
@@ -123,10 +113,9 @@ export default class Nudeps {
 			var rootInstallError = e;
 		}
 
-		// forceDependencies install even when pruning; the rest of directDependencies only when not.
-		let forced = new Set(this.config.forceDependencies);
+		// include: "force" packages install even when pruning; the rest of directDependencies only when not.
 		let toInstall = this.config.prune
-			? this.directDependencies.filter(name => forced.has(name))
+			? this.directDependencies.filter(name => this.include(name) === "force")
 			: this.directDependencies;
 
 		for (const dep of toInstall) {
@@ -294,22 +283,72 @@ export default class Nudeps {
 		return value;
 	}
 
+	// Rules that constrain which packages they apply to; resolved per package by pkgConfig()
+	get packageRules () {
+		let value = (this.config.overrides ?? []).filter(isPackageRule);
+		Object.defineProperty(this, "packageRules", { value, configurable: true });
+		return value;
+	}
+
+	#pkgConfigs = new Map();
+
+	/**
+	 * The effective config for one package: the global config plus every matching
+	 * package rule, applied in order (later wins, per property; `ignore` appends).
+	 * @param {Package} pkg
+	 * @returns {NudepsOptions}
+	 */
+	pkgConfig (pkg) {
+		let value = this.#pkgConfigs.get(pkg);
+
+		if (!value) {
+			value = applyRules(this.config, this.packageRules, {
+				name: pkg.name,
+				installName: pkg.installName,
+				version: pkg.version,
+				mode: this.config.mode,
+			});
+			this.#pkgConfigs.set(pkg, value);
+		}
+
+		return value;
+	}
+
+	/**
+	 * The effective `include` setting for a bare specifier, before its Package
+	 * necessarily exists (rules can add packages that aren't installed yet).
+	 * @param {string} name
+	 * @returns {boolean | "force" | undefined}
+	 */
+	include (name) {
+		let pkg = this.packages.get(name);
+		return applyRules({}, this.packageRules, {
+			name: pkg?.name ?? name,
+			installName: pkg?.installName ?? name,
+			version: pkg?.version,
+			mode: this.config.mode,
+		}).include;
+	}
+
 	/**
 	 * The specifiers nudeps installs directly (beyond what the root trace pulls in): the host's
-	 * production `dependencies` plus any `additionalDependencies` and `forceDependencies`, minus
-	 * `exclude`d ones. Deduped, so an entry already in `dependencies` is a no-op. This is the full
-	 * (non-pruned) set; `prune` is applied by `installAll`, which installs only the
-	 * `forceDependencies` subset — not here.
+	 * production `dependencies` plus packages rules add (`include: true` / `"force"`), minus
+	 * dropped ones (`include: false`). This is the full (non-pruned) set; `prune` is applied
+	 * by `installAll`, which installs only the `include: "force"` subset — not here.
 	 * @returns {string[]}
 	 */
 	get directDependencies () {
-		let exclude = new Set(this.config.exclude ?? []);
-		let names = new Set([
-			...Object.keys(this.pkg.dependencies ?? {}),
-			...this.config.additionalDependencies,
-			...this.config.forceDependencies,
-		]);
-		return [...names].filter(name => !exclude.has(name));
+		let names = new Set(Object.keys(this.pkg.dependencies ?? {}));
+
+		for (let rule of this.packageRules) {
+			if (rule.include === true || rule.include === "force") {
+				for (let name of includeNames(rule)) {
+					names.add(name);
+				}
+			}
+		}
+
+		return [...names].filter(name => this.include(name) !== false);
 	}
 
 	get packages () {
@@ -321,7 +360,8 @@ export default class Nudeps {
 	get generator () {
 		let generatorOptions = {
 			commonJS: this.config.cjs,
-			combineSubpaths: this.config.combineSubpaths,
+			// The subpaths enum maps onto @jspm/generator's combineSubpaths tri-state
+			combineSubpaths: { split: false, combined: true, both: "both" }[this.config.subpaths],
 			installCache: this.installCache,
 			nudeps: this,
 		};
@@ -335,8 +375,8 @@ export default class Nudeps {
 		let value = new ImportMap(this.generator);
 		value.cleanupScopes();
 
-		if (this.config.overrides) {
-			value.applyOverrides(this.config.overrides);
+		if (this.config.imports) {
+			value.applyOverrides({ imports: this.config.imports });
 		}
 
 		Object.defineProperty(this, "map", { value, configurable: true });
@@ -350,10 +390,10 @@ export default class Nudeps {
 	/**
 	 * The directory served as `/`, which host adapters need to turn file paths into URLs.
 	 * Defaults to the workspace root, which in npm workspaces is typically the deploy root.
-	 * @returns {string} Path relative to cwd (`""` when cwd is itself the publish dir)
+	 * @returns {string} Path relative to cwd (`""` when cwd is itself the web root)
 	 */
-	get publishDir () {
-		return this.config.publishDir ?? this.packages.prefix;
+	get root () {
+		return this.config.root ?? this.packages.prefix;
 	}
 
 	get elapsedTime () {
@@ -373,8 +413,8 @@ export default class Nudeps {
 	}
 
 	/**
-	 * Compute the client_modules output directory for a package.
-	 * All packages go to top-level client_modules.
+	 * Compute the output directory for a package: its effective `dir`
+	 * (rules can relocate individual packages) plus the versioned dir name.
 	 * @param {Package} pkg
 	 * @returns {string}
 	 */
@@ -383,7 +423,7 @@ export default class Nudeps {
 			return this.dir;
 		}
 
-		return [this.dir, pkg.dirName].join("/");
+		return path.normalize([this.pkgConfig(pkg).dir, pkg.dirName].join("/"));
 	}
 
 	/**
@@ -484,12 +524,13 @@ export default class Nudeps {
 	}
 
 	/**
-	 * Resolve alias config into alias paths for a package.
+	 * Resolve a package's effective alias setting into alias paths.
 	 * @param {Package} pkg
-	 * @param {*} [alias] - Alias config; defaults to this.config.alias
 	 * @returns {string[]}
 	 */
-	aliases (pkg, alias = this.config.alias) {
+	aliases (pkg) {
+		let alias = this.pkgConfig(pkg).alias;
+
 		if (!alias) {
 			return [];
 		}
@@ -500,56 +541,26 @@ export default class Nudeps {
 			return root?.version !== pkg.version ? [] : [pkg.installName];
 		}
 
-		if (Array.isArray(alias)) {
-			return alias.flatMap(item => this.aliases(pkg, item));
-		}
-
-		if (typeof alias === "string") {
-			return pkg.name === alias || pkg.installName === alias ? [alias] : [];
-		}
-
-		// Object form: resolve to value via key lookup, then fall through
-		if (typeof alias === "object") {
-			alias = alias[pkg.installName] ?? alias[pkg.name];
-		}
-
-		// Function form (top-level or object value)
-		if (typeof alias === "function") {
-			alias = alias(pkg);
-		}
-
-		return alias == null ? [] : [alias].flat();
+		return [alias].flat();
 	}
 
 	/**
 	 * Whether symlinks should be dereferenced (resolved to real paths) when copying a package.
-	 * @param {string} packageName
-	 * @param {string} version
+	 * @param {Package} pkg
 	 * @returns {boolean}
 	 */
-	dereference (packageName, version) {
-		switch (typeof this.config.preserveSymlinks) {
-			case "boolean":
-				return !this.config.preserveSymlinks;
-			case "function":
-				return !this.config.preserveSymlinks({ packageName, version });
-		}
-
-		if (Array.isArray(this.config.preserveSymlinks)) {
-			// Array of package names
-			return !this.config.preserveSymlinks.includes(packageName);
-		}
-
-		return true;
+	dereference (pkg) {
+		return !this.pkgConfig(pkg).preserveSymlinks;
 	}
 
 	shouldSymlink (pkg) {
-		let { symlink } = this.config;
+		let { symlink } = this.pkgConfig(pkg);
 
 		if (typeof symlink === "boolean") {
 			return symlink;
 		}
 
+		// The built-in default: external packages are symlinked
 		return symlink(pkg);
 	}
 
@@ -558,21 +569,16 @@ export default class Nudeps {
 			return false;
 		}
 
-		let packageName = pkg?.name;
+		let ignore = pkg ? this.pkgConfig(pkg).ignore : this.config.ignore;
 
 		// If we traverse backwards we can stop once we find a pattern that would change the inclusion status
-		for (let i = this.config.ignore.length - 1; i >= 0; i--) {
-			let p = this.config.ignore[i];
-
-			if (p.packageName && !p.packageName.includes(packageName)) {
-				continue;
-			}
-
-			let glob = p.exclude ?? p.include;
+		for (let i = ignore.length - 1; i >= 0; i--) {
+			let p = ignore[i];
+			let glob = p.ignore ?? p.copy;
 			let matches = matchesGlob(filePath, glob);
 
 			if (matches) {
-				if (!p.exclude) {
+				if (!p.ignore) {
 					return false;
 				}
 
@@ -636,6 +642,38 @@ export default class Nudeps {
 				delete map.scopes[scope];
 			}
 		}
+
+		// Rule-scoped imports: keys are the matched package's own specifiers, values are
+		// package-relative paths — resolved against the package's localized directory.
+		// NOTE: emitted as global imports; a rule matching several packages overwrites per spec.
+		for (let rule of this.packageRules) {
+			if (!rule.imports) {
+				continue;
+			}
+
+			for (let pkg of packages) {
+				if (this.pkgConfig(pkg).imports !== rule.imports) {
+					continue;
+				}
+
+				for (let [specifier, target] of Object.entries(rule.imports)) {
+					if (target === undefined) {
+						delete map.imports?.[specifier];
+						continue;
+					}
+
+					let urlFromMap = path.relative(mapDir, this.localPath(pkg, target));
+					urlFromMap = urlFromMap.startsWith(".") ? urlFromMap : "./" + urlFromMap;
+					if (specifier.endsWith("/") && !urlFromMap.endsWith("/")) {
+						// Preserve directory specifiers that require a trailing slash in import maps
+						urlFromMap += "/";
+					}
+					map.imports ??= {};
+					map.imports[specifier] = urlFromMap;
+					toCopy[pkg.path] ??= this.localDir(pkg);
+				}
+			}
+		}
 	}
 
 	async copyPackages () {
@@ -681,11 +719,11 @@ export default class Nudeps {
 			}
 			else {
 				stats.copied++;
-				if (this.config.ignore.some(p => p.exclude)) {
+				if (this.pkgConfig(pkg).ignore.some(p => p.ignore)) {
 					pkg.exportedPaths = await this.getExportedPaths(pkg);
 				}
 				cpSync(from, to, {
-					dereference: this.dereference(pkg.name, pkg.version),
+					dereference: this.dereference(pkg),
 					preserveTimestamps: true,
 					recursive: true,
 					filter: src => {
@@ -706,19 +744,18 @@ export default class Nudeps {
 				});
 			}
 
-			// Create alias symlinks (unversioned paths pointing to versioned directories)
-			if (config.alias) {
-				for (let alias of this.aliases(pkg)) {
-					let aliasPath = path.normalize(config.dir + "/" + alias);
-					let relTarget = path.relative(path.dirname(aliasPath), to);
-					let exists = existingDirs.has(aliasPath);
+			// Create alias symlinks (unversioned paths pointing to versioned directories).
+			// Alias paths are relative to the package's effective dir, so they can escape it.
+			for (let alias of this.aliases(pkg)) {
+				let aliasPath = path.normalize(this.pkgConfig(pkg).dir + "/" + alias);
+				let relTarget = path.relative(path.dirname(aliasPath), to);
+				let exists = existingDirs.has(aliasPath);
 
-					if (exists) {
-						toDelete.delete(aliasPath);
-					}
-
-					this.toAlias[aliasPath] = relTarget;
+				if (exists) {
+					toDelete.delete(aliasPath);
 				}
+
+				this.toAlias[aliasPath] = relTarget;
 			}
 		}
 
