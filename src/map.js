@@ -21,8 +21,13 @@ export class ImportMapGenerator extends Generator {
 	constructor ({ installCache, silent, nudeps, ...generatorOptions } = {}) {
 		let commonJS = generatorOptions.commonJS ?? true;
 
+		// nudeps provides the shim, so an entry point importing it must resolve through the
+		// lockfile — a linked nudeps keeps it out of the project's node_modules (#159).
+		let shim = nudeps?.packages.get("cjs-browser-shim");
+
 		super({
 			defaultProvider: "nodemodules",
+			resolutions: shim ? { "cjs-browser-shim": shim.path } : {},
 			env: ["production", "browser", "module"],
 			flattenScopes: false,
 			combineSubpaths: false,
