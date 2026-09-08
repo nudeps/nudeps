@@ -27,10 +27,7 @@ export class ImportMapGenerator extends Generator {
 			flattenScopes: false,
 			combineSubpaths: false,
 			commonJS: true,
-			// Skip .d.ts files whose presence in wildcard exports causes
-			// JSPM trace failures (jspm/jspm#2717, #122).
-			ignore: specifier =>
-				getNodeBuiltins().includes(specifier) || /\.d\.[cm]?ts(\.map)?$/.test(specifier),
+			ignore: specifier => getNodeBuiltins().includes(specifier),
 			...generatorOptions,
 		});
 
@@ -48,9 +45,8 @@ export class ImportMapGenerator extends Generator {
 
 		// Patch package configs before JSPM resolves them:
 		// 1. Apply community overrides (client-side equivalent of what jspm.io CDN does server-side)
-		// 2. Strip non-runtime export conditions that shadow `default` in wildcards (#126)
+		// 2. Strip non-runtime export conditions JSPM enumerates but won't resolve
 		let pm = this.provider;
-		let { env } = this.traceMap.resolver;
 		pm._getPackageConfig = pm.getPackageConfig;
 		pm.getPackageConfig = async function (pkgUrl) {
 			let pcfg = await pm._getPackageConfig(pkgUrl);
@@ -62,7 +58,7 @@ export class ImportMapGenerator extends Generator {
 			}
 
 			if (pcfg?.exports) {
-				pcfg.exports = stripConditions(pcfg.exports, env);
+				pcfg.exports = stripConditions(pcfg.exports);
 			}
 
 			return pcfg;

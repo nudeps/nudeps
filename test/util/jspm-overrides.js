@@ -2,10 +2,17 @@ import { stripConditions } from "../../src/util/jspm-overrides.js";
 
 export default {
 	name: "stripConditions",
-	run: exports => stripConditions(exports, ["production", "browser", "module", "import"]),
+	run: stripConditions,
 	tests: [
 		{
-			name: "Strips types condition shadowing default (#126)",
+			name: "Empties a subpath exported only under a type condition",
+			description:
+				"Left in, JSPM enumerates the subpath but then refuses to resolve it, aborting the batch and silently dropping the subpaths after it.",
+			arg: { "./types": { import: { types: "./index.d.ts" } } },
+			expect: { "./types": { import: {} } },
+		},
+		{
+			name: "Drops types from nested conditions, keeping the runtime target",
 			arg: {
 				"./src/*": {
 					import: {
@@ -45,12 +52,7 @@ export default {
 			},
 		},
 		{
-			name: "Allowlist mode drops unknown conditions in favor of default",
-			arg: { "./x": { deno: "./d.js", default: "./def.js" } },
-			expect: { "./x": { default: "./def.js" } },
-		},
-		{
-			name: "Blocklist mode keeps unknowns but still drops types/typings",
+			name: "Keeps unknown conditions but still drops types/typings",
 			arg: { "./x": { deno: "./d.js", types: "./d.ts", typings: "./d2.ts" } },
 			expect: { "./x": { deno: "./d.js" } },
 		},
