@@ -115,12 +115,24 @@ export class ImportMapGenerator extends Generator {
 
 		// Not cacheable (root package, symlink, etc.): install on this generator
 		try {
-			return await super.install({
+			let ret = await super.install({
 				alias,
 				target,
 				subpaths: true,
 				...installOptions,
 			});
+
+			// Resolving nothing isn't an error to JSPM, so a package with neither `main` nor
+			// `exports` — no subpaths to enumerate, implicit index.js gone with them — would
+			// vanish silently. Subpath-only packages still report deps, so they don't retry.
+			// Packages with no JS entry at all throw instead, and for them empty was right.
+			if (!noRetry && !ret?.staticDeps?.length) {
+				ret = await super
+					.install({ alias, target, subpaths: false, ...installOptions })
+					.catch(() => ret);
+			}
+
+			return ret;
 		}
 		catch (error) {
 			if (noRetry) {
