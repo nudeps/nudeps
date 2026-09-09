@@ -13,40 +13,30 @@ export { overrides };
 const EXPORT_CONDITIONS_BLACKLIST = ["types", "typings"];
 
 /**
- * Strip export conditions that would shadow `default` in JSPM's wildcard
- * resolution (jspm/jspm#2717). At each object level:
- * - If any sibling is known (in `conditions` or is `default`), drop the unknown
- *   siblings — JSPM has a resolution to pick, the rest get in the way.
- * - Otherwise leave the object alone; we can't tell which condition would resolve.
- *
- * `types`/`typings` are always stripped: they resolve to `.d.ts` files which
- * break JSPM tracing even when they're the only condition.
+ * Strip non-runtime export conditions before JSPM sees them.
+ * A subpath exported *only* under one of these has no runtime resolution,
+ * so JSPM enumerates it but then refuses to resolve it, failing the install.
+ * @see https://github.com/jspm/jspm/issues/2751
  * @param {import("@jspm/generator").ExportsTarget} exports
- * @param {string[]} conditions - Recognized export conditions (JSPM resolver env)
  * @returns {import("@jspm/generator").ExportsTarget}
  */
-export function stripConditions (exports, conditions) {
+export function stripConditions (exports) {
 	if (!exports || typeof exports !== "object") {
 		return exports;
 	}
 
 	if (Array.isArray(exports)) {
 		// Fallback array: strip each alternative
-		return exports.map(item => stripConditions(item, conditions));
+		return exports.map(stripConditions);
 	}
-
-	let hasKnown = Object.keys(exports).some(key => key === "default" || conditions.includes(key));
 
 	let ret = {};
 	for (let key in exports) {
-		if (
-			EXPORT_CONDITIONS_BLACKLIST.includes(key) ||
-			(hasKnown && key !== "default" && !conditions.includes(key))
-		) {
+		if (EXPORT_CONDITIONS_BLACKLIST.includes(key)) {
 			continue;
 		}
 
-		ret[key] = stripConditions(exports[key], conditions);
+		ret[key] = stripConditions(exports[key]);
 	}
 
 	return ret;
