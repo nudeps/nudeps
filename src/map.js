@@ -126,6 +126,8 @@ export class ImportMapGenerator extends Generator {
 			// `exports` — no subpaths to enumerate, implicit index.js gone with them — would
 			// vanish silently. Subpath-only packages still report deps, so they don't retry.
 			// Packages with no JS entry at all throw instead, and for them empty was right.
+			// Not a redo: empty staticDeps means the first pass bailed before tracing anything,
+			// and the retry runs on this same generator, so the resolver's caches carry over.
 			if (!noRetry && !ret?.staticDeps?.length) {
 				ret = await super
 					.install({ alias, target, subpaths: false, ...installOptions })
