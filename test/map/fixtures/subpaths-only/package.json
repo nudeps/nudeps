@@ -1,0 +1,7 @@
+{
+	"name": "subpaths-only",
+	"version": "1.0.0",
+	"exports": {
+		"./foo": "./foo.js"
+	}
+}
