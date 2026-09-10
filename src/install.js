@@ -5,18 +5,19 @@ import * as path from "node:path";
 
 /**
  * Add a command to an npm lifecycle hook, falling back to pre/post variants if the hook is already taken.
+ * @returns {string | undefined} The hook the command ended up in, or `undefined` if all three were taken.
  */
-function addHook (pkg, hook, command) {
+export function addHook (pkg, hook, command) {
 	pkg.scripts ??= {};
 
 	for (let name of [hook, "pre" + hook, "post" + hook]) {
 		if (pkg.scripts[name]?.includes(command)) {
 			// Already there
-			return;
+			return name;
 		}
 		if (!pkg.scripts[name]) {
 			pkg.scripts[name] = command;
-			return;
+			return name;
 		}
 	}
 }
