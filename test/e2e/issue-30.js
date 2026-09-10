@@ -26,7 +26,7 @@ export default {
 					version: "1.0.0",
 					type: "module",
 					main: "index.js",
-					dependencies: { nudeps: `file:${NUDEPS_ROOT}` },
+					devDependencies: { nudeps: `file:${NUDEPS_ROOT}` },
 				}),
 			);
 

@@ -21,8 +21,7 @@ export default {
 					name: "additional-deps-repro",
 					version: "1.0.0",
 					type: "module",
-					dependencies: { nudeps: `file:${NUDEPS_ROOT}` },
-					devDependencies: { mitt: "3.0.1" },
+					devDependencies: { nudeps: `file:${NUDEPS_ROOT}`, mitt: "3.0.1" },
 				}),
 			);
 
