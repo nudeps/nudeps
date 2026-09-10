@@ -133,9 +133,8 @@ export default async function (options) {
 	}
 	nudeps.info(...info);
 
-	// Register as a dependent of our local deps so they can notify us of their changes (always),
-	// then notify our own dependents if our output changed. The mapChanged gate breaks
-	// propagation cycles between mutually-local deps (map converges → no change → stops).
+	// Registration is topology, so it always runs; notifying is a change event, so it does not.
+	// Cycles are terminated inside notify(), not here — this gate only saves needless work.
 	nudeps.registerAsDependent();
 	if (mapChanged) {
 		nudeps.notifyDependents();

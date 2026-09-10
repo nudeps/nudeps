@@ -28,10 +28,8 @@ export default {
 					name: "issue-132-repro",
 					version: "1.0.0",
 					type: "module",
-					dependencies: {
-						"color-elements": "0.0.14",
-						nudeps: `file:${NUDEPS_ROOT}`,
-					},
+					dependencies: { "color-elements": "0.0.14" },
+					devDependencies: { nudeps: `file:${NUDEPS_ROOT}` },
 					overrides: { "colorjs.io": "0.5.2" },
 				}),
 			);
