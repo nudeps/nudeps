@@ -54,6 +54,9 @@ export default async function (options) {
 				rmSync(oldConfig.dir, { recursive: true });
 			}
 			else {
+				// renameSync needs the destination's parent, and a consumer that clears
+				// its output directory before building has just deleted it (#152)
+				mkdirSync(path.dirname(config.dir), { recursive: true });
 				renameSync(oldConfig.dir, config.dir);
 			}
 		}
