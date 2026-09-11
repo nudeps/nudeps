@@ -12,6 +12,12 @@ import nudepsPkg from "../package.json" with { type: "json" };
  */
 
 export class ImportMapGenerator extends Generator {
+	/** Specifier of the package being installed, whose trace failure is fatal (unlike a subpath's). */
+	#mainEntry = null;
+
+	/** Wildcard-expanded subpaths dropped from the map. */
+	#skipped = new Set();
+
 	/**
 	 * @param {object} [options]
 	 * @param {object} [options.installCache] - Per-package output map cache (mutated on miss), or null
@@ -32,8 +38,8 @@ export class ImportMapGenerator extends Generator {
 			flattenScopes: false,
 			combineSubpaths: false,
 			commonJS: true,
-			// Skip .d.ts files whose presence in wildcard exports causes
-			// JSPM trace failures (jspm/jspm#2717, #122).
+			// Keep .d.ts files that wildcard exports expose out of the map — a browser has no
+			// use for them (jspm/jspm#2717, #122). Their trace failures are handled below.
 			ignore: specifier =>
 				getNodeBuiltins().includes(specifier) || /\.d\.[cm]?ts(\.map)?$/.test(specifier),
 			...generatorOptions,
@@ -72,6 +78,32 @@ export class ImportMapGenerator extends Generator {
 
 			return pcfg;
 		};
+
+		// Wildcard expansion is speculative: `"./*": "./*"` exposes files the author never
+		// promised are modules — prose, build scripts importing devDependencies. JSPM traces
+		// each expanded subpath independently, but one throw aborts the whole install, so an
+		// unrelated README.md cost `three` its real `three/addons` export (#160).
+		let tm = this.traceMap;
+		let { visit, extractMap } = tm;
+
+		tm.visit = (specifier, opts, parentUrl, seen) =>
+			// Only install()'s per-subpath calls omit `seen` — recursion and extractMap()'s
+			// re-walk pass it, and must stay strict. A subpath is a plain specifier, so visit()
+			// always resolves it asynchronously; `?.` degrades to the old abort if that changes.
+			seen !== undefined || specifier === this.#mainEntry
+				? visit.call(tm, specifier, opts, parentUrl, seen)
+				: visit.call(tm, specifier, opts, parentUrl)?.catch?.(() => {
+						this.#skipped.add(specifier);
+					});
+
+		// JSPM pins a subpath once its trace resolves, so a skipped one has to be unpinned here
+		// — its trace is incomplete, and extractMap() would rethrow the error we just swallowed.
+		tm.extractMap = (pins, ...rest) =>
+			extractMap.call(
+				tm,
+				pins.filter(pin => !this.#skipped.has(pin)),
+				...rest,
+			);
 	}
 
 	get provider () {
@@ -119,6 +151,8 @@ export class ImportMapGenerator extends Generator {
 		}
 
 		// Not cacheable (root package, symlink, etc.): install on this generator
+		this.#mainEntry = alias;
+		let skippedBefore = this.#skipped.size;
 		try {
 			let ret = await super.install({
 				alias,
@@ -126,6 +160,16 @@ export class ImportMapGenerator extends Generator {
 				subpaths: true,
 				...installOptions,
 			});
+
+			// #skipped is cumulative (extractMap() keeps filtering earlier pins), so report the delta
+			let skipped = [...this.#skipped].slice(skippedBefore);
+			if (skipped.length && !this.silent) {
+				// A `./*` export can expose hundreds of files, so name only a few
+				let rest = skipped.splice(3);
+				console.warn(
+					`[nudeps] Skipped untraceable subpaths in ${alias}: ${skipped.join(", ")}${rest.length ? `, +${rest.length} more` : ""}.`,
+				);
+			}
 
 			// Resolving nothing isn't an error to JSPM, so a package with neither `main` nor
 			// `exports` — no subpaths to enumerate, implicit index.js gone with them — would
