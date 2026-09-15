@@ -35,7 +35,14 @@ export default async function () {
 		pkg.type ??= "module";
 	}
 
-	let command = "npx nudeps";
+	let command = "nudeps";
+
+	// Hooks used to run `npx nudeps`, whose extra process replaces the lifecycle variables nudeps
+	// reads to detect a mid-install run (#171). `npm run` already puts node_modules/.bin on PATH.
+	for (let [name, script] of Object.entries(pkg.scripts ?? {})) {
+		pkg.scripts[name] = script.replace(/^npx nudeps\b/, command);
+	}
+
 	addHook(pkg, "dependencies", command);
 	addHook(pkg, "prepare", command);
 
