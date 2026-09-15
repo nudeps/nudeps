@@ -24,7 +24,7 @@ Copies npm packages to a local output directory, generates an import map mapping
 
 ## Lifecycle
 
-`npx nudeps install` (one-time setup) adds two npm hooks to package.json:
+`npx nudeps install` (one-time setup) adds two npm hooks to package.json, both running `nudeps` (the bin npm puts on PATH — an `npx` wrapper there would hide npm's lifecycle variables from nudeps):
 
 - **`dependencies`** — fires after `npm install <pkg>` / `npm uninstall <pkg>`
 - **`prepare`** — fires on bare `npm install` (e.g., after cloning) and before `npm pack`/`npm publish`
@@ -144,7 +144,7 @@ nudeps logs a summary after each run: number of import map entries, time taken, 
 
 ## npm Workspaces
 
-Running nudeps inside a workspace package works: it finds the lockfile at the monorepo root (deps are hoisted there), so hoisted dependencies and sibling workspace packages both resolve — hoisted deps get copied, siblings get symlinked into the package's output dir. `npx nudeps install` in a workspace child automatically adds `dependencies` and `prepare` hooks to the workspace root that delegate to children (`npm run <hook> --if-present --workspaces`), so `npm install` at the root triggers import map generation in each child. On Netlify (and Cloudflare), workspace children write redirect rules to the **root** `_redirects` with the child directory as a path prefix — no per-child `_redirects` is created. This assumes the workspace root is the deploy root; if it isn't, set `root`. Change propagation between sibling workspace packages works like any other local dependency.
+Running nudeps inside a workspace package works: it finds the lockfile at the monorepo root (deps are hoisted there), so hoisted dependencies and sibling workspace packages both resolve — hoisted deps get copied, siblings get symlinked into the package's output dir. `npx nudeps install` in a workspace child automatically adds `dependencies` and `prepare` hooks to the workspace root that delegate to children (`npm run <hook> --if-present --workspaces`), so `npm install` at the root triggers import map generation in each child. npm rewrites the lockfile _after_ running a child's `prepare` hook and only fires `dependencies` on the root, so the root's hook is what regenerates a child's map after a dependency change: nudeps skips the too-early child run (`install`, `ci`, `uninstall`, `link` — the commands that fire the root's hook afterwards — or any run with no root lockfile to resolve against yet) and warns when the root lacks that hook, since nothing would regenerate the map then. On Netlify (and Cloudflare), workspace children write redirect rules to the **root** `_redirects` with the child directory as a path prefix — no per-child `_redirects` is created. This assumes the workspace root is the deploy root; if it isn't, set `root`.
 
 ## Programmatic API
 
@@ -155,7 +155,7 @@ import nudeps from "nudeps";
 let { config } = await nudeps({ prune: true });
 ```
 
-Returns the `Nudeps` instance, whose `config` holds the resolved options (`dir`, `map`, etc.) — read it instead of guessing paths. Returns `null` when the run is skipped (workspace child installing before the lockfile exists).
+Returns the `Nudeps` instance, whose `config` holds the resolved options (`dir`, `map`, etc.) — read it instead of guessing paths. Returns `null` when the run was skipped (a workspace child, mid-install — see npm Workspaces above).
 
 Pass `defaults` to suggest values the user's own config still wins over — useful when a tool (e.g. an SSG) wants its own paths unless the project says otherwise:
 

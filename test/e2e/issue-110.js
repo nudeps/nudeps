@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 // nudeps is already a devDependency, so install() skips `npm install` and only adds the hooks.
 const PKG = { name: "issue-110-repro", type: "module", devDependencies: { nudeps: "*" } };
-const HOOKED = { ...PKG, scripts: { dependencies: "npx nudeps", prepare: "npx nudeps" } };
+const HOOKED = { ...PKG, scripts: { dependencies: "nudeps", prepare: "nudeps" } };
 
 export default {
 	name: "install preserves package.json indentation (issue #110)",
