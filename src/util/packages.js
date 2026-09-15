@@ -326,6 +326,13 @@ export default class Packages {
 		for (let name of packageNames) {
 			let key = (cursor === "." ? "" : cursor + "/") + "node_modules/" + name;
 			pkg = this.#byKey[key] ?? null;
+
+			if (!pkg && this.prefix && cursor === base) {
+				// Undo rebasing for workspace paths, after trying merged child-lockfile keys.
+				key = path.relative(this.prefix, key).split(path.sep).join("/");
+				pkg = this.#byKey[key] ?? null;
+			}
+
 			if (!pkg) {
 				// Global installs don't produce a child lockfile; try hoisted root
 				key = "node_modules/" + name;

@@ -494,6 +494,32 @@ export default {
 				{ arg: "version", expect: "2.0.0" },
 			],
 		},
+		{
+			name: "../../local/lib/node_modules/nanoid/index.js",
+			description:
+				"A linked package inside the workspace root keeps its own dependency instead of falling back to the hoisted version.",
+			packages: new Packages(
+				{
+					packages: {
+						"node_modules/lib": { link: true, resolved: "local/lib" },
+						"local/lib": { name: "lib", version: "1.0.0" },
+						"node_modules/nanoid": { version: "6.0.1" },
+					},
+				},
+				{
+					prefix: "../..",
+					children: {
+						"../../local/lib": {
+							packages: { "node_modules/nanoid": { version: "5.1.5" } },
+						},
+					},
+				},
+			),
+			tests: [
+				{ arg: "version", expect: "5.1.5" },
+				{ arg: "sourcePath", expect: "../../local/lib/node_modules/nanoid" },
+			],
+		},
 		// Chained links: dep nested 2 levels deep through two linked packages.
 		{
 			name: "./node_modules/app/node_modules/@ns/core/node_modules/util-lib/src/index.js",
@@ -519,6 +545,21 @@ export default {
 				{ arg: "path", expect: "../../packages/pkg-a/node_modules/color-name" },
 				{ arg: "sourcePath", expect: "../../packages/pkg-a/node_modules/color-name" },
 				{ arg: "localDir", expect: "./client_modules/color-name@2.1.0" },
+			],
+		},
+		{
+			name: "../../packages/pkg-a/node_modules/nanoid/index.js",
+			description:
+				"Issue #173: a workspace dependency installed only nested must resolve when its source path is parsed again for copying.",
+			packages: new Packages(
+				{ packages: { "packages/pkg-a/node_modules/nanoid": { version: "5.1.5" } } },
+				{ prefix: "../.." },
+			),
+			tests: [
+				{ arg: "name", expect: "nanoid" },
+				{ arg: "version", expect: "5.1.5" },
+				{ arg: "filePath", expect: "index.js" },
+				{ arg: "sourcePath", expect: "../../packages/pkg-a/node_modules/nanoid" },
 			],
 		},
 		// Case G: npm-linked to global store, no child lockfile.
