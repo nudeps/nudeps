@@ -27,19 +27,25 @@ export default class Packages {
 		let dir = cwd;
 
 		while (true) {
-			if (existsSync(path.join(dir, "node_modules", ".package-lock.json"))) {
+			let lockfile = path.join(dir, "node_modules", ".package-lock.json");
+
+			if (existsSync(lockfile)) {
 				// Don't stop — child lockfiles can be stale after workspace hoisting
 				found ??= dir;
 
-				// Only adopt this workspace root if our project is actually a member
-				let workspaces = readJSONSync(path.join(dir, "package.json"), {
-					optional: true,
-				})?.workspaces;
-				if (workspaces) {
-					let member = path.relative(dir, found);
-					if (workspaces.some(workspace => path.matchesGlob(member, workspace))) {
-						return dir;
+				// Only adopt this workspace root if it lists `found` as a member — npm records
+				// members under their own paths, having already applied globs and negations.
+				if (readJSONSync(path.join(dir, "package.json"), { optional: true })?.workspaces) {
+					if (dir !== found) {
+						let member = path.relative(dir, found).split(path.sep).join("/");
+
+						if (readJSONSync(lockfile, { optional: true })?.packages?.[member]) {
+							return dir;
+						}
 					}
+
+					// Stop regardless: in a nested workspace, walking on would reach an outer
+					// root whose lockfile knows nothing about `found`
 					return found;
 				}
 			}
@@ -103,8 +109,9 @@ export default class Packages {
 					}
 				}
 			}
-			else if (prefix) {
-				// Workspace siblings hoist their deps — nothing to pre-load.
+			else if (prefix || !info.resolved.startsWith("..")) {
+				// Workspace members hoist their deps into the root, so there's nothing to pre-load.
+				// `prefix` covers walked-up runs; the path check covers runs at the root itself.
 			}
 			else if (!existsSync(path.join(resolvedDir, "node_modules"))) {
 				warn(
