@@ -35,7 +35,8 @@ export const netlify = {
 			let file = path.join(root, "_redirects");
 			// The publish dir may not exist yet: nudeps can run before the build that fills it
 			fs.mkdirSync(path.resolve(root), { recursive: true });
-			fs.appendFileSync(file, `${redirects}\n`);
+			// Existing rules may not end with a newline, which would merge them with the first generated rule.
+			fs.appendFileSync(file, `\n${redirects}\n`);
 			this.info(`Wrote ${aliasEntries.length} alias redirects to ${file}`);
 		},
 	},
