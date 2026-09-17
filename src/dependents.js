@@ -14,6 +14,8 @@ import { info, warn, error } from "./util/log.js";
  * @import Package from "./util/package.js"
  */
 
+export const DEPENDENTS_FILE = ".nudeps/local-dependents.json";
+
 /**
  * Register this repo as a dependent of each local production dependency, and make sure the dep can
  * notify us back. Runs unconditionally: it records topology, not a change event.
@@ -46,10 +48,9 @@ export function register () {
 			ensurePropagates(dep);
 		}
 
-		let depNudepsDir = path.join(dep.resolvedPath, ".nudeps");
-		createGitignoredDir(depNudepsDir);
+		createGitignoredDir(path.join(dep.resolvedPath, ".nudeps"));
 
-		let dependentsFile = path.join(depNudepsDir, "local-dependents.json");
+		let dependentsFile = path.join(dep.resolvedPath, DEPENDENTS_FILE);
 		let dependents = readJSONSync(dependentsFile, { optional: true }) ?? [];
 		let relPath = path.relative(dep.resolvedPath, ".");
 
@@ -115,7 +116,7 @@ export function notify (changed = true) {
 		return;
 	}
 
-	let dependents = readJSONSync(".nudeps/local-dependents.json", { optional: true });
+	let dependents = readJSONSync(DEPENDENTS_FILE, { optional: true });
 	let env = { ...process.env, NUDEPS_PROPAGATED: [...route, self].join(path.delimiter) };
 
 	for (let entry of dependents ?? []) {
