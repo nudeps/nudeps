@@ -116,10 +116,12 @@ export function notify (changed = true) {
 		return;
 	}
 
-	let dependents = readJSONSync(DEPENDENTS_FILE, { optional: true });
+	// Skipped, not removed from the file: a directory that is gone today can be back tomorrow, and
+	// forgetting it breaks propagation silently — worse than one stat per run (#163).
+	let dependents = readJSONSync(DEPENDENTS_FILE, { optional: true })?.filter(existsSync) ?? [];
 	let env = { ...process.env, NUDEPS_PROPAGATED: [...route, self].join(path.delimiter) };
 
-	for (let entry of dependents ?? []) {
+	for (let entry of dependents) {
 		info(`Propagating to dependent: ${entry}`);
 
 		try {
