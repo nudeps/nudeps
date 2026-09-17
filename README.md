@@ -69,7 +69,7 @@ Try it out in the [demos repository](https://github.com/nudeps/nudeps-demos), or
 
 Nudeps ships with a [`SKILL.md`](SKILL.md) — a comprehensive reference that teaches AI coding agents how to work with nudeps correctly (lifecycle hooks, generated artifacts, CJS handling, common mistakes, etc.).
 
-The easiest way to install it is via the [`skills`](https://github.com/nicepkg/skills) CLI, which supports 45+ agents including Claude Code, Cursor, and Copilot:
+The easiest way to install it is via the [`skills`](https://github.com/vercel-labs/skills) CLI, which supports Claude Code, Cursor, Copilot and many more agents:
 
 ```bash
 npx skills add nudeps/nudeps

@@ -25,7 +25,7 @@ import * as hosts from "./hosts.js";
  * none = unconditional), and the remaining keys are option values to override.
  * Package-matched rules may set only package-scoped options (`dir`, `symlink`,
  * `preserveSymlinks`, `alias`, `ignore`, `imports`, `cjs`) plus `include`;
- * mode-only and unconditional rules may set any option.
+ * mode-only and unconditional rules may set any option except `mode`, `config`, `init` and `overrides`.
  * @typedef {object} OverrideRule
  * @property {Matcher} [name] - Package name to match.
  * @property {Matcher} [installName] - Install name (the key in `dependencies`) to match.
@@ -67,7 +67,7 @@ import * as hosts from "./hosts.js";
  * map's `imports`; values are paths relative to the map or full URLs, and `undefined` deletes an entry.
  * Inside a package-matched rule, values are paths relative to that package instead.
  * @property {Array<string | IgnorePattern>} [ignore] - Files to skip when copying packages; globs are
- * package-relative. Adds to the defaults (readmes, dotfiles, package and lockfiles) rather than replacing them —
+ * package-relative. Adds to the defaults (dotfiles and lockfiles) rather than replacing them —
  * a later `{ copy }` pattern reverses an earlier ignore, including the defaults.
  * @property {Record<string, Omit<OverrideRule, "name" | "installName">> | OverrideRule[]} [overrides] - Conditional
  * config overrides. The dictionary form keys are single exact names (matched against name or install name);
