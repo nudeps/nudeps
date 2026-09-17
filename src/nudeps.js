@@ -226,10 +226,11 @@ export default class Nudeps {
 
 	/**
 	 * Trigger the `dependencies` npm hook in every repo that depends on this one locally, so they
-	 * regenerate against our updated output. Best called only when the map actually changed.
+	 * regenerate against our updated output.
+	 * @param {boolean} mapChanged Whether this run rewrote the import map.
 	 */
-	notifyDependents () {
-		dependents.notify();
+	notifyDependents (mapChanged) {
+		dependents.notify(mapChanged);
 	}
 
 	get pkg () {

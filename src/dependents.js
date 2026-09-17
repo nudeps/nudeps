@@ -96,8 +96,9 @@ function ensurePropagates (dep) {
 /**
  * Trigger the `dependencies` npm hook in every repo that depends on this one locally, so they
  * regenerate against our updated output. Entries are relative to the cwd.
+ * @param {boolean} [changed] Whether our own output changed. Ignored mid-cascade.
  */
-export function notify () {
+export function notify (changed = true) {
 	// The cascade spans processes, so its route travels in the environment. Arriving somewhere we
 	// already came from means a cycle — `a` and `b` depending on each other would notify forever.
 	// Per-route, not global, so a diamond still reaches the shared dependent down both branches.
@@ -105,6 +106,12 @@ export function notify () {
 	let self = realpathSync(".");
 
 	if (route.includes(self)) {
+		return;
+	}
+
+	// Relaying someone else's change: our own map being identical proves nothing about theirs,
+	// so only a run we started ourselves may stop on it.
+	if (!changed && route.length === 0) {
 		return;
 	}
 

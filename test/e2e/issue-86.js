@@ -64,8 +64,9 @@ const cli = (command, cwd) =>
  * A three-link chain: `app` → `lib` → `util`, where only `app` has nudeps. Lea's example in #86 is
  * "a library with no frontend", and such a library can have local dependencies of its own — so the
  * light path has to track upstream as well as notify downstream, or the chain dies at `lib`.
+ * `libRunsNudeps` gives the middle link nudeps of its own, so the chain mixes both paths.
  */
-function setupChain () {
+function setupChain (libRunsNudeps) {
 	let dir = mkdtempSync(join(tmpdir(), "nudeps-issue-86-chain-"));
 	let [app, lib, util] = ["app", "lib", "util"].map(name => {
 		let repo = join(dir, name);
@@ -92,7 +93,13 @@ function setupChain () {
 		);
 
 	pkg(util, {});
-	pkg(lib, { dependencies: { "util-chain": "file:../util" } });
+	pkg(lib, {
+		dependencies: { "util-chain": "file:../util" },
+		...(libRunsNudeps && {
+			devDependencies: { nudeps: `file:${NUDEPS_ROOT}` },
+			scripts: { dependencies: "npx nudeps" },
+		}),
+	});
 	pkg(app, {
 		dependencies: { "lib-chain": "file:../lib" },
 		devDependencies: { nudeps: `file:${NUDEPS_ROOT}` },
@@ -299,6 +306,30 @@ export default {
 				}
 			},
 			expect: true,
+		},
+		{
+			// A dep that already runs nudeps notifies through the full path, so it needs no second
+			// command. Relaying is also why the full path cannot stop on its own unchanged map:
+			// `lib` sits between an unchanged map and a `util` that did change.
+			name: "A dep running nudeps relays the chain without a second command",
+			run () {
+				let { dir, app, lib, util } = setupChain(true);
+				let map = join(app, "importmap.js");
+
+				try {
+					rmSync(map);
+					cli("dependents", util);
+
+					return {
+						libHook: JSON.parse(readScripts(lib)).scripts.dependencies,
+						appRegenerated: existsSync(map),
+					};
+				}
+				finally {
+					rmSync(dir, { recursive: true, force: true });
+				}
+			},
+			expect: { libHook: "npx nudeps", appRegenerated: true },
 		},
 		{
 			// Cycle termination used to be a side effect of the `mapChanged` gate in the full path.

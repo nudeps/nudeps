@@ -120,8 +120,7 @@ export default async function (options) {
 		rmSync(oldConfig.map);
 	}
 
-	// Detect whether the map actually changed (used to skip propagation on no-ops,
-	// which also naturally breaks cycles between mutually-local deps).
+	// Detect whether the map actually changed (used to skip propagation on no-ops).
 	const { map, stats } = nudeps;
 	let mapContent = map.toJS({ module: config.module, terse: config.terse });
 	let existingMap = existsSync(config.map) ? readFileSync(config.map, "utf8") : null;
@@ -161,12 +160,8 @@ export default async function (options) {
 	}
 	nudeps.info(...info);
 
-	// Registration is topology, so it always runs; notifying is a change event, so it does not.
-	// Cycles are terminated inside notify(), not here — this gate only saves needless work.
 	nudeps.registerAsDependent();
-	if (mapChanged) {
-		nudeps.notifyDependents();
-	}
+	nudeps.notifyDependents(mapChanged);
 
 	return nudeps;
 }
