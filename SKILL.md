@@ -58,25 +58,25 @@ import { someFunction } from "some-package";
 
 Config file uses ES module syntax: `export default { ... }`. Unknown or invalid options throw with a pointed error (typos get a suggestion; pre-rename options name their replacement).
 
-| Option             | Default            | Description                                                                                                                                                                                          |
-| ------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dir`              | `"client_modules"` | Output directory for copied packages. Per-package overridable                                                                                                                                        |
-| `map`              | `"importmap.js"`   | Import map injection script path                                                                                                                                                                     |
-| `root`             | Workspace root     | Directory the host serves as `/`. Set it when `dir` lives inside a build output directory (e.g. an SSG's `dist/`), so hosts that need redirects write them there with correct URLs                   |
-| `host`             | Auto-detected      | Deploy host adapter: `"netlify"`, `"vercel"`, `"cloudflare"`, `"gitHubPages"`                                                                                                                        |
-| `mode`             | —                  | Active mode, tested by rules with `mode` matchers. Built-in presets: `"dev"` (symlink) and `"prod"` (no symlink + prune + terse)                                                                     |
-| `prune`            | `false`            | Subset import map to specifiers the entry points use, plus `include: "force"` packages                                                                                                               |
-| `terse`            | `false`            | Lightly minify the map script                                                                                                                                                                        |
-| `module`           | `false`            | Emit the map script for `type="module"` loading (reduces browser support)                                                                                                                            |
-| `cjs`              | `true`             | Include CJS shim for CommonJS packages. Per-package overridable                                                                                                                                      |
-| `subpaths`         | `"split"`          | `"split"` keeps every used subpath mapping explicit; `"combined"` collapses within scopes; `"both"` also collapses top-level                                                                         |
-| `symlink`          | External pkgs only | Symlink packages into `dir` instead of copying                                                                                                                                                       |
-| `preserveSymlinks` | `false`            | Keep symlinks inside a copied package instead of resolving them                                                                                                                                      |
-| `alias`            | `true`             | Unversioned symlink per package for stable asset URLs (CSS, images): `<link href="[dir]/open-props/style.css">`. A string is a custom path relative to the package's `dir` (may escape it: `"../x"`) |
-| `imports`          | —                  | Import map entries merged into the generated map (`{ specifier: path }`, path relative to the map file; `undefined` deletes). In a package rule, paths are package-relative                          |
-| `ignore`           | Readmes, dotfiles… | File globs (package-relative) to skip when copying. Entries: `"glob"`, `{ ignore: glob }`, or `{ copy: glob }` (reverses earlier ignores, including the defaults). Last match wins                   |
-| `overrides`        | —                  | Conditional config rules — see below                                                                                                                                                                 |
-| `hooks`            | —                  | Object of lifecycle hook callbacks (`constructed`, `create-aliases-start`, `create-aliases-after-external`, `create-aliases-end`). See [blissful-hooks](https://github.com/LeaVerou/blissful-hooks)  |
+| Option             | Default             | Description                                                                                                                                                                                          |
+| ------------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dir`              | `"client_modules"`  | Output directory for copied packages. Per-package overridable                                                                                                                                        |
+| `map`              | `"importmap.js"`    | Import map injection script path                                                                                                                                                                     |
+| `root`             | Workspace root      | Directory the host serves as `/`. Set it when `dir` lives inside a build output directory (e.g. an SSG's `dist/`), so hosts that need redirects write them there with correct URLs                   |
+| `host`             | Auto-detected       | Deploy host adapter: `"netlify"`, `"vercel"`, `"cloudflare"`, `"gitHubPages"`                                                                                                                        |
+| `mode`             | —                   | Active mode, tested by rules with `mode` matchers. Built-in presets: `"dev"` (symlink) and `"prod"` (no symlink + prune + terse)                                                                     |
+| `prune`            | `false`             | Subset import map to specifiers the entry points use, plus `include: "force"` packages                                                                                                               |
+| `terse`            | `false`             | Lightly minify the map script                                                                                                                                                                        |
+| `module`           | `false`             | Emit the map script for `type="module"` loading (reduces browser support)                                                                                                                            |
+| `cjs`              | `true`              | Include CJS shim for CommonJS packages. Per-package overridable                                                                                                                                      |
+| `subpaths`         | `"split"`           | `"split"` keeps every used subpath mapping explicit; `"combined"` collapses within scopes; `"both"` also collapses top-level                                                                         |
+| `symlink`          | External pkgs only  | Symlink packages into `dir` instead of copying                                                                                                                                                       |
+| `preserveSymlinks` | `false`             | Keep symlinks inside a copied package instead of resolving them                                                                                                                                      |
+| `alias`            | `true`              | Unversioned symlink per package for stable asset URLs (CSS, images): `<link href="[dir]/open-props/style.css">`. A string is a custom path relative to the package's `dir` (may escape it: `"../x"`) |
+| `imports`          | —                   | Import map entries merged into the generated map (`{ specifier: path }`, path relative to the map file; `undefined` deletes). In a package rule, paths are package-relative                          |
+| `ignore`           | Dotfiles, lockfiles | File globs (package-relative) to skip when copying. Entries: `"glob"`, `{ ignore: glob }`, or `{ copy: glob }` (reverses earlier ignores, including the defaults). Last match wins                   |
+| `overrides`        | —                   | Conditional config rules — see below                                                                                                                                                                 |
+| `hooks`            | —                   | Object of lifecycle hook callbacks (`constructed`, `create-aliases-start`, `create-aliases-after-external`, `create-aliases-end`). See [blissful-hooks](https://github.com/LeaVerou/blissful-hooks)  |
 
 ### Conditional overrides
 
@@ -110,10 +110,10 @@ export default {
 
 Semantics agents must know:
 
-- **Cascade**: all matching rules apply in order, later wins, merged per property. Origin order: option defaults < built-in mode rules < top-level config < user rules < CLI/programmatic args. Rule layers concatenate (a tool's programmatic rules compose with the config file's).
+- **Cascade**: all matching rules apply in order, later wins, merged per property. Origin order: option defaults < programmatic `defaults` < built-in mode rules < top-level config < user rules < CLI/programmatic args. Rule layers concatenate (a tool's programmatic rules compose with the config file's).
 - **`include: false` does not guarantee absence** — the package still lands in the map if code actively imports it.
 - `include: true`/`"force"` need exact-name matchers (you can't install a regex); `include: false` accepts patterns.
-- Package-matched rules may only set package-scoped options (`dir`, `symlink`, `preserveSymlinks`, `alias`, `ignore`, `imports`, `cjs`, `include`); mode-only/unconditional rules may set anything.
+- Package-matched rules may only set package-scoped options (`dir`, `symlink`, `preserveSymlinks`, `alias`, `ignore`, `imports`, `cjs`, `include`); mode-only/unconditional rules may set any option except `mode`, `config`, `init` and `overrides`, which decide what runs before rules exist.
 
 Full option reference: https://nudeps.dev/config/ · Troubleshooting: https://nudeps.dev/troubleshooting/
 
@@ -169,4 +169,4 @@ await nudeps({ defaults: { dir: "dist/client_modules", root: "dist" } });
 - **Import map file** (`map` option) — auto-generated injection script
 - **`.nudeps/`** — cache directory
 
-All three contain `.gitignore` files preventing accidental commits. Add top-level ignores (using actual configured `dir` and `map` values) to hide them from your IDE.
+The two directories contain `.gitignore` files preventing accidental commits; the import map file does not. Add top-level ignores (using actual configured `dir` and `map` values) to hide them from your IDE.
