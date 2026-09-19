@@ -140,7 +140,7 @@ nudeps logs a summary after each run: number of import map entries, time taken, 
 
 ## Local Dependencies
 
-`npm install ../other-repo` works — nudeps symlinks local packages by default instead of copying. If the local dep doesn't have nudeps installed, a warning is printed — run `npx nudeps install` there too. When the local dependency's import map changes, nudeps automatically propagates to dependents.
+`npm install ../other-repo` works — nudeps symlinks local packages by default instead of copying. The local dep needs no nudeps of its own: nudeps adds `"dependencies": "npx nudeps dependents"` to its `package.json` so it can notify its dependents (a dep already running `npx nudeps` is left alone). `npx nudeps dependents` also registers the dep with _its_ own local deps, so chains (`app` → `lib` → `util`) work without nudeps at any intermediate link; cycles stop rather than loop.
 
 ## npm Workspaces
 

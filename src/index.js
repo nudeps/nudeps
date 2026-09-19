@@ -4,10 +4,11 @@
 import * as path from "node:path";
 import { getConfig } from "./config.js";
 import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import { createGitignoredDir, readJSONSync } from "./util.js";
+import { createGitignoredDir, readJSONSync, writeJSONSync } from "./util.js";
 import { stringifyConfig } from "./util/options.js";
 import Nudeps from "./nudeps.js";
 import Packages from "./util/packages.js";
+import * as dependents from "./dependents.js";
 
 /**
  * @import { NudepsOptions } from "./options.js"
@@ -63,15 +64,21 @@ export default async function (options) {
 	let oldConfig = nudeps.oldConfig;
 
 	let cacheExists = existsSync(".nudeps");
+	let localDependents;
 	if (cacheExists && config.init) {
-		// Note: this also clears local-dependents.json. Dependents will
-		// re-register themselves the next time they run nudeps.
+		// Nothing re-registers a dependent except that dependent running nudeps itself, so losing
+		// the list here would stop propagation with nothing to signal it (#164).
+		localDependents = readJSONSync(dependents.DEPENDENTS_FILE, { optional: true });
 		rmSync(".nudeps", { recursive: true });
 		cacheExists = false;
 	}
 
 	if (!cacheExists) {
 		createGitignoredDir(".nudeps");
+
+		if (localDependents) {
+			writeJSONSync(dependents.DEPENDENTS_FILE, localDependents);
+		}
 	}
 	else if (oldConfig) {
 		if (config.dir !== oldConfig.dir && existsSync(oldConfig.dir)) {
@@ -120,8 +127,7 @@ export default async function (options) {
 		rmSync(oldConfig.map);
 	}
 
-	// Detect whether the map actually changed (used to skip propagation on no-ops,
-	// which also naturally breaks cycles between mutually-local deps).
+	// Detect whether the map actually changed (used to skip propagation on no-ops).
 	const { map, stats } = nudeps;
 	let mapContent = map.toJS({ module: config.module, terse: config.terse });
 	let existingMap = existsSync(config.map) ? readFileSync(config.map, "utf8") : null;
@@ -161,13 +167,8 @@ export default async function (options) {
 	}
 	nudeps.info(...info);
 
-	// Register as a dependent of our local deps so they can notify us of their changes (always),
-	// then notify our own dependents if our output changed. The mapChanged gate breaks
-	// propagation cycles between mutually-local deps (map converges → no change → stops).
 	nudeps.registerAsDependent();
-	if (mapChanged) {
-		nudeps.notifyDependents();
-	}
+	nudeps.notifyDependents(mapChanged);
 
 	return nudeps;
 }
