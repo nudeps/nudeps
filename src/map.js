@@ -61,7 +61,7 @@ export class ImportMapGenerator extends Generator {
 		// 1. Apply community overrides (client-side equivalent of what jspm.io CDN does server-side)
 		// 2. Strip non-runtime export conditions that shadow `default` in wildcards (#126)
 		let pm = this.provider;
-		let { env } = this.traceMap.resolver;
+		let { env, cjsEnv } = this.traceMap.resolver;
 		pm._getPackageConfig = pm.getPackageConfig;
 		pm.getPackageConfig = async function (pkgUrl) {
 			let pcfg = await pm._getPackageConfig(pkgUrl);
@@ -73,7 +73,7 @@ export class ImportMapGenerator extends Generator {
 			}
 
 			if (pcfg?.exports) {
-				pcfg.exports = stripConditions(pcfg.exports, env);
+				pcfg.exports = stripConditions(pcfg.exports, [...env, ...cjsEnv]);
 			}
 
 			return pcfg;

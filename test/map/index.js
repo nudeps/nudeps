@@ -1,4 +1,4 @@
-import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Packages from "../../src/util/packages.js";
@@ -75,6 +75,47 @@ export default {
 				}
 			},
 			expect: ["cjs-browser-shim", "shim-repro"],
+		},
+		{
+			name: "Resolves a `require()` of `{ import, require }` exports to the `require` target",
+			description:
+				"Stripping conditions against the ESM env alone dropped `require`, leaving `require()` nothing to resolve (#179).",
+			async run () {
+				let { ImportMapGenerator, ImportMap } = await import("../../src/map.js");
+				let dir = mkdtempSync(join(tmpdir(), "nudeps-require-"));
+				let dual = join(dir, "node_modules/dual-dep");
+
+				try {
+					mkdirSync(dual, { recursive: true });
+					writeFileSync(
+						join(dual, "package.json"),
+						JSON.stringify({
+							name: "dual-dep",
+							type: "module",
+							exports: { import: "./index.js", require: "./index.cjs" },
+						}),
+					);
+					writeFileSync(join(dual, "index.js"), "export default 1;\n");
+					writeFileSync(join(dual, "index.cjs"), "module.exports = 1;\n");
+					writeFileSync(
+						join(dir, "package.json"),
+						JSON.stringify({ name: "require-repro", main: "index.js" }),
+					);
+					writeFileSync(join(dir, "index.js"), `require("dual-dep");\n`);
+
+					let gen = new ImportMapGenerator();
+					await gen.install("require-repro", dir, { noRetry: true });
+
+					let { url } = [...new ImportMap(gen)].find(
+						entry => entry.specifier === "dual-dep",
+					);
+					return url.split("/").at(-1);
+				}
+				finally {
+					rmSync(dir, { recursive: true, force: true });
+				}
+			},
+			expect: "index.cjs",
 		},
 	],
 };
