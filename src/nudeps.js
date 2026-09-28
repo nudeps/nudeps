@@ -712,14 +712,15 @@ export default class Nudeps {
 		}
 
 		for (let dir of toDelete) {
-			if (existsSync(dir)) {
-				stats.deleted++;
-				rmSync(dir, { recursive: true });
-			}
+			stats.deleted++;
+			rmSync(dir, { recursive: true, force: true });
 
 			let parentDir = dir.split("/").slice(0, -1).join("/");
 
-			if (parentDir !== config.dir) {
+			// Only a `@scope` folder is ours to remove.
+			// An external alias's parent belongs to the project (e.g. `""` for the project root).
+			// NOTE: a folder nudeps created for an external alias (e.g. `../vendor/lib`) is left behind when empty.
+			if (parentDir.startsWith(config.dir + "/")) {
 				toDeleteIfEmpty.add(parentDir);
 				continue;
 			}
