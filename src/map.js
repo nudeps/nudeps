@@ -5,6 +5,7 @@ import { Generator } from "@jspm/generator";
 
 import { deepAssign, getNodeBuiltins } from "./util.js";
 import { findOverride, stripConditions } from "./util/jspm-overrides.js";
+import * as log from "./util/log.js";
 import nudepsPkg from "../package.json" with { type: "json" };
 
 /**
@@ -166,8 +167,8 @@ export class ImportMapGenerator extends Generator {
 			if (skipped.length && !this.silent) {
 				// A `./*` export can expose hundreds of files, so name only a few
 				let rest = skipped.splice(3);
-				console.warn(
-					`[nudeps] Skipped untraceable subpaths in ${alias}: ${skipped.join(", ")}${rest.length ? `, +${rest.length} more` : ""}.`,
+				log.warn(
+					`Skipped untraceable subpaths in ${alias}: ${skipped.join(", ")}${rest.length ? `, +${rest.length} more` : ""}.`,
 				);
 			}
 
@@ -197,7 +198,7 @@ export class ImportMapGenerator extends Generator {
 					subpaths: false,
 					...installOptions,
 				});
-				console.warn(`[nudeps] Failed to trace subpaths for ${alias}: ${error.message}.`);
+				log.warn(`Failed to trace subpaths for ${alias}: ${error.message}.`);
 				return ret;
 			}
 			catch (retryError) {

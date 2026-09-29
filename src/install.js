@@ -1,4 +1,5 @@
 import { readJSONSync, writeJSONSync, detectIndent } from "./util.js";
+import * as log from "./util/log.js";
 import Packages from "./util/packages.js";
 import { execSync } from "node:child_process";
 import * as path from "node:path";
@@ -28,7 +29,7 @@ export default async function () {
 	// Install nudeps as a devDependency if not already present
 	if (!pkg?.devDependencies?.nudeps && !pkg?.dependencies?.nudeps) {
 		let command = "npm install nudeps -D";
-		console.info("Nudeps not found, installing via", command, "...");
+		log.info("Nudeps not found, installing via", command, "...");
 		execSync(command, { stdio: "inherit" });
 
 		// Re-read package.json

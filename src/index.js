@@ -2,13 +2,13 @@
  * Main entry point
  */
 import * as path from "node:path";
-import { getConfig } from "./config.js";
-import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import { createGitignoredDir, readJSONSync, writeJSONSync } from "./util.js";
-import { stringifyConfig } from "./util/options.js";
+import { existsSync } from "node:fs";
+import { readJSONSync } from "./util.js";
 import Nudeps from "./nudeps.js";
 import Packages from "./util/packages.js";
-import * as dependents from "./dependents.js";
+import * as log from "./util/log.js";
+
+export { Nudeps };
 
 /**
  * @import { NudepsOptions } from "./options.js"
@@ -41,8 +41,8 @@ export default async function (options) {
 			rootPkg?.workspaces &&
 			!variants.some(name => rootPkg.scripts?.[name]?.includes(delegates))
 		) {
-			console.warn(
-				`[nudeps] The workspace root has no \`dependencies\` hook, so its children's import maps go stale on every install. Run \`npx nudeps install\` here to add it to ${path.join(root, "package.json")}.`,
+			log.warn(
+				`The workspace root has no \`dependencies\` hook, so its children's import maps go stale on every install. Run \`npx nudeps install\` here to add it to ${path.join(root, "package.json")}.`,
 			);
 		}
 
@@ -52,123 +52,15 @@ export default async function (options) {
 			REIFY_COMMANDS.includes(process.env.npm_command) ||
 			!existsSync(path.join(root, "node_modules", ".package-lock.json"))
 		) {
-			console.info(
-				"[nudeps] Skipping import map generation: npm hasn't finished updating the lockfile this package resolves against. If this is not a workspace, please run Nudeps from the package root.",
+			log.info(
+				"Skipping import map generation: npm hasn't finished updating the lockfile this package resolves against. If this is not a workspace, please run Nudeps from the package root.",
 			);
 			return null;
 		}
 	}
 
-	let config = await getConfig(options);
-	let nudeps = new Nudeps({ config });
-	let oldConfig = nudeps.oldConfig;
-
-	let cacheExists = existsSync(".nudeps");
-	let localDependents;
-	if (cacheExists && config.init) {
-		// Nothing re-registers a dependent except that dependent running nudeps itself, so losing
-		// the list here would stop propagation with nothing to signal it (#164).
-		localDependents = readJSONSync(dependents.DEPENDENTS_FILE, { optional: true });
-		rmSync(".nudeps", { recursive: true });
-		cacheExists = false;
-	}
-
-	if (!cacheExists) {
-		createGitignoredDir(".nudeps");
-
-		if (localDependents) {
-			writeJSONSync(dependents.DEPENDENTS_FILE, localDependents);
-		}
-	}
-	else if (oldConfig) {
-		if (config.dir !== oldConfig.dir && existsSync(oldConfig.dir)) {
-			if (config.init) {
-				rmSync(oldConfig.dir, { recursive: true });
-			}
-			else {
-				// renameSync needs the destination's parent, and a consumer that clears
-				// its output directory before building has just deleted it (#152)
-				mkdirSync(path.dirname(config.dir), { recursive: true });
-				renameSync(oldConfig.dir, config.dir);
-			}
-		}
-	}
-
-	await nudeps.installAll();
-
-	let dirExists = existsSync(config.dir);
-	if (config.init && dirExists) {
-		rmSync(config.dir, { recursive: true });
-		dirExists = false;
-	}
-
-	if (!dirExists) {
-		createGitignoredDir(config.dir);
-	}
-
-	// Rewrite the import map to point at local copies, then materialize those copies in config.dir
-	nudeps.localizeMap();
-
-	// Seed aliased deps the map walk missed (CSS-only packages — #102).
-	// aliases() consults per-package rules, so no global gate here.
-	for (let dep of nudeps.directDependencies) {
-		let pkg = nudeps.packages.get(dep);
-
-		if (pkg && !pkg.parent && nudeps.aliases(pkg).length > 0) {
-			nudeps.toCopy[pkg.path] ??= nudeps.localDir(pkg);
-		}
-	}
-
-	await nudeps.copyPackages();
-
-	// Write import map
-	if (oldConfig && oldConfig.map !== config.map && existsSync(oldConfig.map)) {
-		// Remove old import map
-		rmSync(oldConfig.map);
-	}
-
-	// Detect whether the map actually changed (used to skip propagation on no-ops).
-	const { map, stats } = nudeps;
-	let mapContent = map.toJS({ module: config.module, terse: config.terse });
-	let existingMap = existsSync(config.map) ? readFileSync(config.map, "utf8") : null;
-	let mapChanged = mapContent !== existingMap;
-
-	if (mapChanged) {
-		mkdirSync(path.dirname(config.map), { recursive: true });
-		writeFileSync(config.map, mapContent);
-	}
-
-	// stringifyConfig keeps function values as source text so the cache compare sees them
-	writeFileSync(".nudeps/config.json", stringifyConfig(config) + "\n");
-
-	let info = [];
-	if (stats.copied + stats.deleted + stats.aliased > 0) {
-		let parts = ["copied", "deleted", "aliased"]
-			.filter(p => stats[p] > 0)
-			.map(p => `${stats[p]} ${p}`);
-
-		let msg =
-			parts.length > 2
-				? parts.slice(0, -1).join(", ") + ", and " + parts.at(-1)
-				: parts.join(" and ");
-		info.push(msg + ` in ${config.dir}.`);
-	}
-	let { cacheHits, cacheMisses } = nudeps.generator.stats;
-	let cacheInfo = cacheHits > 0 ? `, ${cacheHits}/${cacheHits + cacheMisses} cached` : "";
-	if (mapChanged) {
-		info.push(
-			`Import map with ${stats.entries} entries generated successfully at ${config.map}. Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms (resolve: ${+stats.resolveTime.toFixed(2)} ms${cacheInfo}).`,
-		);
-	}
-	else {
-		info.push(
-			`Import map unchanged (${stats.entries} entries). Time taken: ${+nudeps.elapsedTime.toFixed(2)} ms (resolve: ${+stats.resolveTime.toFixed(2)} ms${cacheInfo}).`,
-		);
-	}
-	nudeps.info(...info);
-
-	nudeps.registerAsDependent();
-	nudeps.notifyDependents(mapChanged);
+	let nudeps = new Nudeps(options);
+	await nudeps.write();
 
 	return nudeps;
 }

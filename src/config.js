@@ -4,6 +4,7 @@
 
 import { importCwdRelative } from "./util.js";
 import { existsSync } from "node:fs";
+import * as log from "./util/log.js";
 import * as availableOptions from "./options.js";
 import { checkType, suggest } from "./util/options.js";
 import {
@@ -186,6 +187,6 @@ function warnOnUnknownMode (mode, rules) {
 
 	if (!known.has(mode)) {
 		let available = [...builtInModes, ...known].join(", ");
-		console.warn(`Unknown mode "${mode}". Modes referenced by rules: ${available}`);
+		log.warn(`Unknown mode "${mode}". Modes referenced by rules: ${available}`);
 	}
 }

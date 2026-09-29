@@ -88,7 +88,7 @@ export default {
 			async run (options) {
 				let warned = "";
 				let original = console.warn;
-				console.warn = msg => (warned += msg);
+				console.warn = (...args) => (warned += args.join(" "));
 				try {
 					await getConfig(options);
 				}

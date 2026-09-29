@@ -76,7 +76,7 @@ Config file uses ES module syntax: `export default { ... }`. Unknown or invalid 
 | `imports`          | —                   | Import map entries merged into the generated map (`{ specifier: path }`, path relative to the map file; `undefined` deletes). In a package rule, paths are package-relative                          |
 | `ignore`           | Dotfiles, lockfiles | File globs (package-relative) to skip when copying. Entries: `"glob"`, `{ ignore: glob }`, or `{ copy: glob }` (reverses earlier ignores, including the defaults). Last match wins                   |
 | `overrides`        | —                   | Conditional config rules — see below                                                                                                                                                                 |
-| `hooks`            | —                   | Object of lifecycle hook callbacks (`constructed`, `create-aliases-start`, `create-aliases-after-external`, `create-aliases-end`). See [blissful-hooks](https://github.com/LeaVerou/blissful-hooks)  |
+| `hooks`            | —                   | Lifecycle hook callbacks (`prepare-start`, `create-aliases-start`, `create-aliases-after-external`, `create-aliases-end`). See [blissful-hooks](https://github.com/LeaVerou/blissful-hooks)          |
 
 ### Conditional overrides
 
@@ -162,6 +162,23 @@ Pass `defaults` to suggest values the user's own config still wins over — usef
 ```js
 await nudeps({ defaults: { dir: "dist/client_modules", root: "dist" } });
 ```
+
+To act between preparing and writing, use the `Nudeps` class, e.g. to write after a build of your own that fills the output directory.
+
+```js
+import { Nudeps } from "nudeps";
+let nudeps = new Nudeps({ defaults: { dir: "dist/client_modules", root: "dist" } });
+await nudeps.prepare(); // nudeps.config.dir is known here
+await build(); // may clear or fill dist/
+await nudeps.write();
+```
+
+- `prepare()` resolves the config and the import map. It writes nothing outside `.nudeps/`.
+- `write()` copies dependencies and writes the map and host files. It runs `prepare()` first if needed.
+
+Each instance prepares and writes once: calling either method again returns the first call's result, even a failed one. In watch mode, create a new `Nudeps` for each build. It traces dependencies again, so it picks up changes, and the install cache keeps that fast.
+
+Unlike `nudeps()`, the class never skips a run, not even while npm is still installing a workspace. Use it in build scripts, not npm hooks.
 
 ## Generated Artifacts — Do Not Edit
 
