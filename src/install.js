@@ -1,7 +1,12 @@
 import { readJSONSync, writeJSONSync, detectIndent } from "./util.js";
 import Packages from "./util/packages.js";
+import { getConfig, getHost } from "./config.js";
 import { execSync } from "node:child_process";
 import * as path from "node:path";
+
+/**
+ * @import { NudepsOptions } from "./options.js"
+ */
 
 /**
  * Check whether an npm lifecycle hook or its pre/post variants run a command.
@@ -30,7 +35,11 @@ export function addHook (pkg, hook, command) {
 	}
 }
 
-export default async function () {
+/**
+ * Set nudeps up in the current project: install it, add its npm hooks, and add any scripts the host needs.
+ * @param {NudepsOptions} [options] - Supplies the `host`
+ */
+export default async function (options) {
 	let pkg = readJSONSync("package.json", { optional: true });
 
 	// Install nudeps as a devDependency if not already present
@@ -54,6 +63,15 @@ export default async function () {
 
 	addHook(pkg, "dependencies", command);
 	addHook(pkg, "prepare", command);
+
+	// Keep existing scripts: e.g. any `build` script already makes Vercel install
+	let host = getHost(await getConfig(options));
+	for (let [name, script] of Object.entries(host?.scripts ?? {})) {
+		if (pkg.scripts[name] === undefined) {
+			pkg.scripts[name] = script;
+			console.info(`Added a "${name}" script, which ${host.name} needs to run nudeps.`);
+		}
+	}
 
 	// These are the user's files, so keep their formatting (#110)
 	writeJSONSync("package.json", pkg, detectIndent("package.json"));
