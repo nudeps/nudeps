@@ -1,7 +1,10 @@
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeJSONSync } from "../src/util.js";
+
+const NUDEPS = new URL("../src/nudeps.js", import.meta.url).href;
 
 export default {
 	name: "Stale entry cleanup",
@@ -10,35 +13,34 @@ export default {
 	 * Create `dirs`, and symlinks to `target` saved as external aliases by a previous run,
 	 * then run a cleanup that produces nothing.
 	 * @param {{ dirs?: string[], aliases?: string[], target?: string }} setup
-	 * @returns {Promise<string[]>} What is left in the project
+	 * @returns {string[]} What is left in the project
 	 */
-	async run ({ dirs = [], aliases = [], target = "client_modules" }) {
-		// Imported here, not at the top: nudeps.js imports package.json,
-		// which htest cannot load statically (htest-dev/htest#181).
-		let { default: Nudeps } = await import("../src/nudeps.js");
+	run ({ dirs = [], aliases = [], target = "client_modules" }) {
 		let root = mkdtempSync(join(tmpdir(), "nudeps-cleanup-"));
-		let cwd = process.cwd();
 
 		try {
-			process.chdir(root);
-			mkdirSync("client_modules");
-			mkdirSync(".nudeps");
+			mkdirSync(join(root, "client_modules"));
+			mkdirSync(join(root, ".nudeps"));
 			for (let dir of dirs) {
-				mkdirSync(dir, { recursive: true });
+				mkdirSync(join(root, dir), { recursive: true });
 			}
 			for (let alias of aliases) {
-				symlinkSync(join(root, target), alias);
+				symlinkSync(join(root, target), join(root, alias));
 			}
-			writeJSONSync(".nudeps/external-aliases.json", aliases);
+			writeJSONSync(join(root, ".nudeps/external-aliases.json"), aliases);
 
-			await new Nudeps({ config: { dir: "client_modules" } }).copyPackages();
+			// A child process gets its own cwd, which parallel sibling tests would otherwise share
+			let code = `import Nudeps from ${JSON.stringify(NUDEPS)}; await new Nudeps({ config: { dir: "client_modules" } }).copyPackages();`;
+			execFileSync(process.execPath, ["--input-type=module", "-e", code], {
+				cwd: root,
+				stdio: "ignore",
+			});
 
 			return readdirSync(root, { recursive: true }).filter(
 				name => !name.startsWith(".nudeps"),
 			);
 		}
 		finally {
-			process.chdir(cwd);
 			rmSync(root, { recursive: true, force: true });
 		}
 	},
