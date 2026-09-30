@@ -10,8 +10,9 @@ const NUDEPS_ROOT = resolve(import.meta.dirname, "../..");
  * Build a dependent (`app`) with a local dependency (`dep`) installed via `file:`, run nudeps in
  * the dependent, and hand back both repos' paths. `depScripts` seeds the dep's package.json so we
  * can exercise what nudeps does to a local dep that does, or doesn't, already notify its dependents.
+ * `wireLocalDeps` is the app's consent to edit that package.json.
  */
-function setup (depScripts) {
+function setup ({ depScripts, wireLocalDeps = true } = {}) {
 	let dir = mkdtempSync(join(tmpdir(), "nudeps-issue-86-"));
 	let dep = join(dir, "dep");
 	let app = join(dir, "app");
@@ -47,6 +48,7 @@ function setup (depScripts) {
 			scripts: { dependencies: "npx nudeps" },
 		}),
 	);
+	writeFileSync(join(app, "nudeps.js"), `export default { wireLocalDeps: ${wireLocalDeps} };\n`);
 
 	let env = { ...process.env, npm_config_audit: "false", npm_config_fund: "false" };
 	execSync("npm install", { cwd: app, env, stdio: "ignore" });
@@ -105,6 +107,7 @@ function setupChain (libRunsNudeps) {
 		devDependencies: { nudeps: `file:${NUDEPS_ROOT}` },
 		scripts: { dependencies: "npx nudeps" },
 	});
+	writeFileSync(join(app, "nudeps.js"), "export default { wireLocalDeps: true };\n");
 
 	let env = { ...process.env, npm_config_audit: "false", npm_config_fund: "false" };
 	execSync("npm install", { cwd: lib, env, stdio: "ignore" });
@@ -161,11 +164,35 @@ export default {
 	description: "https://github.com/nudeps/nudeps/issues/86",
 	tests: [
 		{
+			name: "Without `wireLocalDeps`, the local dep's package.json is untouched",
+			description:
+				"It is a tracked file in another repo, and npm hides hook output during an install, so the edit would go unnoticed. A run by hand says how to consent.",
+			run () {
+				let { dir, dep, app } = setup({ wireLocalDeps: false });
+
+				try {
+					let output = execSync(`node ${join(NUDEPS_ROOT, "src/cli/index.js")} 2>&1`, {
+						cwd: app,
+						encoding: "utf8",
+					});
+
+					return {
+						scripts: JSON.parse(readScripts(dep)).scripts,
+						warned: output.includes("Set `wireLocalDeps: true`"),
+					};
+				}
+				finally {
+					rmSync(dir, { recursive: true, force: true });
+				}
+			},
+			expect: { scripts: undefined, warned: true },
+		},
+		{
 			name: "Hook written into the local dep",
 			description:
 				"Before #86 nudeps skipped any dep without nudeps installed, so nothing was written.",
 			run (depScripts) {
-				let { dir, dep } = setup(depScripts);
+				let { dir, dep } = setup({ depScripts });
 
 				try {
 					return JSON.parse(readScripts(dep)).scripts;
@@ -178,7 +205,7 @@ export default {
 				{
 					name: "Dep with no scripts gets the hook",
 					arg: undefined,
-					expect: { dependencies: "npx nudeps dependents" },
+					expect: { dependencies: "npx nudeps dependents --wireLocalDeps" },
 				},
 				{
 					name: "Dep already running nudeps is left alone",
@@ -194,7 +221,7 @@ export default {
 					arg: { dependencies: "npm run build" },
 					expect: {
 						dependencies: "npm run build",
-						predependencies: "npx nudeps dependents",
+						predependencies: "npx nudeps dependents --wireLocalDeps",
 					},
 				},
 				{
@@ -217,7 +244,7 @@ export default {
 			description:
 				"Registration is what lets the dep notify us later, and it must not depend on whether the dep runs nudeps — leaving it alone is only about its package.json.",
 			run (depScripts) {
-				let { dir, dep } = setup(depScripts);
+				let { dir, dep } = setup({ depScripts });
 
 				try {
 					return readFileSync(join(dep, ".nudeps/local-dependents.json"), "utf8");
@@ -259,12 +286,13 @@ export default {
 		{
 			// #86 asks for a path that "only tracks and updates dependents". Updating alone leaves
 			// `util` invisible to everyone: nothing would ever tell `lib` that `util` changed.
+			// A relay's only consent is the flag in the hook that started it.
 			name: "`nudeps dependents` tracks the dep's own local dependencies",
-			run () {
+			run (args) {
 				let { dir, lib, util } = setupChain();
 
 				try {
-					cli("dependents", lib);
+					cli(`dependents ${args}`, lib);
 
 					return {
 						hook: JSON.parse(readScripts(util)).scripts?.dependencies,
@@ -275,7 +303,21 @@ export default {
 					rmSync(dir, { recursive: true, force: true });
 				}
 			},
-			expect: { hook: "npx nudeps dependents", dependents: ["../lib"] },
+			tests: [
+				{
+					name: "Without the flag, it registers but leaves `util` alone",
+					arg: "",
+					expect: { hook: undefined, dependents: ["../lib"] },
+				},
+				{
+					name: "With the flag, it also wires `util`",
+					arg: "--wireLocalDeps",
+					expect: {
+						hook: "npx nudeps dependents --wireLocalDeps",
+						dependents: ["../lib"],
+					},
+				},
+			],
 		},
 		{
 			name: "A change in the deepest dep reaches the app through the chain",
@@ -286,8 +328,8 @@ export default {
 				let map = join(app, "importmap.js");
 
 				try {
-					// One run in `lib` wires `util`, so every link has a hook to rewrite
-					cli("dependents", lib);
+					// One flagged run in `lib` registers it with `util` and wires `util`
+					cli("dependents --wireLocalDeps", lib);
 
 					for (let repo of [lib, util]) {
 						let pkgPath = join(repo, "package.json");
@@ -405,6 +447,10 @@ export default {
 						dependencies: { "@ws/lib": "^1.0.0" },
 						devDependencies: { nudeps: `file:${NUDEPS_ROOT}` },
 					}),
+				);
+				writeFileSync(
+					join(child("app"), "nudeps.js"),
+					"export default { wireLocalDeps: true };\n",
 				);
 
 				let env = { ...process.env, npm_config_audit: "false", npm_config_fund: "false" };

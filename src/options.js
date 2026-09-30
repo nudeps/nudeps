@@ -60,6 +60,9 @@ import * as hosts from "./hosts.js";
  * @property {boolean | ((pkg: Package) => boolean)} [symlink] - Whether to symlink a package instead of copying it.
  * Defaults to symlinking only external packages (those outside the local `node_modules` tree).
  * @property {boolean} [preserveSymlinks=false] - Whether to keep symlinks inside a copied package as-is instead of resolving them to real paths.
+ * @property {boolean} [wireLocalDeps=false] - Add `npx nudeps dependents --wireLocalDeps` to the `dependencies` hook
+ * of every local production dependency outside this package's lockfile root, so they notify this package
+ * when their dependencies change. The flag lets each of them wire its own local deps in turn.
  * @property {boolean | string} [alias=true] - Unversioned symlink pointing at a package's versioned directory,
  * so assets (CSS, images) have stable URLs. `true` uses the install name; a string is a custom path relative to
  * the package's effective `dir` (and may escape it, e.g. `"../open-props"`).
@@ -183,6 +186,12 @@ export const symlink = {
 };
 
 export const preserveSymlinks = {
+	type: "boolean",
+	default: false,
+};
+
+// Off by default: it edits package.json files in other repos.
+export const wireLocalDeps = {
 	type: "boolean",
 	default: false,
 };

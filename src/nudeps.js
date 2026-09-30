@@ -338,9 +338,9 @@ export default class Nudeps {
 	}
 
 	// The install cache's key. A cache saved under another key is not reused.
-	// The key leaves out `init`, which changes how a run starts, not what it resolves.
+	// The key leaves out `init` and `wireLocalDeps`, which change how a run starts or ends, not what it resolves.
 	get #cacheKey () {
-		let { init, ...config } = this.config;
+		let { init, wireLocalDeps, ...config } = this.config;
 		// Functions and regexes become source text,
 		// so editing one in the config file changes the key.
 		return stringifyConfig(config);
@@ -481,7 +481,22 @@ export default class Nudeps {
 			return;
 		}
 
-		let hook = addHook(depPkg, "dependencies", "npx nudeps dependents");
+		// The flag passes the consent on, so the dep wires its own local deps in turn
+		let command = "npx nudeps dependents --wireLocalDeps";
+
+		// Another repo's package.json is edited only with consent.
+		// A relay has no config: its consent is the flag in the hook that started it.
+		if (!(this.config ?? this.options).wireLocalDeps) {
+			let fix = this.config
+				? "Set `wireLocalDeps: true` (`--wireLocalDeps` on the command line)"
+				: "Add `--wireLocalDeps` to this package's `nudeps dependents` hook";
+			this.warn(
+				`${dep.installName} will not propagate its changes. ${fix} to add \`${command}\` to the \`dependencies\` hook in ${pkgPath}, or add it yourself.`,
+			);
+			return;
+		}
+
+		let hook = addHook(depPkg, "dependencies", command);
 
 		if (!hook) {
 			this.warn(
@@ -492,7 +507,7 @@ export default class Nudeps {
 
 		// The dep's package.json belongs to its own repo, so keep its formatting (#110)
 		writeJSONSync(pkgPath, depPkg, detectIndent(pkgPath));
-		this.info(`Added \`npx nudeps dependents\` to the \`${hook}\` hook in ${pkgPath}.`);
+		this.info(`Added \`${command}\` to the \`${hook}\` hook in ${pkgPath}.`);
 	}
 
 	/**
