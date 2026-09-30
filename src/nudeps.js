@@ -26,7 +26,7 @@ import { getTopLevelModules } from "./util.js";
 import Packages from "./util/packages.js";
 import * as hosts from "./hosts.js";
 import * as log from "./util/log.js";
-import { addHook } from "./install.js";
+import { addHook, hasHook } from "./install.js";
 
 import nudepsPkg from "../package.json" with { type: "json" };
 
@@ -427,8 +427,7 @@ export default class Nudeps {
 
 		// A dep already running nudeps notifies this package anyway;
 		// a second command would notify it twice
-		let hooks = ["dependencies", "predependencies", "postdependencies"];
-		if (hooks.some(hook => depPkg.scripts?.[hook]?.includes("nudeps"))) {
+		if (hasHook(depPkg, "dependencies", "nudeps")) {
 			return;
 		}
 

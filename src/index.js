@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { readJSONSync } from "./util.js";
 import Nudeps from "./nudeps.js";
 import Packages from "./util/packages.js";
+import { hasHook } from "./install.js";
 import * as log from "./util/log.js";
 
 export { Nudeps };
@@ -35,12 +36,8 @@ export default async function (options) {
 		// this package's map (#172).
 		let rootPkg = readJSONSync(path.join(root, "package.json"), { optional: true });
 		let delegates = "npm run dependencies --if-present --workspaces";
-		let variants = ["dependencies", "predependencies", "postdependencies"];
 
-		if (
-			rootPkg?.workspaces &&
-			!variants.some(name => rootPkg.scripts?.[name]?.includes(delegates))
-		) {
+		if (rootPkg?.workspaces && !hasHook(rootPkg, "dependencies", delegates)) {
 			log.warn(
 				`The workspace root has no \`dependencies\` hook, so its children's import maps go stale on every install. Run \`npx nudeps install\` here to add it to ${path.join(root, "package.json")}.`,
 			);

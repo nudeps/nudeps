@@ -5,6 +5,14 @@ import { execSync } from "node:child_process";
 import * as path from "node:path";
 
 /**
+ * Check whether an npm lifecycle hook or its pre/post variants run a command.
+ * @returns {boolean}
+ */
+export function hasHook (pkg, hook, command) {
+	return [hook, "pre" + hook, "post" + hook].some(name => pkg.scripts?.[name]?.includes(command));
+}
+
+/**
  * Add a command to an npm lifecycle hook, falling back to pre/post variants if the hook is already taken.
  * @returns {string | undefined} The hook the command ended up in, or `undefined` if all three were taken.
  */
