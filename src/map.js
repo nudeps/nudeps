@@ -5,7 +5,6 @@ import { Generator } from "@jspm/generator";
 
 import { deepAssign, getNodeBuiltins } from "./util.js";
 import { findOverride, stripConditions } from "./util/jspm-overrides.js";
-import * as log from "./util/log.js";
 import nudepsPkg from "../package.json" with { type: "json" };
 
 /**
@@ -22,7 +21,7 @@ export class ImportMapGenerator extends Generator {
 	/**
 	 * @param {object} [options]
 	 * @param {object} [options.installCache] - Per-package output map cache (mutated on miss), or null
-	 * @param {Nudeps} [options.nudeps] - Nudeps instance for lock data access
+	 * @param {Nudeps} [options.nudeps] - Nudeps instance for lock data access and logging
 	 * @param {boolean} [options.silent] - Suppress user-facing log messages (for internal temp generators)
 	 */
 	constructor ({ installCache, silent, nudeps, ...generatorOptions } = {}) {
@@ -167,7 +166,7 @@ export class ImportMapGenerator extends Generator {
 			if (skipped.length && !this.silent) {
 				// A `./*` export can expose hundreds of files, so name only a few
 				let rest = skipped.splice(3);
-				log.warn(
+				this.nudeps?.warn(
 					`Skipped untraceable subpaths in ${alias}: ${skipped.join(", ")}${rest.length ? `, +${rest.length} more` : ""}.`,
 				);
 			}
@@ -198,7 +197,7 @@ export class ImportMapGenerator extends Generator {
 					subpaths: false,
 					...installOptions,
 				});
-				log.warn(`Failed to trace subpaths for ${alias}: ${error.message}.`);
+				this.nudeps?.warn(`Failed to trace subpaths for ${alias}: ${error.message}.`);
 				return ret;
 			}
 			catch (retryError) {

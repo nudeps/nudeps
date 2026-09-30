@@ -178,7 +178,15 @@ await nudeps.write();
 
 Each instance prepares and writes once: calling either method again returns the first call's result, even a failed one. In watch mode, create a new `Nudeps` for each build. It traces dependencies again, so it picks up changes, and the install cache keeps that fast.
 
-Unlike `nudeps()`, the class never skips a run, not even while npm is still installing a workspace. Use it in build scripts, not npm hooks.
+Unlike `nudeps()`, the class never skips a run, not even while npm is still installing a workspace. Use it in build scripts, not npm hooks, or skip such a run yourself: `if (!nudeps.isDeferred()) await nudeps.write();`.
+
+Every nudeps message goes through the instance's `info()`, `warn()` and `error()`. Override them on the instance or in a subclass to redirect or silence them:
+
+```js
+let nudeps = new Nudeps();
+nudeps.info = () => {}; // keep warnings and errors only
+await nudeps.write();
+```
 
 ## Generated Artifacts — Do Not Edit
 

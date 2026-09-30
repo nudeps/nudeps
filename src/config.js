@@ -1,10 +1,9 @@
 /**
- * Initialize nudeps for a given project repo
+ * Resolve the nudeps config from the config file, options, rules and defaults.
  */
 
 import { importCwdRelative } from "./util.js";
 import { existsSync } from "node:fs";
-import * as log from "./util/log.js";
 import * as availableOptions from "./options.js";
 import { checkType, suggest } from "./util/options.js";
 import {
@@ -17,7 +16,7 @@ import {
 } from "./rules.js";
 
 /**
- * @import { NudepsOptions } from "./options.js"
+ * @import { NudepsOptions, OverrideRule } from "./options.js"
  */
 
 // Keys from previous versions, mapped to what replaced them
@@ -98,7 +97,6 @@ export async function getConfig ({ defaults = {}, ...args } = {}) {
 
 	let rules = [defaults.overrides, config.overrides, args.overrides].flatMap(normalizeRules);
 	validateRules(rules);
-	warnOnUnknownMode(mode, rules);
 
 	let subject = { mode };
 	let globalRules = rules.filter(rule => !isPackageRule(rule));
@@ -165,8 +163,11 @@ function looksLikeImportMap (value) {
  * Modes are no longer declared anywhere, so the best we can do for a typo'd active mode
  * is check that some rule (or built-in) could match it. Patterns can't be enumerated —
  * any regex/function mode matcher disables the check.
+ * @param {string} [mode] - The active mode.
+ * @param {OverrideRule[]} rules - Normalized rules, e.g. a resolved config's `overrides`.
+ * @returns {string | undefined} A warning when no rule could match the mode.
  */
-function warnOnUnknownMode (mode, rules) {
+export function getModeWarning (mode, rules) {
 	if (mode === undefined || builtInModes.has(mode)) {
 		return;
 	}
@@ -187,6 +188,6 @@ function warnOnUnknownMode (mode, rules) {
 
 	if (!known.has(mode)) {
 		let available = [...builtInModes, ...known].join(", ");
-		log.warn(`Unknown mode "${mode}". Modes referenced by rules: ${available}`);
+		return `Unknown mode "${mode}". Modes referenced by rules: ${available}`;
 	}
 }

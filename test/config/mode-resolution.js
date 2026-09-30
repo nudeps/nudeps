@@ -1,4 +1,4 @@
-import { getConfig } from "../../src/config.js";
+import { getConfig, getModeWarning } from "../../src/config.js";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -84,18 +84,12 @@ export default {
 			expect: { terse: true },
 		},
 		{
-			name: "unknown active mode warns but still resolves",
+			name: "unknown active mode yields a warning but still resolves",
 			async run (options) {
-				let warned = "";
-				let original = console.warn;
-				console.warn = (...args) => (warned += args.join(" "));
-				try {
-					await getConfig(options);
-				}
-				finally {
-					console.warn = original;
-				}
-				return warned.includes(`Unknown mode "nonexistent"`);
+				let config = await getConfig(options);
+				return getModeWarning(config.mode, config.overrides)?.includes(
+					`Unknown mode "nonexistent"`,
+				);
 			},
 			arg: { config: STAGING, mode: "nonexistent" },
 			expect: true,

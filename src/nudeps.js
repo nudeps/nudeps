@@ -16,7 +16,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 
 import Hooks from "blissful-hooks";
 
-import { getConfig } from "./config.js";
+import { getConfig, getModeWarning } from "./config.js";
 import { readJSONSync, writeJSONSync, createGitignoredDir, detectIndent } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import { matchesGlob, ensureSymlink, relativeURL } from "./util/fs.js";
@@ -25,12 +25,16 @@ import { applyRules, isPackageRule, includeNames } from "./rules.js";
 import { getTopLevelModules } from "./util.js";
 import Packages from "./util/packages.js";
 import * as hosts from "./hosts.js";
-import * as log from "./util/log.js";
 import { addHook, hasHook } from "./install.js";
 
 import nudepsPkg from "../package.json" with { type: "json" };
 
 const DEPENDENTS_FILE = ".nudeps/local-dependents.json";
+
+// Commands that rewrite the lockfile after a child's hooks and then fire the root's `dependencies`
+// hook, which runs nudeps again against the new one (#171). `update`, `dedupe` and `prune` fire no hook
+// afterwards, so their too-early run is the only one there is — skipping those would strand the map.
+const REIFY_COMMANDS = ["install", "ci", "uninstall", "link"];
 
 /**
  * @import Package from "./util/package.js"
@@ -67,6 +71,47 @@ export default class Nudeps {
 	}
 
 	/**
+	 * Check whether this package resolves against a parent's lockfile that npm
+	 * has yet to write or is about to rewrite, so the run that reads it comes later.
+	 * `prepare()` and `write()` never check this: call it first to skip such a run.
+	 * Logs why a run is deferred, and warns when no later run will come (#172).
+	 * @returns {boolean}
+	 */
+	isDeferred () {
+		let root = process.env.npm_config_local_prefix;
+		// npm also runs a local dependency's hooks with its consumer as the prefix, but that package has
+		// its own, current lockfile — only one resolving against the parent's has to wait for npm.
+		if (!root || root === process.cwd() || Packages.findRoot() === process.cwd()) {
+			return false;
+		}
+
+		// npm fires `dependencies` on the root only, so without that hook nothing ever regenerates
+		// this package's map (#172).
+		let rootPkg = readJSONSync(path.join(root, "package.json"), { optional: true });
+		let delegates = "npm run dependencies --if-present --workspaces";
+
+		if (rootPkg?.workspaces && !hasHook(rootPkg, "dependencies", delegates)) {
+			this.warn(
+				`The workspace root has no \`dependencies\` hook, so its children's import maps go stale on every install. Run \`npx nudeps install\` here to add it to ${path.join(root, "package.json")}.`,
+			);
+		}
+
+		// No lockfile yet means nothing to resolve against either way — and it is the only signal
+		// left when a hook wraps nudeps in `npx`, whose own npm run replaces `npm_command`.
+		if (
+			REIFY_COMMANDS.includes(process.env.npm_command) ||
+			!existsSync(path.join(root, "node_modules", ".package-lock.json"))
+		) {
+			this.info(
+				"Skipping import map generation: npm hasn't finished updating the lockfile this package resolves against. If this is not a workspace, please run Nudeps from the package root.",
+			);
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
 	 * Resolve the config, trace the dependency graph and localize the import map in memory.
 	 * Writes nothing but nudeps' own caches, so it can run long before `write()`.
 	 * @returns {Promise<void>}
@@ -78,6 +123,11 @@ export default class Nudeps {
 	async #prepare () {
 		let start = performance.now();
 		this.config = await getConfig(this.options);
+
+		let warning = getModeWarning(this.config.mode, this.config.overrides);
+		if (warning) {
+			this.warn(warning);
+		}
 
 		if (this.config.host) {
 			// Adapters may be factories taking the config (e.g. apache)
@@ -611,16 +661,18 @@ export default class Nudeps {
 		return this.config.root ?? this.packages.prefix;
 	}
 
+	// Tagged, so nudeps' output stays attributable among npm's own.
+	// Override these on an instance or a subclass to redirect it.
 	info (...messages) {
-		log.info(...messages);
+		console.info("[nudeps]", ...messages);
 	}
 
 	warn (...messages) {
-		log.warn(...messages);
+		console.warn("[nudeps]", ...messages);
 	}
 
 	error (...messages) {
-		log.error(...messages);
+		console.error("[nudeps]", ...messages);
 	}
 
 	/**
