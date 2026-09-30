@@ -764,7 +764,7 @@ export default class Nudeps {
 			await expandedGen.finalize();
 		}
 		catch (e) {
-			this.info(`Warning: Could not trace exports for ${pkg.name}: ${e.message}`);
+			this.warn(`Could not trace exports for ${pkg.name}: ${e.message}`);
 			return new Set();
 		}
 
