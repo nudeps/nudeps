@@ -1,9 +1,10 @@
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const INSTALL = import.meta.resolve("../../src/install.js");
+const NUDEPS = import.meta.resolve("../../src/nudeps.js");
 
 // nudeps is already a devDependency, so install() skips `npm install` and only adds the scripts.
 const PKG = { name: "issue-182-repro", type: "module", devDependencies: { nudeps: "*" } };
@@ -50,6 +51,35 @@ export default {
 			name: "Other hosts get no build script",
 			arg: { options: { host: "netlify" } },
 			expect: HOOKS,
+		},
+		{
+			name: "A regular run warns about a missing build script instead of adding it",
+			description: "package.json is the user's, so only `nudeps install` edits it",
+			run () {
+				let dir = mkdtempSync(join(tmpdir(), "nudeps-issue-182-"));
+
+				try {
+					writeFileSync(join(dir, "package.json"), JSON.stringify(PKG));
+					writeFileSync(join(dir, "vercel.json"), "{}");
+
+					// prepare() warns before it needs node_modules, so its later failure is irrelevant
+					let code = `import Nudeps from ${JSON.stringify(NUDEPS)}; await new Nudeps().prepare().catch(() => {});`;
+					let { stderr } = spawnSync(process.execPath, ["-e", code], {
+						cwd: dir,
+						encoding: "utf8",
+					});
+
+					return {
+						scripts: JSON.parse(readFileSync(join(dir, "package.json"), "utf8"))
+							.scripts,
+						warned: stderr.includes("Run `npx nudeps install`"),
+					};
+				}
+				finally {
+					rmSync(dir, { recursive: true, force: true });
+				}
+			},
+			expect: { scripts: undefined, warned: true },
 		},
 	],
 };

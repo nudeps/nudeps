@@ -134,6 +134,15 @@ export default class Nudeps {
 			this.info(`Detected host: ${this.host.name}`);
 		}
 
+		// Only `nudeps install` writes these: a regular run leaves package.json alone
+		for (let [name, script] of Object.entries(this.host.scripts ?? {})) {
+			if (this.pkg.scripts?.[name] === undefined) {
+				this.warn(
+					`${this.host.name} may not run nudeps without a "${name}" script. Run \`npx nudeps install\` to add \`"${name}": "${script}"\` to package.json, or add it yourself.`,
+				);
+			}
+		}
+
 		if (this.host.hooks) {
 			this.hooks.add(this.host.hooks);
 		}

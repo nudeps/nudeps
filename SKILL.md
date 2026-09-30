@@ -29,7 +29,7 @@ Copies npm packages to a local output directory, generates an import map mapping
 - **`dependencies`** — fires after `npm install <pkg>` / `npm uninstall <pkg>`
 - **`prepare`** — fires on bare `npm install` (e.g., after cloning) and before `npm pack`/`npm publish`
 
-For Vercel projects, `nudeps install` also adds `"build": "nudeps"` when there is no `build` script: Vercel runs `npm install`, and so these hooks, only with a build step. It detects Vercel from `vercel.json` or `.vercel/project.json` (created by `vercel link`). Otherwise, pass `--host vercel`.
+For Vercel projects, `nudeps install` also adds `"build": "nudeps"` when there is no `build` script: Vercel runs `npm install`, and so these hooks, only with a build step. It detects Vercel from `vercel.json` or `.vercel/project.json` (created by `vercel link`). Otherwise, pass `--host vercel`. Other runs never add the script: they warn and name `npx nudeps install` as the fix.
 
 If these hooks exist, nudeps runs automatically — **do not run it manually**. If they don't exist, run `npx nudeps` explicitly after dependency changes.
 
