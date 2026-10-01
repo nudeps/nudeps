@@ -16,7 +16,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 
 import Hooks from "blissful-hooks";
 
-import { getConfig, getModeWarning } from "./config.js";
+import { getConfig, getHost, getModeWarning } from "./config.js";
 import { readJSONSync, writeJSONSync, createGitignoredDir, detectIndent } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import { matchesGlob, ensureSymlink, relativeURL } from "./util/fs.js";
@@ -24,7 +24,6 @@ import { stringifyConfig } from "./util/options.js";
 import { applyRules, isPackageRule, includeNames } from "./rules.js";
 import { getTopLevelModules } from "./util.js";
 import Packages from "./util/packages.js";
-import * as hosts from "./hosts.js";
 import { addHook, hasHook } from "./install.js";
 
 import nudepsPkg from "../package.json" with { type: "json" };
@@ -129,24 +128,20 @@ export default class Nudeps {
 			this.warn(warning);
 		}
 
-		if (this.config.host) {
-			// Adapters may be factories taking the config (e.g. apache)
-			let adapter = hosts[this.config.host];
-			this.host = typeof adapter === "function" ? adapter(this.config) : adapter;
-		}
-		else {
-			// Auto-detect host
-			for (let hostId in hosts) {
-				let host = hosts[hostId];
-				if (host.detect?.()) {
-					this.host = host;
-					this.info(`Detected host: ${host.name}`);
-					break;
-				}
-			}
+		this.host = getHost(this.config) ?? {};
+
+		if (this.host.name && !this.config.host) {
+			this.info(`Detected host: ${this.host.name}`);
 		}
 
-		this.host ??= {};
+		// Only `nudeps install` writes these: a regular run leaves package.json alone
+		for (let [name, script] of Object.entries(this.host.scripts ?? {})) {
+			if (this.pkg.scripts?.[name] === undefined) {
+				this.warn(
+					`${this.host.name} may not run nudeps without a "${name}" script. Run \`npx nudeps install\` to add \`"${name}": "${script}"\` to package.json, or add it yourself.`,
+				);
+			}
+		}
 
 		if (this.host.hooks) {
 			this.hooks.add(this.host.hooks);

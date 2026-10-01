@@ -45,7 +45,7 @@ import * as hosts from "./hosts.js";
  * @property {string} [map="importmap.js"] - Path of the generated import map script.
  * @property {string} [root] - Directory the host serves as `/`, defaults to the package (or workspace) root.
  * Only needed when `dir` lives inside a build output directory (e.g. an SSG's `dist/`), since redirect rules are URLs, not file paths.
- * @property {string} [host] - Deploy host adapter (a key of `hosts.js`, e.g. `"netlify"`). Auto-detected from the environment when not set.
+ * @property {string} [host] - Deploy host adapter (a key of `hosts.js`, e.g. `"netlify"`). Auto-detected when not set.
  * @property {string} [mode] - Active mode, tested by rules with `mode` matchers. Built-in presets: `"dev"` and `"prod"`.
  * @property {string} [config="nudeps.js"] - Path of the config file to read. Ignored if the file does not exist.
  * @property {boolean} [init=false] - Start from scratch: delete nudeps' caches and `dir` before generating.
@@ -202,7 +202,7 @@ export const alias = {
 	default: true,
 };
 
-// Deploy host adapter; auto-detected from the environment when not set.
+// Deploy host adapter; auto-detected when not set.
 export const host = {
 	type: "string",
 	validate: v => v in hosts,

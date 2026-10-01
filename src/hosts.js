@@ -45,8 +45,21 @@ export const netlify = {
 export const vercel = {
 	name: "Vercel",
 	detect: () => process.env.VERCEL === "1",
-	symlinks: false,
+	// Identify a Vercel project outside its builds, where `VERCEL` is unset (e.g. `nudeps install`)
+	configFiles: ["vercel.json", ".vercel/project.json"],
+	// Serves directory symlinks inside the output dir (#182)
+	symlinks: true,
 	redirects: true,
+	// Vercel runs `npm install`, and so the nudeps hooks, only with a build step (#182)
+	scripts: { build: "nudeps" },
+};
+
+export const amplify = {
+	name: "AWS Amplify",
+	detect: () => Boolean(process.env.AWS_APP_ID),
+	// Serves directory symlinks, even ones pointing outside the output dir (#182)
+	symlinks: true,
+	redirects: true, // Only via the console or API, not a file nudeps could write
 };
 
 // same file, same syntax
