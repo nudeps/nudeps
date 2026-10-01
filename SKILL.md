@@ -72,7 +72,7 @@ Config file uses ES module syntax: `export default { ... }`. Unknown or invalid 
 | `subpaths`         | `"split"`           | `"split"` keeps every used subpath mapping explicit; `"combined"` collapses within scopes; `"both"` also collapses top-level                                                                         |
 | `symlink`          | External pkgs only  | Symlink packages into `dir` instead of copying                                                                                                                                                       |
 | `preserveSymlinks` | `false`             | Keep symlinks inside a copied package instead of resolving them                                                                                                                                      |
-| `wireLocalDeps`    | `false`             | Consent to add `"dependencies": "npx nudeps dependents --wireLocalDeps"` to local deps' `package.json`, so they notify this package and wire their own local deps                                    |
+| `wireLocalDeps`    | —                   | Config-only consent to add `"dependencies": "npx nudeps dependents"` to every local dep in the chain. Unset warns, `false` is silent. A package rule also covers that dep's local deps               |
 | `alias`            | `true`              | Unversioned symlink per package for stable asset URLs (CSS, images): `<link href="[dir]/open-props/style.css">`. A string is a custom path relative to the package's `dir` (may escape it: `"../x"`) |
 | `imports`          | —                   | Import map entries merged into the generated map (`{ specifier: path }`, path relative to the map file; `undefined` deletes). In a package rule, paths are package-relative                          |
 | `ignore`           | Dotfiles, lockfiles | File globs (package-relative) to skip when copying. Entries: `"glob"`, `{ ignore: glob }`, or `{ copy: glob }` (reverses earlier ignores, including the defaults). Last match wins                   |
@@ -114,7 +114,7 @@ Semantics agents must know:
 - **Cascade**: all matching rules apply in order, later wins, merged per property. Origin order: option defaults < programmatic `defaults` < built-in mode rules < top-level config < user rules < CLI/programmatic args. Rule layers concatenate (a tool's programmatic rules compose with the config file's).
 - **`include: false` does not guarantee absence** — the package still lands in the map if code actively imports it.
 - `include: true`/`"force"` need exact-name matchers (you can't install a regex); `include: false` accepts patterns.
-- Package-matched rules may only set package-scoped options (`dir`, `symlink`, `preserveSymlinks`, `alias`, `ignore`, `imports`, `cjs`, `include`); mode-only/unconditional rules may set any option except `mode`, `config`, `init` and `overrides`, which decide what runs before rules exist.
+- Package-matched rules may only set package-scoped options (`dir`, `symlink`, `preserveSymlinks`, `alias`, `ignore`, `imports`, `cjs`, `wireLocalDeps`, `include`); mode-only/unconditional rules may set any option except `mode`, `config`, `init` and `overrides`, which decide what runs before rules exist.
 
 Full option reference: https://nudeps.dev/config/ · Troubleshooting: https://nudeps.dev/troubleshooting/
 
@@ -141,7 +141,7 @@ nudeps logs a summary after each run: number of import map entries, time taken, 
 
 ## Local Dependencies
 
-`npm install ../other-repo` works — nudeps symlinks local packages by default instead of copying. The local dep needs no nudeps of its own, only `"dependencies": "npx nudeps dependents --wireLocalDeps"` in its `package.json` so it can notify its dependents; the flag lets it wire its own local deps in turn. With `wireLocalDeps: true`, nudeps adds that hook itself; without it, nudeps warns instead of editing another repo's `package.json`. A dep already running `npx nudeps` is left alone. `npx nudeps dependents` also registers the dep with _its_ own local deps, so chains (`app` → `lib` → `util`) work without nudeps at any intermediate link; cycles stop rather than loop.
+`npm install ../other-repo` works — nudeps symlinks local packages by default instead of copying. The local dep needs no nudeps of its own, only `"dependencies": "npx nudeps dependents"` in its `package.json` so it can notify its dependents. Every run registers each local dep in the chain (`app` → `lib` → `util`) with the package that links it. With `wireLocalDeps: true` in the app's config, nudeps also adds that hook to each of them. Unset, it warns instead of editing another repo's `package.json`, and `false` silences the warning. A dep already running `npx nudeps` is left alone. `npx nudeps dependents` also registers the dep with _its_ own local deps, so chains work without nudeps at any intermediate link. Cycles stop rather than loop.
 
 ## npm Workspaces
 

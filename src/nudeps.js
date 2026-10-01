@@ -338,9 +338,12 @@ export default class Nudeps {
 	}
 
 	// The install cache's key. A cache saved under another key is not reused.
-	// The key leaves out `init` and `wireLocalDeps`, which change how a run starts or ends, not what it resolves.
+	// Run options change how a run starts or ends, not what it resolves,
+	// so toggling one, even per package, must keep the cache.
 	get #cacheKey () {
-		let { init, wireLocalDeps, ...config } = this.config;
+		let dropRunOptions = ({ init, wireLocalDeps, ...rest }) => rest;
+		let config = dropRunOptions(this.config);
+		config.overrides = config.overrides.map(dropRunOptions);
 		// Functions and regexes become source text,
 		// so editing one in the config file changes the key.
 		return stringifyConfig(config);
@@ -416,33 +419,32 @@ export default class Nudeps {
 	}
 
 	/**
-	 * Register this package as a dependent of each local production dependency,
-	 * and make sure the dep can notify it back.
+	 * Register each local production dependency with the package that links it:
+	 * this package, or the local dep it sits under.
+	 * A configured run also makes sure the dep can notify back.
 	 * Runs unconditionally: it records topology, not a change event.
 	 */
 	registerAsDependent () {
-		let pkg = readJSONSync("./package.json", { optional: true });
 		// Nothing installed is normal, not an error: a local dep with no dependencies of its own
 		// still has to notify its dependents.
-		if (!pkg || Packages.findRoot() === null) {
+		if (!existsSync("./package.json") || Packages.findRoot() === null) {
 			return;
 		}
 
-		let prodDeps = new Set(Object.keys(pkg.dependencies ?? {}));
 		let root = path.resolve(this.packages.prefix);
 
 		for (let dep of this.packages.externals) {
-			// nudeps never installs devDependencies, so they have nothing to propagate
-			if (!prodDeps.has(dep.installName)) {
-				continue;
-			}
-			if (!existsSync(dep.resolvedPath)) {
+			if (!this.#isProdDep(dep) || !existsSync(dep.resolvedPath)) {
 				continue;
 			}
 
 			// Only outside this package's lockfile root: a workspace sibling shares it,
 			// and npm already runs that sibling's hooks on every install.
-			if (path.relative(root, path.resolve(dep.resolvedPath)).startsWith("..")) {
+			// A relay has no config, so only a configured run edits another repo's package.json.
+			if (
+				this.config &&
+				path.relative(root, path.resolve(dep.resolvedPath)).startsWith("..")
+			) {
 				this.#ensurePropagates(dep);
 			}
 
@@ -450,7 +452,9 @@ export default class Nudeps {
 
 			let dependentsFile = path.join(dep.resolvedPath, DEPENDENTS_FILE);
 			let dependents = readJSONSync(dependentsFile, { optional: true }) ?? [];
-			let relPath = path.relative(dep.resolvedPath, ".");
+			// The dependent is the package that links dep: `lib` for its own `util`, not this package
+			let dependentPath = dep.parent?.isExternal ? dep.parent.resolvedPath : ".";
+			let relPath = path.relative(dep.resolvedPath, dependentPath);
 
 			if (!dependents.includes(relPath)) {
 				dependents.push(relPath);
@@ -460,11 +464,52 @@ export default class Nudeps {
 	}
 
 	/**
+	 * Whether a local dep is a production dependency of this package, directly or through another dep.
+	 * @param {Package} dep
+	 * @returns {boolean}
+	 */
+	#isProdDep (dep) {
+		// nudeps never installs devDependencies, so they have nothing to propagate
+		if (dep.info?.dev) {
+			return false;
+		}
+
+		// Nested under another local dep: its lockfile entry says only what it is to that dep
+		if (dep.parent?.isExternal) {
+			return this.#isProdDep(dep.parent);
+		}
+
+		return dep.installName in (this.pkg.dependencies ?? {});
+	}
+
+	/**
 	 * Give a local dependency a `dependencies` hook,
 	 * so it can report its changes without nudeps of its own.
 	 * @param {Package} dep
 	 */
 	#ensurePropagates (dep) {
+		// The nearest package rule up the chain of dependents decides,
+		// so opting out `lib` also spares its own `util`
+		let wire = this.config.wireLocalDeps;
+		for (let pkg = dep; pkg; pkg = pkg.parent) {
+			let rule = applyRules({}, this.packageRules, {
+				name: pkg.name,
+				installName: pkg.installName,
+				version: pkg.version,
+				mode: this.config.mode,
+			});
+
+			if (rule.wireLocalDeps !== undefined) {
+				wire = rule.wireLocalDeps;
+				break;
+			}
+		}
+
+		// The user adds the hook by hand
+		if (wire === false) {
+			return;
+		}
+
 		let pkgPath = path.join(dep.resolvedPath, "package.json");
 		let depPkg = readJSONSync(pkgPath, { optional: true });
 
@@ -481,17 +526,12 @@ export default class Nudeps {
 			return;
 		}
 
-		// The flag passes the consent on, so the dep wires its own local deps in turn
-		let command = "npx nudeps dependents --wireLocalDeps";
+		let command = "npx nudeps dependents";
 
 		// Another repo's package.json is edited only with consent.
-		// A relay has no config: its consent is the flag in the hook that started it.
-		if (!(this.config ?? this.options).wireLocalDeps) {
-			let fix = this.config
-				? "Set `wireLocalDeps: true` (`--wireLocalDeps` on the command line)"
-				: "Add `--wireLocalDeps` to this package's `nudeps dependents` hook";
+		if (!wire) {
 			this.warn(
-				`${dep.installName} will not propagate its changes. ${fix} to add \`${command}\` to the \`dependencies\` hook in ${pkgPath}, or add it yourself.`,
+				`${dep.installName} will not propagate its changes. Set \`wireLocalDeps: true\` in the nudeps config to add \`${command}\` to the \`dependencies\` hook in ${pkgPath}, or add it yourself.`,
 			);
 			return;
 		}

@@ -24,7 +24,7 @@ import * as hosts from "./hosts.js";
  * select which packages and/or modes the rule applies to (all present must match;
  * none = unconditional), and the remaining keys are option values to override.
  * Package-matched rules may set only package-scoped options (`dir`, `symlink`,
- * `preserveSymlinks`, `alias`, `ignore`, `imports`, `cjs`) plus `include`;
+ * `preserveSymlinks`, `alias`, `ignore`, `imports`, `cjs`, `wireLocalDeps`) plus `include`;
  * mode-only and unconditional rules may set any option except `mode`, `config`, `init` and `overrides`.
  * @typedef {object} OverrideRule
  * @property {Matcher} [name] - Package name to match.
@@ -60,9 +60,10 @@ import * as hosts from "./hosts.js";
  * @property {boolean | ((pkg: Package) => boolean)} [symlink] - Whether to symlink a package instead of copying it.
  * Defaults to symlinking only external packages (those outside the local `node_modules` tree).
  * @property {boolean} [preserveSymlinks=false] - Whether to keep symlinks inside a copied package as-is instead of resolving them to real paths.
- * @property {boolean} [wireLocalDeps=false] - Add `npx nudeps dependents --wireLocalDeps` to the `dependencies` hook
- * of every local production dependency outside this package's lockfile root, so they notify this package
- * when their dependencies change. The flag lets each of them wire its own local deps in turn.
+ * @property {boolean} [wireLocalDeps] - Consent to add `npx nudeps dependents` to the `dependencies` hook
+ * of every local production dependency outside this package's lockfile root, and of their local deps in turn,
+ * so they notify their dependents when their dependencies change. Unset warns with the fix, `false` stays silent.
+ * A package rule decides for that dep and the local deps it pulls in.
  * @property {boolean | string} [alias=true] - Unversioned symlink pointing at a package's versioned directory,
  * so assets (CSS, images) have stable URLs. `true` uses the install name; a string is a custom path relative to
  * the package's effective `dir` (and may escape it, e.g. `"../open-props"`).
@@ -190,10 +191,10 @@ export const preserveSymlinks = {
 	default: false,
 };
 
-// Off by default: it edits package.json files in other repos.
+// Unset by default: it edits package.json files in other repos, so the app opts in.
 export const wireLocalDeps = {
+	cli: false,
 	type: "boolean",
-	default: false,
 };
 
 export const alias = {

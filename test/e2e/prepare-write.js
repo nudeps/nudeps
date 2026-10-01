@@ -130,6 +130,19 @@ export default {
 					`,
 					expect: { cold: 0, next: 1 },
 				},
+				{
+					name: "Leaves the cache valid when a package's `wireLocalDeps` changes",
+					description:
+						"It decides what a run edits outside the map, not what it resolves, so toggling it in a rule must keep the cache.",
+					arg: `
+						let rule = wireLocalDeps => ({ overrides: { "lib-pw": { wireLocalDeps } } });
+						await new Nudeps(rule(true)).write();
+						let next = new Nudeps(rule(false));
+						await next.prepare();
+						console.log(JSON.stringify(next.generator.stats.cacheHits));
+					`,
+					expect: 1,
+				},
 			],
 		},
 		{
