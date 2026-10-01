@@ -115,7 +115,7 @@ export default {
 		},
 		{
 			name: "CLI coercion",
-			run: readArgs,
+			run: argv => readArgs(argv).options,
 			check: { deep: true },
 			tests: [
 				{
@@ -132,6 +132,18 @@ export default {
 					name: "an invalid value is passed through for getConfig to reject",
 					arg: ["--terse=yes"],
 					expect: { terse: "yes" },
+				},
+			],
+		},
+		{
+			name: "CLI unknown flags",
+			run: readArgs,
+			check: { deep: true },
+			tests: [
+				{
+					name: "an unknown flag is dropped and reported for the caller to log",
+					arg: ["--trese"],
+					expect: { options: {}, warnings: ["Ignoring unknown CLI flag --trese"] },
 				},
 			],
 		},

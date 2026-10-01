@@ -24,7 +24,7 @@ import * as hosts from "./hosts.js";
  * select which packages and/or modes the rule applies to (all present must match;
  * none = unconditional), and the remaining keys are option values to override.
  * Package-matched rules may set only package-scoped options (`dir`, `symlink`,
- * `preserveSymlinks`, `alias`, `ignore`, `imports`, `cjs`) plus `include`;
+ * `preserveSymlinks`, `alias`, `ignore`, `imports`, `cjs`, `wireLocalDeps`) plus `include`;
  * mode-only and unconditional rules may set any option except `mode`, `config`, `init` and `overrides`.
  * @typedef {object} OverrideRule
  * @property {Matcher} [name] - Package name to match.
@@ -48,7 +48,7 @@ import * as hosts from "./hosts.js";
  * @property {string} [host] - Deploy host adapter (a key of `hosts.js`, e.g. `"netlify"`). Auto-detected from the environment when not set.
  * @property {string} [mode] - Active mode, tested by rules with `mode` matchers. Built-in presets: `"dev"` and `"prod"`.
  * @property {string} [config="nudeps.js"] - Path of the config file to read. Ignored if the file does not exist.
- * @property {boolean} [init=false] - Start from scratch: delete the `.nudeps` cache and `dir` before generating.
+ * @property {boolean} [init=false] - Start from scratch: delete nudeps' caches and `dir` before generating.
  * @property {boolean} [prune=false] - Subset the import map to only the specifiers the entry points actually use
  * (plus `include: "force"` packages).
  * @property {boolean} [terse=false] - Lightly minify the generated import map script.
@@ -60,6 +60,10 @@ import * as hosts from "./hosts.js";
  * @property {boolean | ((pkg: Package) => boolean)} [symlink] - Whether to symlink a package instead of copying it.
  * Defaults to symlinking only external packages (those outside the local `node_modules` tree).
  * @property {boolean} [preserveSymlinks=false] - Whether to keep symlinks inside a copied package as-is instead of resolving them to real paths.
+ * @property {boolean} [wireLocalDeps] - Consent to add `npx nudeps dependents` to the `dependencies` hook
+ * of every local production dependency outside this package's lockfile root, and of their local deps in turn,
+ * so they notify their dependents when their dependencies change. Unset warns with the fix, `false` stays silent.
+ * A package rule decides for that dep and the local deps it pulls in.
  * @property {boolean | string} [alias=true] - Unversioned symlink pointing at a package's versioned directory,
  * so assets (CSS, images) have stable URLs. `true` uses the install name; a string is a custom path relative to
  * the package's effective `dir` (and may escape it, e.g. `"../open-props"`).
@@ -185,6 +189,12 @@ export const symlink = {
 export const preserveSymlinks = {
 	type: "boolean",
 	default: false,
+};
+
+// Unset by default: it edits package.json files in other repos, so the app opts in.
+export const wireLocalDeps = {
+	cli: false,
+	type: "boolean",
 };
 
 export const alias = {

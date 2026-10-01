@@ -112,6 +112,11 @@ export default {
 					throws: e => e.message.includes("not package-scoped"),
 				},
 				{
+					name: "package rule can opt a dep out of wireLocalDeps",
+					arg: [{ name: "leaflet", wireLocalDeps: false }],
+					expect: undefined,
+				},
+				{
 					name: "mode in a rule is a matcher, not a setting (package × mode is legal)",
 					arg: [{ name: "leaflet", mode: "prod", symlink: false }],
 					expect: undefined,

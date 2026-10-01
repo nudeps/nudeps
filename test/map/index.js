@@ -5,7 +5,7 @@ import Packages from "../../src/util/packages.js";
 
 const FIXTURES = join(import.meta.dirname, "fixtures");
 
-// Stands in for Nudeps: the generator only reads lock data from it, and that is what locates the
+// Stands in for Nudeps: these installs only read lock data from it, and that is what locates the
 // shim when it lives under a linked nudeps instead of the project's node_modules.
 const nudeps = {
 	packages: new Packages({
@@ -20,9 +20,9 @@ export default {
 		// stamps on the map, which htest cannot load statically (htest-dev/htest#181).
 		let { ImportMapGenerator } = await import("../../src/map.js");
 
-		// Without a Nudeps instance nothing is cacheable, so installs take the JSPM path directly
+		// Without an install cache nothing is cacheable, so installs take the JSPM path directly
 		// — the one the retry lives on.
-		let gen = new ImportMapGenerator();
+		let gen = new ImportMapGenerator({ nudeps });
 		await gen.install(name, join(FIXTURES, name));
 
 		return Object.keys(gen.getMap().imports ?? {}).sort();
@@ -103,7 +103,7 @@ export default {
 					);
 					writeFileSync(join(dir, "index.js"), `require("dual-dep");\n`);
 
-					let gen = new ImportMapGenerator();
+					let gen = new ImportMapGenerator({ nudeps });
 					await gen.install("require-repro", dir, { noRetry: true });
 
 					let { url } = [...new ImportMap(gen)].find(

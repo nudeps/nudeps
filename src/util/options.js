@@ -84,8 +84,8 @@ function levenshtein (a, b) {
 
 /**
  * Serialize a config object so that function and regex values survive as their source text.
- * Idempotent across a write/read/write cycle, so it can be used both to persist
- * `.nudeps/config.json` and to compare against it for cache invalidation.
+ * Used both to persist `.nudeps/config.json` and as the install cache's key.
+ * Idempotent across a write/read/write cycle.
  * @param {object} config
  * @returns {string}
  */

@@ -31,7 +31,10 @@ export default {
 			}
 			writeJSONSync(".nudeps/external-aliases.json", aliases);
 
-			await new Nudeps({ config: { dir: "client_modules" } }).copyPackages();
+			// No prepare(): with nothing to copy, copyPackages() only needs config.dir
+			let nudeps = new Nudeps();
+			nudeps.config = { dir: "client_modules" };
+			await nudeps.copyPackages();
 
 			return readdirSync(root, { recursive: true }).filter(
 				name => !name.startsWith(".nudeps"),

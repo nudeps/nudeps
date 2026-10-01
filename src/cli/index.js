@@ -1,20 +1,23 @@
 #!/usr/bin/env node
-import nudeps from "../index.js";
+import { Nudeps } from "../index.js";
 import install from "../install.js";
-import * as dependents from "../dependents.js";
 import readArgs from "./args.js";
 
-let args = readArgs();
+let { options, warnings } = readArgs();
+let installing = process.argv.includes("install");
+let nudeps = new Nudeps(installing ? { ...options, init: true } : options);
 
-if (process.argv.includes("install")) {
+for (let warning of warnings) {
+	nudeps.warn(warning);
+}
+
+if (installing) {
 	await install();
-	await nudeps({ ...args, init: true });
 }
-else if (process.argv.includes("dependents")) {
-	// Register first, so our own local deps can reach us in turn (#86)
-	dependents.register();
-	dependents.notify();
+
+if (process.argv.includes("dependents")) {
+	nudeps.propagate();
 }
-else {
-	await nudeps(args);
+else if (!nudeps.isDeferred()) {
+	await nudeps.write();
 }

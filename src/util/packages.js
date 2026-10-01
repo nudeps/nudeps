@@ -63,11 +63,9 @@ export default class Packages {
 	 * Walks up from `cwd` to the nearest node_modules/.package-lock.json — which in an
 	 * npm workspace lives at the monorepo root — and rebases paths to cwd accordingly.
 	 * @param {string} [cwd]
-	 * @param {object} [options]
-	 * @param {(message: string) => void} [options.warn] - Called for non-fatal lockfile issues.
 	 * @returns {Packages}
 	 */
-	static load (cwd = process.cwd(), { warn = () => {} } = {}) {
+	static load (cwd = process.cwd()) {
 		let dir = Packages.findRoot(cwd);
 
 		if (dir === null) {
@@ -86,6 +84,7 @@ export default class Packages {
 		// Pre-load child lockfiles for external (linked) deps. Nested links in
 		// child lockfiles are pushed onto the same array, so they're visited too.
 		let children = {};
+		let warnings = [];
 		let links = Object.values(raw).filter(info => info.link);
 		let seen = new Set();
 		for (let info of links) {
@@ -114,16 +113,16 @@ export default class Packages {
 				// `prefix` covers walked-up runs; the path check covers runs at the root itself.
 			}
 			else if (!existsSync(path.join(resolvedDir, "node_modules"))) {
-				warn(
-					`Warning: node_modules not found at ${info.resolved}. Run \`npm install\` there first.`,
+				warnings.push(
+					`node_modules not found at ${info.resolved}. Run \`npm install\` there first.`,
 				);
 			}
 			else {
-				warn(`Warning: No lockfile found at ${info.resolved}`);
+				warnings.push(`No lockfile found at ${info.resolved}`);
 			}
 		}
 
-		return new Packages(data, { children, prefix });
+		return new Packages(data, { children, prefix, warnings });
 	}
 
 	/**
@@ -131,9 +130,11 @@ export default class Packages {
 	 * @param {object} [options]
 	 * @param {object} [options.children] - Child lockfile data keyed by resolved path, for merging transitive deps of local deps
 	 * @param {string} [options.prefix] - cwd→lockfile-dir path (e.g. "../..") for workspaces, to rebase paths to cwd. Keys stay as-is for URL matching.
+	 * @param {string[]} [options.warnings] - Non-fatal lockfile issues for the caller to report.
 	 */
-	constructor (data, { children = {}, prefix = "" } = {}) {
+	constructor (data, { children = {}, prefix = "", warnings = [] } = {}) {
 		this.prefix = prefix;
+		this.warnings = warnings;
 		let raw = data?.packages ?? {};
 
 		// Rebase a lockfile-relative path to cwd (no prefix keeps the historical "./" form).
