@@ -47,7 +47,7 @@
 		"release-it": "latest"
 	},
 	"dependencies": {
-		"@jspm/generator": "^2.16.1",
+		"@jspm/generator": "^2.17.0",
 		"@jspm/overrides": "^1.0.0",
 		"blissful-hooks": "^0.0.2",
 		"cjs-browser-shim": "latest",
