@@ -287,9 +287,18 @@ export default class Nudeps {
 		}
 
 		// include: "force" packages install even when pruning; the rest of directDependencies only when not.
-		let toInstall = this.config.prune
-			? this.directDependencies.filter(name => this.include(name) === "force")
-			: this.directDependencies;
+		// So do the ones the root trace reaches through the shim's require(), which JSPM cannot see.
+		let toInstall = this.directDependencies;
+		if (this.config.prune) {
+			let required = generator.shimRequires;
+			toInstall = toInstall.filter(
+				name =>
+					this.include(name) === "force" ||
+					required.some(
+						specifier => specifier === name || specifier.startsWith(name + "/"),
+					),
+			);
+		}
 
 		for (const dep of toInstall) {
 			try {
@@ -649,7 +658,8 @@ export default class Nudeps {
 	 * The specifiers nudeps installs directly (beyond what the root trace pulls in): the host's
 	 * production `dependencies` plus packages rules add (`include: true` / `"force"`), minus
 	 * dropped ones (`include: false`). This is the full (non-pruned) set; `prune` is applied
-	 * by `installAll`, which installs only the `include: "force"` subset — not here.
+	 * by `installAll`, which installs only the `include: "force"` subset
+	 * plus the shim's `require()` targets — not here.
 	 * @returns {string[]}
 	 */
 	get directDependencies () {

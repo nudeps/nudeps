@@ -1,6 +1,7 @@
 /**
  * Utils for generating and manipulating import maps
  */
+import { readFileSync } from "node:fs";
 import { Generator } from "@jspm/generator";
 
 import { deepAssign, getNodeBuiltins } from "./util.js";
@@ -226,6 +227,18 @@ export class ImportMapGenerator extends Generator {
 		}
 
 		return [];
+	}
+
+	/**
+	 * Specifiers that ESM files load through `require()` from cjs-browser-shim.
+	 * JSPM traces a file as either ESM or CommonJS, so it never sees these edges (#81).
+	 * @returns {string[]}
+	 */
+	get shimRequires () {
+		return this.getEntries(e => e?.format === "esm" && e.deps?.includes("cjs-browser-shim"))
+			.map(([url]) => readFileSync(new URL(url), "utf8"))
+			.flatMap(source =>
+				Array.from(source.matchAll(/\brequire\(\s*["'`]([^"'`]+)["'`]\s*\)/g), m => m[1]));
 	}
 
 	/**
