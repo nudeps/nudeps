@@ -120,14 +120,20 @@ export default {
 		{
 			name: "Traces `require()` calls in the project's own ESM files",
 			description:
-				"JSPM parses a file as either ESM or CommonJS, so a `require()` through cjs-browser-shim is an edge it never sees, and `prune` dropped the package (#81). The shim is imported once in a helper here: the file calling `require()` never imports it itself. A stale `require()` in a comment must not fail the trace, and a dependency's own files are not scanned.",
+				"JSPM parses a file as either ESM or CommonJS, so a `require()` through cjs-browser-shim is an edge it never sees, and `prune` dropped the package (#81). The shim is imported once in a helper here: the file calling `require()` never imports it itself. A required .cjs file is traced as CommonJS, so its own requires count. Stale `require()`s in comments must not fail the trace. A dependency's files are scanned only if it depends on the shim: any other package's `require()` is a Node-only path.",
 			async run () {
 				let { ImportMapGenerator, ImportMap } = await import("../../src/map.js");
 				let dir = mkdtempSync(join(tmpdir(), "nudeps-require-esm-"));
 				let lock = { "node_modules/cjs-browser-shim": { version: "0.0.1" } };
 
 				try {
-					for (let name of ["cjs-dep", "backtick-dep", "unused-dep"]) {
+					for (let name of [
+						"cjs-dep",
+						"backtick-dep",
+						"legacy-dep",
+						"nested-dep",
+						"unused-dep",
+					]) {
 						let pkg = join(dir, "node_modules", name);
 						mkdirSync(pkg, { recursive: true });
 						writeFileSync(
@@ -137,19 +143,30 @@ export default {
 						writeFileSync(join(pkg, "index.js"), "module.exports = { ok: true };\n");
 						lock[`node_modules/${name}`] = { version: "1.0.0" };
 					}
-					// An ESM dependency's require() is not an edge: unused-dep must stay out
-					let esm = join(dir, "node_modules/esm-dep");
-					mkdirSync(esm);
+					// ESM dependencies: shim-dep depends on the shim, so its require() is an edge;
+					// esm-dep does not, so unused-dep must stay out
+					for (let [name, required] of [
+						["shim-dep", "nested-dep"],
+						["esm-dep", "unused-dep"],
+					]) {
+						let pkg = join(dir, "node_modules", name);
+						mkdirSync(pkg);
+						writeFileSync(
+							join(pkg, "package.json"),
+							JSON.stringify({ name, type: "module", main: "index.js" }),
+						);
+						writeFileSync(
+							join(pkg, "index.js"),
+							`import { require } from "cjs-browser-shim";\n` +
+								`export default require("${required}");\n`,
+						);
+						lock[`node_modules/${name}`] = { version: "1.0.0" };
+					}
+					lock["node_modules/shim-dep"].dependencies = { "cjs-browser-shim": "*" };
 					writeFileSync(
-						join(esm, "package.json"),
-						JSON.stringify({ name: "esm-dep", type: "module", main: "index.js" }),
+						join(dir, "legacy.cjs"),
+						`module.exports = require("legacy-dep");\n`,
 					);
-					writeFileSync(
-						join(esm, "index.js"),
-						`import { require } from "cjs-browser-shim";\n` +
-							`export default require("unused-dep");\n`,
-					);
-					lock["node_modules/esm-dep"] = { version: "1.0.0" };
 					writeFileSync(
 						join(dir, "package.json"),
 						JSON.stringify({
@@ -166,9 +183,11 @@ export default {
 						join(dir, "index.js"),
 						`import { require } from "./util.js";\n` +
 							`import "esm-dep";\n` +
-							`// require("removed-dep")\n` +
+							`import "shim-dep";\n` +
+							`// require("removed-dep"); require("./removed.cjs")\n` +
 							`const { ok } = require("cjs-dep");\n` +
-							"const extra = require(`backtick-dep`);\n",
+							"const extra = require(`backtick-dep`);\n" +
+							`const legacy = require("./legacy.cjs");\n`,
 					);
 
 					let packages = new Packages({ packages: lock });
@@ -184,7 +203,16 @@ export default {
 					rmSync(dir, { recursive: true, force: true });
 				}
 			},
-			expect: ["backtick-dep", "cjs-browser-shim", "cjs-dep", "esm-dep", "require-esm-repro"],
+			expect: [
+				"backtick-dep",
+				"cjs-browser-shim",
+				"cjs-dep",
+				"esm-dep",
+				"legacy-dep",
+				"nested-dep",
+				"require-esm-repro",
+				"shim-dep",
+			],
 		},
 	],
 };

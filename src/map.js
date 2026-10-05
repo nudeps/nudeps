@@ -1,7 +1,7 @@
 /**
  * Utils for generating and manipulating import maps
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { Generator } from "@jspm/generator";
 
 import { deepAssign, getNodeBuiltins } from "./util.js";
@@ -25,6 +25,19 @@ const REQUIRE_CALL = /(?<![\w$.])require\s*\(\s*(["'`])([^"'`\\$\n]+)\1\s*\)/g;
 function packageName (specifier) {
 	let depth = specifier.startsWith("@") ? 2 : 1;
 	return specifier.split("/").slice(0, depth).join("/");
+}
+
+/**
+ * @param {URL} url
+ * @returns {boolean} Whether the URL is an existing file
+ */
+function isFile (url) {
+	try {
+		return statSync(url).isFile();
+	}
+	catch {
+		return false;
+	}
 }
 
 export class ImportMapGenerator extends Generator {
@@ -108,29 +121,36 @@ export class ImportMapGenerator extends Generator {
 		// cjs-browser-shim loads CommonJS packages — is an edge it never sees, and `prune`, which
 		// keeps only what the trace reaches, dropped those packages (#81). Upstream declined to trace
 		// them (jspm/jspm#2752), so add them to the file's deps here; from then on JSPM resolves and
-		// traces them like imports. Only the project's own files are read: a dependency's
-		// `require()` would land in a scope, which the shim does not consult. Only specifiers naming
-		// an installed package are added, so a stale `require()` in a comment can't fail the trace.
+		// traces them like imports (a required .cjs file as CommonJS, its own requires included).
+		// Only code written against the shim calls its require(): the project's files, and those of
+		// packages depending on the shim. Any other package's `require()` is a Node-only path.
+		// Only specifiers that resolve — an installed package, an existing file — are added, so a
+		// stale `require()` in a comment can't fail the trace.
 		let { resolver } = tm;
 		let { _analyzeAsync } = resolver;
 
 		resolver._analyzeAsync = async (url, ...rest) => {
 			let entry = await _analyzeAsync.call(resolver, url, ...rest);
 
-			if (
-				entry?.format === "esm" &&
-				!this.#required.has(entry) &&
-				url.startsWith("file:") &&
-				!this.nudeps.packages.parse(url).pkg
-			) {
+			if (entry?.format === "esm" && !this.#required.has(entry) && url.startsWith("file:")) {
 				this.#required.add(entry);
+				let { pkg } = this.nudeps.packages.parse(url);
+				let usesShim = pkg
+					? pkg.hasDependency("cjs-browser-shim")
+					: !url.includes("/node_modules/");
+
+				if (!usesShim) {
+					return entry;
+				}
+
 				let source = readFileSync(new URL(url), "utf8");
 
 				for (let [, , specifier] of source.matchAll(REQUIRE_CALL)) {
-					if (
-						!entry.deps.includes(specifier) &&
-						this.nudeps.packages.has(packageName(specifier))
-					) {
+					let resolvable = /^\.\.?\//.test(specifier)
+						? isFile(new URL(specifier, url))
+						: this.nudeps.packages.has(packageName(specifier));
+
+					if (resolvable && !entry.deps.includes(specifier)) {
 						entry.deps.push(specifier);
 					}
 				}
