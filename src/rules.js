@@ -25,6 +25,7 @@ const PACKAGE_SCOPED = new Set([
 	"ignore",
 	"imports",
 	"cjs",
+	"wireLocalDeps",
 ]);
 
 // Options no rule may set: they decide what runs, before rules exist

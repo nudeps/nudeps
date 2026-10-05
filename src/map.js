@@ -19,17 +19,17 @@ export class ImportMapGenerator extends Generator {
 	#skipped = new Set();
 
 	/**
-	 * @param {object} [options]
+	 * @param {object} options
 	 * @param {object} [options.installCache] - Per-package output map cache (mutated on miss), or null
-	 * @param {Nudeps} [options.nudeps] - Nudeps instance for lock data access
+	 * @param {Nudeps} options.nudeps - Nudeps instance for lock data access and logging
 	 * @param {boolean} [options.silent] - Suppress user-facing log messages (for internal temp generators)
 	 */
-	constructor ({ installCache, silent, nudeps, ...generatorOptions } = {}) {
+	constructor ({ installCache, silent, nudeps, ...generatorOptions }) {
 		let commonJS = generatorOptions.commonJS ?? true;
 
 		// nudeps provides the shim, so an entry point importing it must resolve through the
 		// lockfile — a linked nudeps keeps it out of the project's node_modules (#159).
-		let shim = nudeps?.packages.get("cjs-browser-shim");
+		let shim = nudeps.packages.get("cjs-browser-shim");
 
 		super({
 			defaultProvider: "nodemodules",
@@ -47,7 +47,7 @@ export class ImportMapGenerator extends Generator {
 
 		this.commonJS = commonJS;
 		this.installCache = installCache ?? null;
-		this.nudeps = nudeps ?? null;
+		this.nudeps = nudeps;
 		this.silent = silent ?? false;
 		this.mapsToMerge = [];
 		this.staleCacheKeys = new Set(Object.keys(installCache ?? {}));
@@ -113,15 +113,15 @@ export class ImportMapGenerator extends Generator {
 	async install (alias, target, { noRetry, ...installOptions } = {}) {
 		if (target === undefined) {
 			// The lockfile knows where the dep really lives (nested deps, workspace prefix); guess otherwise.
-			let prefix = this.nudeps?.packages.prefix ?? "";
+			let prefix = this.nudeps.packages.prefix;
 			target =
-				this.nudeps?.packages.get(alias)?.path ??
+				this.nudeps.packages.get(alias)?.path ??
 				`${prefix ? prefix + "/" : "./"}node_modules/${alias}`;
 		}
 
 		// Check if this install is cacheable:
 		// must have a cache, not be the root package ("."), and not be a symlink (local dep)
-		let pkg = this.nudeps && target !== "." ? this.nudeps.packages.parse(target).pkg : null;
+		let pkg = target !== "." ? this.nudeps.packages.parse(target).pkg : null;
 		let shouldCache = this.installCache && pkg?.version && !pkg.isExternal;
 		let cacheKey = shouldCache ? this.nudeps.localDir(pkg) : null;
 
@@ -166,8 +166,8 @@ export class ImportMapGenerator extends Generator {
 			if (skipped.length && !this.silent) {
 				// A `./*` export can expose hundreds of files, so name only a few
 				let rest = skipped.splice(3);
-				console.warn(
-					`[nudeps] Skipped untraceable subpaths in ${alias}: ${skipped.join(", ")}${rest.length ? `, +${rest.length} more` : ""}.`,
+				this.nudeps.warn(
+					`Skipped untraceable subpaths in ${alias}: ${skipped.join(", ")}${rest.length ? `, +${rest.length} more` : ""}.`,
 				);
 			}
 
@@ -197,7 +197,7 @@ export class ImportMapGenerator extends Generator {
 					subpaths: false,
 					...installOptions,
 				});
-				console.warn(`[nudeps] Failed to trace subpaths for ${alias}: ${error.message}.`);
+				this.nudeps.warn(`Failed to trace subpaths for ${alias}: ${error.message}.`);
 				return ret;
 			}
 			catch (retryError) {

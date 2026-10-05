@@ -1,14 +1,23 @@
-/**
- * Main entry point
- */
-
-import { existsSync, unlinkSync, rmSync, rmdirSync, cpSync } from "node:fs";
+import { execSync } from "node:child_process";
+import {
+	existsSync,
+	unlinkSync,
+	rmSync,
+	rmdirSync,
+	cpSync,
+	mkdirSync,
+	readFileSync,
+	realpathSync,
+	renameSync,
+	writeFileSync,
+} from "node:fs";
 import * as path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 
 import Hooks from "blissful-hooks";
 
-import { readJSONSync, writeJSONSync } from "./util.js";
+import { getConfig, getModeWarning } from "./config.js";
+import { readJSONSync, writeJSONSync, createGitignoredDir, detectIndent } from "./util.js";
 import { ImportMapGenerator, ImportMap } from "./map.js";
 import { matchesGlob, ensureSymlink, relativeURL } from "./util/fs.js";
 import { stringifyConfig } from "./util/options.js";
@@ -16,16 +25,27 @@ import { applyRules, isPackageRule, includeNames } from "./rules.js";
 import { getTopLevelModules } from "./util.js";
 import Packages from "./util/packages.js";
 import * as hosts from "./hosts.js";
-import * as log from "./util/log.js";
-import * as dependents from "./dependents.js";
+import { addHook, hasHook } from "./install.js";
 
 import nudepsPkg from "../package.json" with { type: "json" };
+
+const DEPENDENTS_FILE = ".nudeps/local-dependents.json";
+
+// Commands that rewrite the lockfile after a child's hooks and then fire the root's `dependencies`
+// hook, which runs nudeps again against the new one (#171). `update`, `dedupe` and `prune` fire no hook
+// afterwards, so their too-early run is the only one there is — skipping those would strand the map.
+const REIFY_COMMANDS = ["install", "ci", "uninstall", "link"];
 
 /**
  * @import Package from "./util/package.js"
  * @import { NudepsOptions } from "./options.js"
  */
 
+/**
+ * Each instance prepares and writes once: `prepare()`, then `write()`.
+ * Calling either again returns the first call's result, even a failed one.
+ * To prepare and write again, e.g. for the next build, create a new instance.
+ */
 export default class Nudeps {
 	stats = {
 		entries: 0,
@@ -33,19 +53,81 @@ export default class Nudeps {
 		deleted: 0,
 		linked: 0,
 		aliased: 0,
-		startTime: performance.now(),
 	};
 	toCopy = {};
 	toAlias = {};
-	toDelete = null;
-	toDeleteIfEmpty = new Set();
 	#cachedExports = null;
 	#exportsData = {};
 	#exportsDirty = false;
+	#prepared;
+	#written;
 
-	constructor ({ config }) {
-		this.config = config;
-		this.oldConfig = readJSONSync(".nudeps/config.json", { optional: true });
+	/**
+	 * @param {NudepsOptions} [options] - Overrides taking precedence over the config file and mode defaults.
+	 * Resolved into `config` by `prepare()`, so members that read `config` need `prepare()` first.
+	 */
+	constructor (options = {}) {
+		this.options = options;
+	}
+
+	/**
+	 * Check whether this package resolves against a parent's lockfile that npm
+	 * has yet to write or is about to rewrite, so the run that reads it comes later.
+	 * `prepare()` and `write()` never check this: call it first to skip such a run.
+	 * Logs why a run is deferred, and warns when no later run will come (#172).
+	 * @returns {boolean}
+	 */
+	isDeferred () {
+		let root = process.env.npm_config_local_prefix;
+		// npm also runs a local dependency's hooks with its consumer as the prefix, but that package has
+		// its own, current lockfile — only one resolving against the parent's has to wait for npm.
+		if (!root || root === process.cwd() || Packages.findRoot() === process.cwd()) {
+			return false;
+		}
+
+		// npm fires `dependencies` on the root only, so without that hook nothing ever regenerates
+		// this package's map (#172).
+		let rootPkg = readJSONSync(path.join(root, "package.json"), { optional: true });
+		let delegates = "npm run dependencies --if-present --workspaces";
+
+		if (rootPkg?.workspaces && !hasHook(rootPkg, "dependencies", delegates)) {
+			this.warn(
+				`The workspace root has no \`dependencies\` hook, so its children's import maps go stale on every install. Run \`npx nudeps install\` here to add it to ${path.join(root, "package.json")}.`,
+			);
+		}
+
+		// No lockfile yet means nothing to resolve against either way — and it is the only signal
+		// left when a hook wraps nudeps in `npx`, whose own npm run replaces `npm_command`.
+		if (
+			REIFY_COMMANDS.includes(process.env.npm_command) ||
+			!existsSync(path.join(root, "node_modules", ".package-lock.json"))
+		) {
+			this.info(
+				"Skipping import map generation: npm hasn't finished updating the lockfile this package resolves against. If this is not a workspace, please run Nudeps from the package root.",
+			);
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Resolve the config, trace the dependency graph and localize the import map in memory.
+	 * Writes nothing but nudeps' own caches, so it can run long before `write()`.
+	 * @returns {Promise<void>}
+	 */
+	prepare () {
+		return (this.#prepared ??= this.#prepare());
+	}
+
+	async #prepare () {
+		let start = performance.now();
+		this.config = await getConfig(this.options);
+
+		let warning = getModeWarning(this.config.mode, this.config.overrides);
+		if (warning) {
+			this.warn(warning);
+		}
 
 		if (this.config.host) {
 			// Adapters may be factories taking the config (e.g. apache)
@@ -70,30 +152,125 @@ export default class Nudeps {
 			this.hooks.add(this.host.hooks);
 		}
 
-		let { dirs, symlinks } = config.init
-			? { dirs: [], symlinks: [] }
-			: getTopLevelModules(config.dir);
-		this.existingDirs = new Set(dirs.map(d => config.dir + "/" + d));
-		this.existingSymlinks = new Set(symlinks.map(d => config.dir + "/" + d));
-
-		// Load previously-written external aliases so they enter the deletion queue.
-		// They go in both sets because aliases are always symlinks,
-		// and existingDirs tracks all entries while existingSymlinks marks which are symlinks.
-		let savedExternal = config.init
-			? []
-			: (readJSONSync(".nudeps/external-aliases.json", { optional: true }) ?? []);
-		for (let p of savedExternal) {
-			this.existingDirs.add(p);
-			this.existingSymlinks.add(p);
-		}
-
-		this.toDelete = new Set(this.existingDirs);
-
 		if (this.config.hooks) {
 			this.hooks.add(this.config.hooks);
 		}
 
-		this.$hook("constructed");
+		createGitignoredDir(".nudeps");
+
+		// Delete only the caches. Keep the other .nudeps files:
+		// write() needs them to clean up the last run, and they list the local dependents (#164).
+		if (this.config.init) {
+			rmSync(".nudeps/cache.json", { force: true });
+			rmSync(".nudeps/exports.json", { force: true });
+		}
+
+		this.$hook("prepare-start");
+
+		for (let warning of this.packages.warnings) {
+			this.warn(warning);
+		}
+
+		await this.installAll();
+
+		// Rewrite the import map to point at local copies, which write() then materializes in config.dir
+		this.localizeMap();
+
+		this.stats.prepareTime = performance.now() - start;
+	}
+
+	/**
+	 * Materialize client-side dependencies in `config.dir`, write the import map,
+	 * and notify local dependents. Runs `prepare()` first if it hasn't run yet.
+	 * @returns {Promise<void>}
+	 */
+	write () {
+		return (this.#written ??= this.#write());
+	}
+
+	async #write () {
+		await this.prepare();
+
+		let start = performance.now();
+		let { config } = this;
+		let oldConfig = readJSONSync(".nudeps/config.json", { optional: true });
+
+		if (oldConfig && config.dir !== oldConfig.dir && existsSync(oldConfig.dir)) {
+			if (config.init) {
+				rmSync(oldConfig.dir, { recursive: true });
+			}
+			else {
+				// renameSync needs the destination's parent, and a consumer that clears
+				// its output directory before building has just deleted it (#152)
+				mkdirSync(path.dirname(config.dir), { recursive: true });
+				renameSync(oldConfig.dir, config.dir);
+			}
+		}
+
+		if (config.init) {
+			rmSync(config.dir, { recursive: true, force: true });
+		}
+
+		createGitignoredDir(config.dir);
+
+		await this.copyPackages();
+
+		if (oldConfig && oldConfig.map !== config.map && existsSync(oldConfig.map)) {
+			rmSync(oldConfig.map);
+		}
+
+		// An unchanged map needs no propagation
+		let mapContent = this.map.toJS({ module: config.module, terse: config.terse });
+		let existingMap = existsSync(config.map) ? readFileSync(config.map, "utf8") : null;
+		let mapChanged = mapContent !== existingMap;
+
+		if (mapChanged) {
+			mkdirSync(path.dirname(config.map), { recursive: true });
+			writeFileSync(config.map, mapContent);
+		}
+
+		writeFileSync(".nudeps/config.json", stringifyConfig(config) + "\n");
+
+		this.stats.writeTime = performance.now() - start;
+		this.report(mapChanged);
+
+		this.propagate(mapChanged);
+	}
+
+	/**
+	 * Log what the run changed in `config.dir` and the map, and how long it took.
+	 * @param {boolean} mapChanged
+	 */
+	report (mapChanged) {
+		let { config, stats } = this;
+		let info = [];
+		if (stats.copied + stats.deleted + stats.aliased > 0) {
+			let parts = ["copied", "deleted", "aliased"]
+				.filter(p => stats[p] > 0)
+				.map(p => `${stats[p]} ${p}`);
+
+			let msg =
+				parts.length > 2
+					? parts.slice(0, -1).join(", ") + ", and " + parts.at(-1)
+					: parts.join(" and ");
+			info.push(msg + ` in ${config.dir}.`);
+		}
+		// Leave out the time between prepare() and write().
+		// The caller spends it, e.g. on its build.
+		let time = stats.prepareTime + stats.writeTime;
+		let { cacheHits, cacheMisses } = this.generator.stats;
+		let cacheInfo = cacheHits > 0 ? `, ${cacheHits}/${cacheHits + cacheMisses} cached` : "";
+		if (mapChanged) {
+			info.push(
+				`Import map with ${stats.entries} entries generated successfully at ${config.map}. Time taken: ${+time.toFixed(2)} ms (resolve: ${+stats.resolveTime.toFixed(2)} ms${cacheInfo}).`,
+			);
+		}
+		else {
+			info.push(
+				`Import map unchanged (${stats.entries} entries). Time taken: ${+time.toFixed(2)} ms (resolve: ${+stats.resolveTime.toFixed(2)} ms${cacheInfo}).`,
+			);
+		}
+		this.info(...info);
 	}
 
 	hooks = new Hooks();
@@ -160,12 +337,23 @@ export default class Nudeps {
 		}
 	}
 
+	// The install cache's key. A cache saved under another key is not reused.
+	// Run options change how a run starts or ends, not what it resolves,
+	// so toggling one, even per package, must keep the cache.
+	get #cacheKey () {
+		let dropRunOptions = ({ init, wireLocalDeps, ...rest }) => rest;
+		let config = dropRunOptions(this.config);
+		config.overrides = config.overrides.map(dropRunOptions);
+		// Functions and regexes become source text,
+		// so editing one in the config file changes the key.
+		return stringifyConfig(config);
+	}
+
 	get installCache () {
-		// stringifyConfig keeps function/regex values as source text, so editing e.g. a
-		// symlink callback or hooks in the config file correctly busts the cache
-		let configChanged = stringifyConfig(this.oldConfig) !== stringifyConfig(this.config);
+		// Check the key saved in the cache itself, not .nudeps/config.json.
+		// A run that stops after prepare() updates the cache but not config.json.
 		let cacheData = readJSONSync(".nudeps/cache.json", { optional: true });
-		if (cacheData?.version !== nudepsPkg.version || configChanged) {
+		if (cacheData?.version !== nudepsPkg.version || cacheData.config !== this.#cacheKey) {
 			cacheData = null;
 		}
 		let value = cacheData?.packages ?? {};
@@ -203,6 +391,7 @@ export default class Nudeps {
 
 		writeJSONSync(".nudeps/cache.json", {
 			version: nudepsPkg.version,
+			config: this.#cacheKey,
 			dirNames: Array.from(this.packages, p => p.dirName),
 			packages: this.installCache,
 		});
@@ -217,20 +406,195 @@ export default class Nudeps {
 	}
 
 	/**
-	 * Register this repo as a dependent of each local production dependency, so they can propagate
-	 * their changes back to us.
+	 * Pass a change on through the local dependency graph:
+	 * register this package with its local deps, then notify its dependents.
+	 * Needs no `prepare()`, so a library with no nudeps config of its own can take part (#86).
+	 * @param {boolean} [changed=true] Whether this package's import map changed.
+	 * Ignored when passing on another package's change.
 	 */
-	registerAsDependent () {
-		dependents.register();
+	propagate (changed) {
+		// Register first, so its local deps can reach this package in turn (#86)
+		this.registerAsDependent();
+		this.notifyDependents(changed);
 	}
 
 	/**
-	 * Trigger the `dependencies` npm hook in every repo that depends on this one locally, so they
-	 * regenerate against our updated output.
-	 * @param {boolean} mapChanged Whether this run rewrote the import map.
+	 * Register each local production dependency with the package that links it:
+	 * this package, or the local dep it sits under.
+	 * A configured run also makes sure the dep can notify back.
+	 * Runs unconditionally: it records topology, not a change event.
 	 */
-	notifyDependents (mapChanged) {
-		dependents.notify(mapChanged);
+	registerAsDependent () {
+		// Nothing installed is normal, not an error: a local dep with no dependencies of its own
+		// still has to notify its dependents.
+		if (!existsSync("./package.json") || Packages.findRoot() === null) {
+			return;
+		}
+
+		let root = path.resolve(this.packages.prefix);
+
+		for (let dep of this.packages.externals) {
+			if (!this.#isProdDep(dep) || !existsSync(dep.resolvedPath)) {
+				continue;
+			}
+
+			// Only outside this package's lockfile root: a workspace sibling shares it,
+			// and npm already runs that sibling's hooks on every install.
+			// A relay has no config, so only a configured run edits another repo's package.json.
+			if (
+				this.config &&
+				path.relative(root, path.resolve(dep.resolvedPath)).startsWith("..")
+			) {
+				this.#ensurePropagates(dep);
+			}
+
+			createGitignoredDir(path.join(dep.resolvedPath, ".nudeps"));
+
+			let dependentsFile = path.join(dep.resolvedPath, DEPENDENTS_FILE);
+			let dependents = readJSONSync(dependentsFile, { optional: true }) ?? [];
+			// The dependent is the package that links dep: `lib` for its own `util`, not this package
+			let dependentPath = dep.parent?.isExternal ? dep.parent.resolvedPath : ".";
+			let relPath = path.relative(dep.resolvedPath, dependentPath);
+
+			if (!dependents.includes(relPath)) {
+				dependents.push(relPath);
+				writeJSONSync(dependentsFile, dependents);
+			}
+		}
+	}
+
+	/**
+	 * Whether a local dep is a production dependency of this package, directly or through another dep.
+	 * @param {Package} dep
+	 * @returns {boolean}
+	 */
+	#isProdDep (dep) {
+		// nudeps never installs devDependencies, so they have nothing to propagate
+		if (dep.info?.dev) {
+			return false;
+		}
+
+		// Nested under another local dep: its lockfile entry says only what it is to that dep
+		if (dep.parent?.isExternal) {
+			return this.#isProdDep(dep.parent);
+		}
+
+		return dep.installName in (this.pkg.dependencies ?? {});
+	}
+
+	/**
+	 * Give a local dependency a `dependencies` hook,
+	 * so it can report its changes without nudeps of its own.
+	 * @param {Package} dep
+	 */
+	#ensurePropagates (dep) {
+		// The nearest package rule up the chain of dependents decides,
+		// so opting out `lib` also spares its own `util`
+		let wire = this.config.wireLocalDeps;
+		for (let pkg = dep; pkg; pkg = pkg.parent) {
+			let rule = applyRules({}, this.packageRules, {
+				name: pkg.name,
+				installName: pkg.installName,
+				version: pkg.version,
+				mode: this.config.mode,
+			});
+
+			if (rule.wireLocalDeps !== undefined) {
+				wire = rule.wireLocalDeps;
+				break;
+			}
+		}
+
+		// The user adds the hook by hand
+		if (wire === false) {
+			return;
+		}
+
+		let pkgPath = path.join(dep.resolvedPath, "package.json");
+		let depPkg = readJSONSync(pkgPath, { optional: true });
+
+		if (!depPkg) {
+			this.warn(
+				`Cannot read ${pkgPath}, so ${dep.installName} will not propagate its changes.`,
+			);
+			return;
+		}
+
+		// A dep already running nudeps notifies this package anyway;
+		// a second command would notify it twice
+		if (hasHook(depPkg, "dependencies", "nudeps")) {
+			return;
+		}
+
+		let command = "npx nudeps dependents";
+
+		// Another repo's package.json is edited only with consent.
+		if (!wire) {
+			this.warn(
+				`${dep.installName} will not propagate its changes. Set \`wireLocalDeps: true\` in the nudeps config to add \`${command}\` to the \`dependencies\` hook in ${pkgPath}, or add it yourself.`,
+			);
+			return;
+		}
+
+		let hook = addHook(depPkg, "dependencies", command);
+
+		if (!hook) {
+			this.warn(
+				`No free \`dependencies\` hook in ${pkgPath}, so ${dep.installName} will not propagate its changes.`,
+			);
+			return;
+		}
+
+		// The dep's package.json belongs to its own repo, so keep its formatting (#110)
+		writeJSONSync(pkgPath, depPkg, detectIndent(pkgPath));
+		this.info(`Added \`${command}\` to the \`${hook}\` hook in ${pkgPath}.`);
+	}
+
+	/**
+	 * Trigger the `dependencies` npm hook in every package that depends on this one locally,
+	 * so they regenerate against its updated output. Entries are relative to the cwd.
+	 * @param {boolean} [changed=true] Whether this package's import map changed.
+	 * Ignored when passing on another package's change.
+	 */
+	notifyDependents (changed = true) {
+		// The cascade spans processes, so its route travels in the environment.
+		// Arriving at a package already on the route means a cycle —
+		// `a` and `b` depending on each other would notify forever.
+		// Per-route, not global, so a diamond still reaches the shared dependent down both branches.
+		let route = (process.env.NUDEPS_PROPAGATED ?? "").split(path.delimiter).filter(Boolean);
+		let self = realpathSync(".");
+
+		if (route.includes(self)) {
+			return;
+		}
+
+		// Relaying another package's change:
+		// this package's unchanged map proves nothing about theirs,
+		// so only a run started in this package may stop on it.
+		if (!changed && route.length === 0) {
+			return;
+		}
+
+		// Skipped, not removed from the file: a directory that is gone today can be back tomorrow, and
+		// forgetting it breaks propagation silently — worse than one stat per run (#163).
+		let dependents =
+			readJSONSync(DEPENDENTS_FILE, { optional: true })?.filter(existsSync) ?? [];
+		let env = { ...process.env, NUDEPS_PROPAGATED: [...route, self].join(path.delimiter) };
+
+		for (let entry of dependents) {
+			this.info(`Propagating to dependent: ${entry}`);
+
+			try {
+				execSync("npm run dependencies --if-present", {
+					cwd: entry,
+					env,
+					stdio: "inherit",
+				});
+			}
+			catch (e) {
+				this.error(`Failed to propagate to ${entry}: ${e.message}`);
+			}
+		}
 	}
 
 	get pkg () {
@@ -308,7 +672,7 @@ export default class Nudeps {
 	}
 
 	get packages () {
-		let value = Packages.load(process.cwd(), { warn: msg => this.info(msg) });
+		let value = Packages.load();
 		Object.defineProperty(this, "packages", { value, configurable: true });
 		return value;
 	}
@@ -352,20 +716,18 @@ export default class Nudeps {
 		return this.config.root ?? this.packages.prefix;
 	}
 
-	get elapsedTime () {
-		return performance.now() - this.stats.startTime;
-	}
-
+	// Tagged, so nudeps' output stays attributable among npm's own.
+	// Override these on an instance or a subclass to redirect it.
 	info (...messages) {
-		log.info(...messages);
+		console.info("[nudeps]", ...messages);
 	}
 
 	warn (...messages) {
-		log.warn(...messages);
+		console.warn("[nudeps]", ...messages);
 	}
 
 	error (...messages) {
-		log.error(...messages);
+		console.error("[nudeps]", ...messages);
 	}
 
 	/**
@@ -442,7 +804,7 @@ export default class Nudeps {
 			await expandedGen.finalize();
 		}
 		catch (e) {
-			this.info(`Warning: Could not trace exports for ${pkg.name}: ${e.message}`);
+			this.warn(`Could not trace exports for ${pkg.name}: ${e.message}`);
 			return new Set();
 		}
 
@@ -628,11 +990,37 @@ export default class Nudeps {
 				}
 			}
 		}
+
+		// Also copy aliased packages that have no map entry, e.g. CSS-only packages (#102).
+		// aliases() checks the alias option per package, so don't check the global one here.
+		for (let dep of this.directDependencies) {
+			let pkg = packages.get(dep);
+
+			if (pkg && !pkg.parent && this.aliases(pkg).length > 0) {
+				toCopy[pkg.path] ??= this.localDir(pkg);
+			}
+		}
 	}
 
 	async copyPackages () {
-		let { config, existingDirs, existingSymlinks, toCopy, toDelete, toDeleteIfEmpty, stats } =
-			this;
+		let { config, toCopy, stats } = this;
+
+		// Read now, not in prepare(): a consumer may clear its output between the two (#152)
+		let { dirs, symlinks } = getTopLevelModules(config.dir);
+		let existingDirs = new Set(dirs.map(d => config.dir + "/" + d));
+		let existingSymlinks = new Set(symlinks.map(d => config.dir + "/" + d));
+
+		// Load previously-written external aliases so they enter the deletion queue.
+		// They go in both sets because aliases are always symlinks,
+		// and existingDirs tracks all entries while existingSymlinks marks which are symlinks.
+		let savedExternal = readJSONSync(".nudeps/external-aliases.json", { optional: true }) ?? [];
+		for (let p of savedExternal) {
+			existingDirs.add(p);
+			existingSymlinks.add(p);
+		}
+
+		let toDelete = new Set(existingDirs);
+		let toDeleteIfEmpty = new Set();
 
 		// Copy (or symlink) package directories. The same package can be reached via
 		// multiple link paths (e.g. a linked dep depended on by two other linked deps),

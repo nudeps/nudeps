@@ -1,5 +1,5 @@
 /**
- * Parse CLI arguments into nudeps option overrides.
+ * Parse CLI arguments into nudeps option overrides, and warnings about unknown flags for the caller to log.
  * Reads process.argv by default; accepts a custom argv array for testing.
  * Only coerces values by declared type; validation happens in getConfig, which throws loudly.
  */
@@ -41,11 +41,12 @@ export default function readArgs (argv = process.argv.slice(2)) {
 		}
 	}
 
+	let warnings = [];
 	for (let key in args) {
 		if (!known.has(key)) {
-			console.warn(`[nudeps] Ignoring unknown CLI flag --${key}`);
+			warnings.push(`Ignoring unknown CLI flag --${key}`);
 		}
 	}
 
-	return ret;
+	return { options: ret, warnings };
 }
