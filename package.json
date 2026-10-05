@@ -39,8 +39,8 @@
 		"init-demos": "cd ../nudeps-demos/ && ./each.sh 'npm link nudeps && npx nudeps --init'"
 	},
 	"devDependencies": {
-		"htest.dev": "^0.0.27",
-		"prettier": "~3.8.3",
+		"htest.dev": "^0.1",
+		"prettier": "~3.9",
 		"prettier-plugin-brace-style": "latest",
 		"prettier-plugin-merge": "latest",
 		"prettier-plugin-space-before-function-paren": "latest",
