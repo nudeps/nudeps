@@ -5,6 +5,7 @@
 import { importCwdRelative } from "./util.js";
 import { existsSync } from "node:fs";
 import * as availableOptions from "./options.js";
+import * as hosts from "./hosts.js";
 import { checkType, suggest } from "./util/options.js";
 import {
 	builtInRules,
@@ -144,6 +145,27 @@ export async function getConfig ({ defaults = {}, ...args } = {}) {
 	}
 
 	return ret;
+}
+
+/**
+ * Get the deploy host adapter: the configured one, else the one whose `detect()` matches,
+ * else the one whose `configFiles` exist.
+ * @param {NudepsOptions} config - A resolved config
+ * @returns {object | undefined}
+ */
+export function getHost (config) {
+	if (config.host) {
+		// Adapters may be factories taking the config (e.g. apache)
+		let adapter = hosts[config.host];
+		return typeof adapter === "function" ? adapter(config) : adapter;
+	}
+
+	// A build environment beats config files, e.g. a stray vercel.json on Amplify
+	let adapters = Object.values(hosts);
+	return (
+		adapters.find(host => host.detect?.()) ??
+		adapters.find(host => host.configFiles?.some(file => existsSync(file)))
+	);
 }
 
 /**

@@ -29,6 +29,8 @@ Copies npm packages to a local output directory, generates an import map mapping
 - **`dependencies`** — fires after `npm install <pkg>` / `npm uninstall <pkg>`
 - **`prepare`** — fires on bare `npm install` (e.g., after cloning) and before `npm pack`/`npm publish`
 
+For Vercel projects, `nudeps install` also adds `"build": "nudeps"` when there is no `build` script: Vercel runs `npm install`, and so these hooks, only with a build step. It detects Vercel from `vercel.json` or `.vercel/project.json` (created by `vercel link`). Otherwise, pass `--host vercel`. Other runs never add the script: they warn and name `npx nudeps install` as the fix.
+
 If these hooks exist, nudeps runs automatically — **do not run it manually**. If they don't exist, run `npx nudeps` explicitly after dependency changes.
 
 Use `npx nudeps --init` to force a full re-initialization (clears caches and regenerates everything).
@@ -63,7 +65,7 @@ Config file uses ES module syntax: `export default { ... }`. Unknown or invalid 
 | `dir`              | `"client_modules"`  | Output directory for copied packages. Per-package overridable                                                                                                                                        |
 | `map`              | `"importmap.js"`    | Import map injection script path                                                                                                                                                                     |
 | `root`             | Workspace root      | Directory the host serves as `/`. Set it when `dir` lives inside a build output directory (e.g. an SSG's `dist/`), so hosts that need redirects write them there with correct URLs                   |
-| `host`             | Auto-detected       | Deploy host adapter: `"netlify"`, `"vercel"`, `"cloudflare"`, `"gitHubPages"`                                                                                                                        |
+| `host`             | Auto-detected       | Deploy host adapter: `"netlify"`, `"vercel"`, `"amplify"`, `"cloudflare"`, `"gitHubPages"`                                                                                                           |
 | `mode`             | —                   | Active mode, tested by rules with `mode` matchers. Built-in presets: `"dev"` (symlink) and `"prod"` (no symlink + prune + terse)                                                                     |
 | `prune`            | `false`             | Subset import map to specifiers the entry points use, plus `include: "force"` packages                                                                                                               |
 | `terse`            | `false`             | Lightly minify the map script                                                                                                                                                                        |

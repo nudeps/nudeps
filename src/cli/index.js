@@ -12,7 +12,7 @@ for (let warning of warnings) {
 }
 
 if (installing) {
-	await install();
+	await install(options);
 }
 
 if (process.argv.includes("dependents")) {
