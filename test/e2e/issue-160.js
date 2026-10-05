@@ -27,10 +27,10 @@ export default {
 			writeFileSync(join(dep, "index.js"), "export const main = 1;\n");
 			writeFileSync(join(dep, "extra.js"), "export const extra = 2;\n");
 
-			// The two ways a wildcard-exposed file fails to trace: unparseable, and parseable but
-			// importing something absent. The second only fails once its own deps are walked, so it
-			// also covers the transitive case — a skipped subpath must not resurface via a survivor.
+			// JSPM tolerates prose (BROKEN.md) and missing imports (build.js) in enumerated subpaths,
+			// but a module that fails to parse (broken.js) still aborts the install.
 			writeFileSync(join(dep, "BROKEN.md"), "# Changelog\n\nimport {\n");
+			writeFileSync(join(dep, "broken.js"), "export {\n");
 			writeFileSync(join(dep, "build.js"), `import "never-installed-package";\n`);
 
 			writeFileSync(

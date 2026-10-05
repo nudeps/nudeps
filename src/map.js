@@ -4,7 +4,7 @@
 import { Generator } from "@jspm/generator";
 
 import { deepAssign, getNodeBuiltins } from "./util.js";
-import { findOverride, stripConditions } from "./util/jspm-overrides.js";
+import { findOverride } from "./util/jspm-overrides.js";
 import nudepsPkg from "../package.json" with { type: "json" };
 
 /**
@@ -12,9 +12,6 @@ import nudepsPkg from "../package.json" with { type: "json" };
  */
 
 export class ImportMapGenerator extends Generator {
-	/** Specifier of the package being installed, whose trace failure is fatal (unlike a subpath's). */
-	#mainEntry = null;
-
 	/** Wildcard-expanded subpaths dropped from the map. */
 	#skipped = new Set();
 
@@ -38,10 +35,7 @@ export class ImportMapGenerator extends Generator {
 			flattenScopes: false,
 			combineSubpaths: false,
 			commonJS: true,
-			// Keep .d.ts files that wildcard exports expose out of the map — a browser has no
-			// use for them (jspm/jspm#2717, #122). Their trace failures are handled below.
-			ignore: specifier =>
-				getNodeBuiltins().includes(specifier) || /\.d\.[cm]?ts(\.map)?$/.test(specifier),
+			ignore: specifier => getNodeBuiltins().includes(specifier),
 			...generatorOptions,
 		});
 
@@ -57,11 +51,9 @@ export class ImportMapGenerator extends Generator {
 		// sub-generators created on cache miss still produce user-facing log messages.
 		this._options = { nudeps, ...generatorOptions };
 
-		// Patch package configs before JSPM resolves them:
-		// 1. Apply community overrides (client-side equivalent of what jspm.io CDN does server-side)
-		// 2. Strip non-runtime export conditions that shadow `default` in wildcards (#126)
+		// Apply community overrides before JSPM resolves package configs
+		// (client-side equivalent of what jspm.io CDN does server-side)
 		let pm = this.provider;
-		let { env, cjsEnv } = this.traceMap.resolver;
 		pm._getPackageConfig = pm.getPackageConfig;
 		pm.getPackageConfig = async function (pkgUrl) {
 			let pcfg = await pm._getPackageConfig(pkgUrl);
@@ -72,38 +64,26 @@ export class ImportMapGenerator extends Generator {
 				}
 			}
 
-			if (pcfg?.exports) {
-				pcfg.exports = stripConditions(pcfg.exports, [...env, ...cjsEnv]);
-			}
-
 			return pcfg;
 		};
 
 		// Wildcard expansion is speculative: `"./*": "./*"` exposes files the author never
-		// promised are modules — prose, build scripts importing devDependencies. JSPM traces
-		// each expanded subpath independently, but one throw aborts the whole install, so an
-		// unrelated README.md cost `three` its real `three/addons` export (#160).
+		// promised are modules. JSPM skips the ones it can't resolve, but a file that fails to parse
+		// as a module (e.g. an extensionless LICENSE) still aborts the whole install,
+		// costing the package its real exports (#160).
 		let tm = this.traceMap;
-		let { visit, extractMap } = tm;
+		let { visit } = tm;
 
-		tm.visit = (specifier, opts, parentUrl, seen) =>
-			// Only install()'s per-subpath calls omit `seen` — recursion and extractMap()'s
-			// re-walk pass it, and must stay strict. A subpath is a plain specifier, so visit()
-			// always resolves it asynchronously; `?.` degrades to the old abort if that changes.
-			seen !== undefined || specifier === this.#mainEntry
-				? visit.call(tm, specifier, opts, parentUrl, seen)
-				: visit.call(tm, specifier, opts, parentUrl)?.catch?.(() => {
+		tm.visit = (specifier, opts, ...rest) => {
+			let ret = visit.call(tm, specifier, opts, ...rest);
+			// Only an enumerated subpath is both top-level and of unknown importer. JSPM leaves
+			// it unpinned when its trace resolves to `undefined`.
+			return opts.unknownImporter && opts.toplevel
+				? ret?.catch(() => {
 						this.#skipped.add(specifier);
-					});
-
-		// JSPM pins a subpath once its trace resolves, so a skipped one has to be unpinned here
-		// — its trace is incomplete, and extractMap() would rethrow the error we just swallowed.
-		tm.extractMap = (pins, ...rest) =>
-			extractMap.call(
-				tm,
-				pins.filter(pin => !this.#skipped.has(pin)),
-				...rest,
-			);
+					})
+				: ret;
+		};
 	}
 
 	get provider () {
@@ -151,8 +131,7 @@ export class ImportMapGenerator extends Generator {
 		}
 
 		// Not cacheable (root package, symlink, etc.): install on this generator
-		this.#mainEntry = alias;
-		let skippedBefore = this.#skipped.size;
+		this.#skipped.clear();
 		try {
 			let ret = await super.install({
 				alias,
@@ -161,10 +140,9 @@ export class ImportMapGenerator extends Generator {
 				...installOptions,
 			});
 
-			// #skipped is cumulative (extractMap() keeps filtering earlier pins), so report the delta
-			let skipped = [...this.#skipped].slice(skippedBefore);
+			let skipped = [...this.#skipped];
 			if (skipped.length && !this.silent) {
-				// A `./*` export can expose hundreds of files, so name only a few
+				// One line per package, however many of its files fail to parse
 				let rest = skipped.splice(3);
 				this.nudeps.warn(
 					`Skipped untraceable subpaths in ${alias}: ${skipped.join(", ")}${rest.length ? `, +${rest.length} more` : ""}.`,
