@@ -1,6 +1,7 @@
 /**
  * Utils for generating and manipulating import maps
  */
+import { readFileSync } from "node:fs";
 import { Generator } from "@jspm/generator";
 
 import { deepAssign, getNodeBuiltins } from "./util.js";
@@ -11,9 +12,27 @@ import nudepsPkg from "../package.json" with { type: "json" };
  * @import Nudeps from "./nudeps.js"
  */
 
+// `require()` with a literal specifier: a string in one kind of quote, with no escape or
+// interpolation inside. Computed specifiers (`require(name)`) cannot be traced, as with import().
+// The callee is matched by name alone, which is also how JSPM reads CommonJS.
+const REQUIRE_CALL = /(?<![\w$.])require\s*\(\s*(["'`])([^"'`\\$\n]+)\1\s*\)/g;
+
+/**
+ * The package a bare specifier names, e.g. `@scope/pkg` for `@scope/pkg/sub`.
+ * @param {string} specifier
+ * @returns {string}
+ */
+function packageName (specifier) {
+	let depth = specifier.startsWith("@") ? 2 : 1;
+	return specifier.split("/").slice(0, depth).join("/");
+}
+
 export class ImportMapGenerator extends Generator {
 	/** Wildcard-expanded subpaths dropped from the map. */
 	#skipped = new Set();
+
+	/** Trace entries whose `require()` calls have been added to their deps. */
+	#required = new WeakSet();
 
 	/**
 	 * @param {object} options
@@ -83,6 +102,41 @@ export class ImportMapGenerator extends Generator {
 						this.#skipped.add(specifier);
 					})
 				: ret;
+		};
+
+		// JSPM parses a file as either ESM or CommonJS, so a `require()` in an ESM file — how
+		// cjs-browser-shim loads CommonJS packages — is an edge it never sees, and `prune`, which
+		// keeps only what the trace reaches, dropped those packages (#81). Upstream declined to trace
+		// them (jspm/jspm#2752), so add them to the file's deps here; from then on JSPM resolves and
+		// traces them like imports. Only the project's own files are read: a dependency's
+		// `require()` would land in a scope, which the shim does not consult. Only specifiers naming
+		// an installed package are added, so a stale `require()` in a comment can't fail the trace.
+		let { resolver } = tm;
+		let { _analyzeAsync } = resolver;
+
+		resolver._analyzeAsync = async (url, ...rest) => {
+			let entry = await _analyzeAsync.call(resolver, url, ...rest);
+
+			if (
+				entry?.format === "esm" &&
+				!this.#required.has(entry) &&
+				url.startsWith("file:") &&
+				!this.nudeps.packages.parse(url).pkg
+			) {
+				this.#required.add(entry);
+				let source = readFileSync(new URL(url), "utf8");
+
+				for (let [, , specifier] of source.matchAll(REQUIRE_CALL)) {
+					if (
+						!entry.deps.includes(specifier) &&
+						this.nudeps.packages.has(packageName(specifier))
+					) {
+						entry.deps.push(specifier);
+					}
+				}
+			}
+
+			return entry;
 		};
 	}
 

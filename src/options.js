@@ -49,8 +49,8 @@ import * as hosts from "./hosts.js";
  * @property {string} [mode] - Active mode, tested by rules with `mode` matchers. Built-in presets: `"dev"` and `"prod"`.
  * @property {string} [config="nudeps.js"] - Path of the config file to read. Ignored if the file does not exist.
  * @property {boolean} [init=false] - Start from scratch: delete nudeps' caches and `dir` before generating.
- * @property {boolean} [prune=false] - Subset the import map to only the specifiers the entry points actually use
- * (plus `include: "force"` packages).
+ * @property {boolean} [prune=false] - Subset the import map to only the specifiers the entry points actually use,
+ * `require()` calls with a literal specifier included (plus `include: "force"` packages).
  * @property {boolean} [terse=false] - Lightly minify the generated import map script.
  * @property {boolean} [module=false] - Whether the import map script will be loaded as `type="module"`.
  * @property {boolean} [cjs=true] - Add `cjs-browser-shim` when CommonJS packages are detected.
