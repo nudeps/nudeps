@@ -67,7 +67,7 @@ Config file uses ES module syntax: `export default { ... }`. Unknown or invalid 
 | `root`             | Workspace root      | Directory the host serves as `/`. Set it when `dir` lives inside a build output directory (e.g. an SSG's `dist/`), so hosts that need redirects write them there with correct URLs                   |
 | `host`             | Auto-detected       | Deploy host adapter: `"netlify"`, `"vercel"`, `"amplify"`, `"cloudflare"`, `"gitHubPages"`                                                                                                           |
 | `mode`             | —                   | Active mode, tested by rules with `mode` matchers. Built-in presets: `"dev"` (symlink) and `"prod"` (no symlink + prune + terse)                                                                     |
-| `prune`            | `false`             | Subset import map to specifiers the entry points use, plus `include: "force"` packages                                                                                                               |
+| `prune`            | `false`             | Subset import map to specifiers the entry points use (`require()` calls with a literal specifier included), plus `include: "force"` packages                                                         |
 | `terse`            | `false`             | Lightly minify the map script                                                                                                                                                                        |
 | `module`           | `false`             | Emit the map script for `type="module"` loading (reduces browser support)                                                                                                                            |
 | `cjs`              | `true`              | Include CJS shim for CommonJS packages. Per-package overridable                                                                                                                                      |
@@ -136,6 +136,8 @@ For CJS packages, use the shim pattern:
 import { require } from "cjs-browser-shim";
 const { createElement } = require("react");
 ```
+
+A `require()` with a literal specifier is traced like an `import`, so `prune` keeps the package. A computed one (`require(name)`) can't be, so mark that package `include: "force"`.
 
 ## Output
 
