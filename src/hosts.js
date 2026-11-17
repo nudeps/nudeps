@@ -62,11 +62,12 @@ export const amplify = {
 	redirects: true, // Only via the console or API, not a file nudeps could write
 };
 
-// same file, same syntax
 export const cloudflare = {
-	...netlify,
 	name: "Cloudflare",
-	detect: () => process.env.CLOUDFLARE_PAGES === "true",
+	detect: () => process.env.CF_PAGES === "1",
+	// Serves directory symlinks inside the output dir, so aliases need no redirects
+	symlinks: true,
+	redirects: true,
 };
 
 export const apache = ({ root, file = ".htaccess" } = {}) => ({
